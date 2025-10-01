@@ -116,7 +116,7 @@ Edge functions in this template use **Supabase Auth tokens** for security:
 2. **Create Storage Bucket:**
    - Go to your Supabase project dashboard
    - Navigate to Storage
-   - Create a new bucket (e.g., "app-storage" or as needed by your application)
+   - Create a new bucket (e.g., "org-logos" or as needed by your application)
    - Configure bucket policies as required
 
 3. **Configure Email Service (Required for OTP):**

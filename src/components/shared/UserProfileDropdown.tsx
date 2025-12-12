@@ -2,11 +2,16 @@ import {
   Check,
   Download,
   HelpCircle,
+  Layout,
+  LayoutGrid,
+  Layers,
   LogOut,
   Mail,
   Monitor,
   Moon,
   Palette,
+  PanelLeft,
+  PanelTop,
   Settings,
   Sun,
   User,
@@ -16,6 +21,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUpdateStore } from '../../modules/auto-update/stores/updateStore';
+import { useLayoutStore } from '../../stores/layoutStore';
 import { UpdateDrawer } from '../../modules/auto-update/UpdateDrawer';
 import { isElectron, processAvatarUrl } from '../../utils/asset-path';
 import { openExternalUrl } from '../../utils/external-url';
@@ -38,6 +44,7 @@ export function UserProfileDropdown() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { hasUpdate } = useUpdateStore();
+  const { layoutMode, setLayoutMode } = useLayoutStore();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUpdateDrawerOpen, setIsUpdateDrawerOpen] = useState(false);
 
@@ -171,6 +178,56 @@ export function UserProfileDropdown() {
                 <Monitor className="mr-2 h-4 w-4" />
                 <span>System</span>
                 {theme === 'system' && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          {/* Layout Submenu */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="cursor-pointer">
+              <Layout className="mr-3 h-4 w-4" />
+              <span className="ml-2">Layout</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem
+                onClick={() => setLayoutMode('sidebar')}
+                className="cursor-pointer"
+              >
+                <PanelLeft className="mr-2 h-4 w-4" />
+                <span>Sidebar</span>
+                {layoutMode === 'sidebar' && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setLayoutMode('topnav')}
+                className="cursor-pointer"
+              >
+                <PanelTop className="mr-2 h-4 w-4" />
+                <span>Top Navigation</span>
+                {layoutMode === 'topnav' && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setLayoutMode('stacked')}
+                className="cursor-pointer"
+              >
+                <Layers className="mr-2 h-4 w-4" />
+                <span>Stacked</span>
+                {layoutMode === 'stacked' && (
+                  <Check className="ml-auto h-4 w-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setLayoutMode('grid')}
+                className="cursor-pointer"
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                <span>Grid</span>
+                {layoutMode === 'grid' && (
                   <Check className="ml-auto h-4 w-4 text-primary" />
                 )}
               </DropdownMenuItem>

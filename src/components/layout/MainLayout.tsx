@@ -1,32 +1,24 @@
-import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
-import { SidebarProvider, useSidebar } from '../../contexts/SidebarContext';
+import { SidebarProvider } from '../../contexts/SidebarContext';
+import { useLayoutStore } from '../../stores/layoutStore';
+import { ModernLayout } from './ModernLayout';
+import { ClassicLayout } from './ClassicLayout';
+import { TopNavLayout } from './TopNavLayout';
+import { GridLayout } from './GridLayout';
 
 function MainLayoutContent() {
-  const { isCollapsed, isMobile } = useSidebar();
+  const { layoutMode } = useLayoutStore();
 
-  // Calculate margin based on sidebar state
-  const getMainMargin = () => {
-    if (isMobile) return 'ml-0'; // No margin on mobile
-    return isCollapsed ? 'ml-16' : 'ml-64'; // 16 for collapsed, 64 for expanded
-  };
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <Sidebar />
-
-      {/* Main content area */}
-      <main
-        className={`${getMainMargin()} pt-16 min-h-screen transition-all duration-300 ease-in-out`}
-      >
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
+  switch (layoutMode) {
+    case 'grid':
+      return <GridLayout />;
+    case 'topnav':
+      return <TopNavLayout />;
+    case 'stacked':
+      return <ClassicLayout />;
+    case 'sidebar':
+    default:
+      return <ModernLayout />;
+  }
 }
 
 export function MainLayout() {

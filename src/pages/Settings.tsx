@@ -36,6 +36,7 @@ import {
 import { LogoCropper } from '../components/shared/LogoCropper';
 import { ModernFileUpload } from '../components/shared/ModernFileUpload';
 import { OrganizationLogo } from '../components/shared/OrganizationLogo';
+import { LayoutSelector } from '../components/shared/LayoutSelector';
 import { ThemeSelector } from '../components/shared/ThemeSelector';
 import { ThemeSwitcher } from '../components/shared/ThemeSwitcher';
 import { RolesSettings } from './settings/RolesSettings';
@@ -573,6 +574,18 @@ export function Settings() {
               </CardHeader>
               <CardContent>
                 <ThemeSwitcher />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Layout Selection</CardTitle>
+                <CardDescription>
+                  Choose how the application navigation and structure appears
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LayoutSelector />
               </CardContent>
             </Card>
 

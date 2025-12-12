@@ -2,11 +2,20 @@ import { OrganizationSelector } from '../shared/OrganizationSelector';
 import { BranchSelector } from '../shared/BranchSelector';
 import { UserProfileDropdown } from '../shared/UserProfileDropdown';
 import { RestartToUpdateButton } from '../../modules/auto-update/RestartToUpdateButton';
+import { cn } from '@/lib/utils';
 
-export function Header() {
+interface HeaderProps {
+  className?: string;
+}
 
+export function Header({ className }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-50">
+    <header
+      className={cn(
+        'fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-50',
+        className
+      )}
+    >
       <div className="flex items-center justify-between h-full px-6">
         <div className="flex items-center space-x-4">
           <OrganizationSelector />

@@ -1,69 +1,24 @@
-import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Home,
-  Settings,
-  Users,
-  LogOut,
-  MapPin,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from 'lucide-react';
+import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
-import type {
-  PermissionScope,
-  PermissionAction,
-} from '@/modules/permissions/types';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
+import { navItems } from '@/config/navigation';
 
-interface NavItem {
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  devOnly?: boolean;
-  permission?: {
-    scope: PermissionScope;
-    action?: PermissionAction;
-  };
+interface SidebarProps {
+  className?: string;
+  fullHeight?: boolean;
 }
 
-const navItems: NavItem[] = [
-  {
-    to: '/dashboard',
-    icon: Home,
-    label: 'Dashboard',
-    permission: { scope: 'dashboard' },
-  },
-  {
-    to: '/branches',
-    icon: MapPin,
-    label: 'Branches',
-    permission: { scope: 'branch_management' },
-  },
-  {
-    to: '/user-management',
-    icon: Users,
-    label: 'Users',
-    permission: { scope: 'user_management' },
-  },
-  {
-    to: '/settings',
-    icon: Settings,
-    label: 'Settings',
-    permission: { scope: 'settings' },
-  },
-];
-
-export function Sidebar() {
+export function Sidebar({ className, fullHeight = false }: SidebarProps) {
   const isDev = import.meta.env.DEV;
   const { checkPermission } = useRoleCheck();
 
@@ -92,8 +47,10 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-16 bottom-0 bg-background border-r border-border z-40 transition-all duration-300 ease-in-out',
-        isCollapsed ? 'w-16' : 'w-64'
+        'fixed left-0 bg-background border-r border-border z-40 transition-all duration-300 ease-in-out',
+        fullHeight ? 'top-0 bottom-0 z-60' : 'top-16 bottom-0',
+        isCollapsed ? 'w-16' : 'w-64',
+        className
       )}
     >
       <div className="flex flex-col justify-between h-full">

@@ -49,12 +49,25 @@ export interface Organization {
   is_active: boolean;
 }
 
+export interface OrganizationRoleEntity {
+  id: string;
+  organization_id: string;
+  name: string;
+  type: 'owner' | 'admin' | 'branch_admin' | 'custom';
+  permissions: string; // JSON string of UserPermissions
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // User organization relationship interface
 export interface UserOrganization {
   id: string;
   user_id: string;
   organization_id: string;
-  role: UserRole;
+  role: UserRole; // Keeps backward compatibility for now, but should ideally derive from role_id
+  role_id?: string | null; // New field
+  role_details?: OrganizationRoleEntity; // For joined queries
   created_at: string;
   updated_at: string;
   organization?: Organization; // Optional populated organization data
@@ -62,7 +75,10 @@ export interface UserOrganization {
 
 // Organization with user role (for context)
 export interface OrganizationWithRole extends Organization {
-  user_role: UserRole;
+  user_role: UserRole; // This might be 'custom' if we update UserRole, or we map it to closest standard role
+  role_id?: string | null; // New field
+  role_name?: string; // New field for display
+  permissions?: string | null; // JSON string of UserPermissions (from user override or role)
 }
 
 // Organization creation/update types

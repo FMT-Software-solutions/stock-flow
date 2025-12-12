@@ -12,7 +12,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Lock } from 'lucide-react';
 import { UserActionsDropdown } from './UserActionsDropdown';
 import { format } from 'date-fns';
-import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { ROLE_DISPLAY_NAMES } from '@/types/organizations';
 import type { UserWithRelations, UserAction } from '@/types/user-management';
 import { getFullName } from '@/types/user-management';
@@ -24,6 +23,9 @@ interface UserTableProps {
   isLoading?: boolean;
   onUserAction?: (action: UserAction, user: UserWithRelations) => void;
   branches?: any[]; // Available branches for comparison
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canDeactivate?: boolean;
 }
 
 export function UserTable({
@@ -32,10 +34,10 @@ export function UserTable({
   isLoading,
   onUserAction,
   branches = [],
+  canEdit = false,
+  canDelete = false,
+  canDeactivate = false,
 }: UserTableProps) {
-  const { canManageUserData, canManageAllData } = useRoleCheck();
-  const isAdmin = canManageUserData();
-
   const handleAction = (action: UserAction, user: UserWithRelations) => {
     onUserAction?.(action, user);
   };
@@ -161,7 +163,9 @@ export function UserTable({
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={processAvatarUrl(user.profile.avatar)} />
+                        <AvatarImage
+                          src={processAvatarUrl(user.profile.avatar)}
+                        />
                         <AvatarFallback className="text-xs">
                           {getUserInitials(user)}
                         </AvatarFallback>
@@ -235,9 +239,10 @@ export function UserTable({
                     {userRole !== 'owner' && currentUserId !== user.id && (
                       <UserActionsDropdown
                         user={user}
-                        isAdmin={isAdmin}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canDeactivate={canDeactivate}
                         onAction={handleAction}
-                        canDelete={canManageAllData()}
                       />
                     )}
                   </TableCell>

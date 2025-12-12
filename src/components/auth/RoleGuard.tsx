@@ -1,4 +1,9 @@
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { hasPermission } from '@/modules/permissions';
+import type {
+  PermissionAction,
+  PermissionScope,
+} from '@/modules/permissions/types';
 import type { OrganizationRole } from '@/types/organizations';
 import type { ReactNode } from 'react';
 
@@ -37,6 +42,30 @@ export function useRoleCheck() {
     return roles.includes(currentOrganization.user_role);
   };
 
+  const checkPermission = (
+    scope: PermissionScope,
+    action?: PermissionAction
+  ) => {
+    if (!currentOrganization) return false;
+
+    // If no permissions string, we might be in a legacy state or error state
+    // For safety, we can fallback to role-based defaults if needed,
+    // but typically we should have permissions populated.
+    if (!currentOrganization.permissions) {
+      // Fallback: Owner always has access
+      if (currentOrganization.user_role === 'owner') return true;
+      return false;
+    }
+
+    try {
+      const permissions = JSON.parse(currentOrganization.permissions);
+      return hasPermission(permissions, scope, action);
+    } catch (e) {
+      console.error('Failed to parse permissions', e);
+      return false;
+    }
+  };
+
   const canManageAllData = () => hasRole(['owner', 'admin']);
   const canViewAllData = () =>
     hasRole(['owner', 'admin', 'branch_admin', 'write']);
@@ -52,6 +81,7 @@ export function useRoleCheck() {
 
   return {
     hasRole,
+    checkPermission,
     canManageAllData,
     canViewAllData,
     canManageBranchData,

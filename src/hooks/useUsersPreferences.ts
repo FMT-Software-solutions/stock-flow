@@ -12,7 +12,6 @@ export function useUsersPreferences() {
   const [filters, setFilters] = useState<UserFilters>({
     status: 'all',
     role: undefined,
-    branchId: undefined,
   });
 
   // Load preferences when organization changes
@@ -101,7 +100,6 @@ export function useUsersPreferences() {
     setFilters({
       status: 'all',
       role: undefined,
-      branchId: undefined,
     });
     setCurrentPage(1);
   };

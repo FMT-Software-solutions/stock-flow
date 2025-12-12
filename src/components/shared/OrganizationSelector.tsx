@@ -70,7 +70,7 @@ export function OrganizationSelector() {
                 <Building2 className="h-5 w-5 text-muted-foreground" />
               )}
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-foreground">
+                <span className="text-sm font-medium text-foreground truncate max-w-[250px">
                   {currentOrganization.name}
                 </span>
               </div>

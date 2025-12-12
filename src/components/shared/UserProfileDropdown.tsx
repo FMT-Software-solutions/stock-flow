@@ -1,7 +1,24 @@
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import {
+  Check,
+  Download,
+  HelpCircle,
+  LogOut,
+  Mail,
+  Monitor,
+  Moon,
+  Palette,
+  Settings,
+  Sun,
+  User,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUpdateStore } from '../../modules/auto-update/stores/updateStore';
+import { UpdateDrawer } from '../../modules/auto-update/UpdateDrawer';
+import { isElectron, processAvatarUrl } from '../../utils/asset-path';
+import { openExternalUrl } from '../../utils/external-url';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Button } from '../ui/button';
 import {
@@ -9,29 +26,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import {
-  LogOut,
-  User,
-  Settings,
-  Download,
-  HelpCircle,
-  Mail,
-  Palette,
-  Sun,
-  Moon,
-  Monitor,
-  Check,
-} from 'lucide-react';
 import { HelpDrawer } from './HelpDrawer';
-import { UpdateDrawer } from '../../modules/auto-update/UpdateDrawer';
-import { openExternalUrl } from '../../utils/external-url';
-import { useUpdateStore } from '../../modules/auto-update/stores/updateStore';
-import { processAvatarUrl } from '../../utils/asset-path';
 
 export function UserProfileDropdown() {
   const { user, signOut } = useAuth();
@@ -92,7 +92,10 @@ export function UserProfileDropdown() {
             className="relative h-10 w-10 rounded-full p-0 hover:bg-accent"
           >
             <Avatar className="h-10 w-10">
-              <AvatarImage src={processAvatarUrl(profile.avatar)} alt={displayName} />
+              <AvatarImage
+                src={processAvatarUrl(profile.avatar)}
+                alt={displayName}
+              />
               <AvatarFallback className="bg-primary/10 text-primary font-medium">
                 {fallbackText}
               </AvatarFallback>
@@ -104,7 +107,10 @@ export function UserProfileDropdown() {
           <div className="p-4 bg-muted/30">
             <div className="flex items-center space-x-3">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={processAvatarUrl(profile.avatar)} alt={displayName} />
+                <AvatarImage
+                  src={processAvatarUrl(profile.avatar)}
+                  alt={displayName}
+                />
                 <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">
                   {fallbackText}
                 </AvatarFallback>
@@ -171,7 +177,6 @@ export function UserProfileDropdown() {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
-          {/* Settings */}
           <DropdownMenuItem
             onClick={handleSettingsClick}
             className="cursor-pointer"
@@ -180,17 +185,18 @@ export function UserProfileDropdown() {
             <span>Settings</span>
           </DropdownMenuItem>
 
-          {/* Check for Updates */}
-          <DropdownMenuItem
-            onClick={handleCheckForUpdates}
-            className="cursor-pointer"
-          >
-            <Download className="mr-3 h-4 w-4" />
-            <span>Check for Updates</span>
-            {hasUpdate && (
-              <div className="ml-auto h-2 w-2 rounded-full bg-green-500" />
-            )}
-          </DropdownMenuItem>
+          {isElectron() && (
+            <DropdownMenuItem
+              onClick={handleCheckForUpdates}
+              className="cursor-pointer"
+            >
+              <Download className="mr-3 h-4 w-4" />
+              <span>Check for Updates</span>
+              {hasUpdate && (
+                <div className="ml-auto h-2 w-2 rounded-full bg-green-500" />
+              )}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 
@@ -227,12 +233,14 @@ export function UserProfileDropdown() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <UpdateDrawer
-        isOpen={isUpdateDrawerOpen}
-        onOpenChange={setIsUpdateDrawerOpen}
-      >
-        {null}
-      </UpdateDrawer>
+      {isElectron() && (
+        <UpdateDrawer
+          isOpen={isUpdateDrawerOpen}
+          onOpenChange={setIsUpdateDrawerOpen}
+        >
+          {null}
+        </UpdateDrawer>
+      )}
     </div>
   );
 }

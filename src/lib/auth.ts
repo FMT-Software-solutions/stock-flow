@@ -1,7 +1,7 @@
 // Authentication and authorization utilities
 
 // User roles within organizations
-export type UserRole = 'owner' | 'admin' | 'branch_admin' | 'write' | 'read';
+export type UserRole = 'owner' | 'admin' | 'branch_admin' | 'write' | 'read' | 'custom';
 
 // Role hierarchy for permission checking
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
@@ -10,6 +10,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   branch_admin: 3,
   write: 2,
   read: 1,
+  custom: 0, // Custom roles don't fit into hierarchy, they rely on permissions
 };
 
 // Helper function to check if user has permission
@@ -27,6 +28,7 @@ export const USER_ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
   branch_admin: 'Branch Administrator',
   write: 'Editor',
   read: 'Viewer',
+  custom: 'Custom Role',
 };
 
 // Role descriptions
@@ -36,4 +38,5 @@ export const USER_ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   branch_admin: 'Manage users and settings within assigned branches',
   write: 'Create and edit content',
   read: 'View-only access',
+  custom: 'Custom defined access',
 };

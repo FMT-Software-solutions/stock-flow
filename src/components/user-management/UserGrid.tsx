@@ -1,4 +1,3 @@
-import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -17,6 +16,9 @@ interface UserGridProps {
   isLoading?: boolean;
   onUserAction?: (action: UserAction, user: UserWithRelations) => void;
   branches?: any[]; // Available branches for comparison
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canDeactivate?: boolean;
 }
 
 export function UserGrid({
@@ -25,10 +27,10 @@ export function UserGrid({
   isLoading,
   onUserAction,
   branches = [],
+  canEdit = false,
+  canDelete = false,
+  canDeactivate = false,
 }: UserGridProps) {
-  const { canManageUserData, canManageAllData } = useRoleCheck();
-  const isAdmin = canManageUserData();
-
   const handleAction = (action: UserAction, user: UserWithRelations) => {
     onUserAction?.(action, user);
   };
@@ -121,7 +123,9 @@ export function UserGrid({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={processAvatarUrl(user.profile.avatar)} />
+                      <AvatarImage
+                        src={processAvatarUrl(user.profile.avatar)}
+                      />
                       <AvatarFallback className="text-sm">
                         {getUserInitials(user)}
                       </AvatarFallback>
@@ -132,7 +136,7 @@ export function UserGrid({
                           {fullName}
                         </h3>
                         {isInactive && (
-                          <Lock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                          <Lock className="h-3 w-3 text-gray-400 shrink-0" />
                         )}
                       </div>
                       <Badge
@@ -148,16 +152,17 @@ export function UserGrid({
                   {currentUserId !== user.id && (
                     <UserActionsDropdown
                       user={user}
-                      isAdmin={isAdmin}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      canDeactivate={canDeactivate}
                       onAction={handleAction}
-                      canDelete={canManageAllData()}
                     />
                   )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <Mail className="h-4 w-4 flex-shrink-0" />
+                  <Mail className="h-4 w-4 shrink-0" />
                   <span className="truncate">{user.profile.email}</span>
                 </div>
 
@@ -165,7 +170,7 @@ export function UserGrid({
                   ? userBranches.length > 0
                   : userBranches) && (
                   <div className="flex items-start space-x-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                     <div className="min-w-0">
                       {userBranches === 'All Branches' ? (
                         <span>All Branches</span>

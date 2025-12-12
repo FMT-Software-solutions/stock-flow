@@ -18,7 +18,9 @@ interface CreateUserData {
   firstName: string;
   lastName: string;
   role: string;
+  roleId?: string;
   branchIds?: string[];
+  permissions?: string; // Stringified JSON
 }
 
 interface UpdateUserData {
@@ -27,9 +29,101 @@ interface UpdateUserData {
     firstName?: string;
     lastName?: string;
     role?: string;
+    roleId?: string;
     branchId?: string;
     branchIds?: string[];
+    permissions?: string; // Stringified JSON
   };
+}
+
+export function useUser(userId: string | undefined) {
+  const { currentOrganization } = useOrganization();
+  
+  return useQuery({
+    queryKey: userId ? userKeys.user(userId) : [],
+    queryFn: async (): Promise<UserWithRelations> => {
+      if (!userId || !currentOrganization) throw new Error('Invalid user or organization');
+
+      const { data, error } = await supabase
+        .from('user_organizations')
+        .select(`
+          id,
+          user_id,
+          role,
+          role_id,
+          organization_role:organization_roles(
+            id,
+            name,
+            type,
+            permissions
+          ),
+          is_active,
+          permissions,
+          organization_id,
+          created_at,
+          updated_at,
+          profiles!user_organizations_user_id_fkey1(
+            id,
+            email,
+            first_name,
+            last_name,
+            avatar,
+            phone,
+            gender,
+            date_of_birth,
+            created_at,
+            updated_at
+          ),
+          auth_users!user_organizations_user_id_fkey2(
+            id,
+            is_first_login,
+            last_login,
+            password_updated,
+            otp_requests_count,
+            last_otp_request
+          )
+        `)
+        .eq('organization_id', currentOrganization.id)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error('User not found');
+
+      // Fetch branches for this user
+      const { data: branchesData } = await supabase
+        .from('user_branches')
+        .select(`
+          id,
+          user_id,
+          branch_id,
+          organization_id,
+          created_at,
+          updated_at,
+          branches (
+            id,
+            name,
+            location,
+            is_active
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('organization_id', currentOrganization.id);
+
+      const userBranches = branchesData?.map(ub => ({
+        ...ub,
+        branch: ub.branches
+      })) || [];
+
+      return {
+        ...data.auth_users,
+        profile: data.profiles,
+        user_organizations: [data],
+        user_branches: userBranches
+      } as unknown as UserWithRelations;
+    },
+    enabled: !!userId && !!currentOrganization?.id,
+  });
 }
 
 export function useUserQueries() {
@@ -54,7 +148,15 @@ export function useUserQueries() {
           id,
           user_id,
           role,
+          role_id,
+          organization_role:organization_roles(
+            id,
+            name,
+            type,
+            permissions
+          ),
           is_active,
+          permissions,
           organization_id,
           created_at,
           updated_at,
@@ -146,6 +248,7 @@ export function useUserQueries() {
             organization_id: userOrg.organization_id,
             role: userOrg.role,
             is_active: userOrg.is_active,
+            permissions: userOrg.permissions,
             created_at: userOrg.created_at,
             updated_at: userOrg.updated_at,
             organization: {
@@ -214,7 +317,9 @@ export function useUserQueries() {
             firstName: userData.firstName,
             lastName: userData.lastName,
             role: userData.role,
+            roleId: userData.roleId,
             branchIds: userData.branchIds,
+            permissions: userData.permissions,
             organizationId: currentOrganization.id,
           }),
         }
@@ -262,18 +367,27 @@ export function useUserQueries() {
         updates.push(Promise.resolve(profileUpdate));
       }
 
-      // 2. Update role if changed
-      if (userData.role) {
-        const roleUpdate = supabase
+      // 2. Update role or permissions if changed
+      if (userData.role || userData.permissions !== undefined) {
+        const updatePayload: any = {
+          updated_at: new Date().toISOString(),
+        };
+
+        if (userData.role) {
+          updatePayload.role = userData.role;
+        }
+
+        if (userData.permissions !== undefined) {
+          updatePayload.permissions = userData.permissions;
+        }
+
+        const userOrgUpdate = supabase
           .from('user_organizations')
-          .update({
-            role: userData.role,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq('user_id', authUserId)
           .eq('organization_id', currentOrganization.id);
         
-        updates.push(Promise.resolve(roleUpdate));
+        updates.push(Promise.resolve(userOrgUpdate));
       }
 
       // 3. Update branch assignments if changed
@@ -340,8 +454,9 @@ export function useUserQueries() {
 
       return { success: true };
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: userKeys.organizationUsers(currentOrganization?.id || '') });
+      queryClient.invalidateQueries({ queryKey: userKeys.user(variables.authUserId) });
       queryClient.invalidateQueries({ queryKey: ['activity-logs'] });
       // Toast notification handled in component
     },

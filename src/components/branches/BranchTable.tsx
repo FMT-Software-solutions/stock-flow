@@ -25,20 +25,24 @@ import {
 import { BranchForm } from '@/components/forms/BranchForm';
 import { Edit, Lock } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useBranchContext } from '@/contexts/BranchContext';
 import type { Branch } from '@/types';
 
 interface BranchTableProps {
   branches: Branch[];
   isLoading?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export function BranchTable({ branches, isLoading }: BranchTableProps) {
-  const { canManageAllData } = useRoleCheck();
+export function BranchTable({
+  branches,
+  isLoading,
+  canEdit = false,
+}: BranchTableProps) {
+  const { isOwner, userBranches } = useBranchContext();
   const [selectedBranch, setSelectedBranch] = useState<Branch | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const isAdmin = canManageAllData();
 
   const handleSuccess = () => {
     setIsDialogOpen(false);
@@ -110,7 +114,10 @@ export function BranchTable({ branches, isLoading }: BranchTableProps) {
             </TableHeader>
             <TableBody>
               {branches.map((branch) => {
-                const canEdit = isAdmin || branch.is_active;
+                const isAssigned = userBranches.some(
+                  (ub) => ub.id === branch.id
+                );
+                const userCanEdit = canEdit && (isOwner || isAssigned);
                 const isInactive = !branch.is_active;
 
                 return (
@@ -154,7 +161,7 @@ export function BranchTable({ branches, isLoading }: BranchTableProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {canEdit ? (
+                      {userCanEdit ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -177,7 +184,7 @@ export function BranchTable({ branches, isLoading }: BranchTableProps) {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              Only owners and admins can edit inactive branches
+                              You do not have permission to edit this branch
                             </p>
                           </TooltipContent>
                         </Tooltip>

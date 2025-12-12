@@ -15,6 +15,7 @@ import MultipleSelector, { type Option } from '@/components/ui/multiselect';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { UserRole } from '@/lib/auth';
 import type { UserWithRelations } from '@/types/user-management';
+import { useRoles } from '@/hooks/useRoleQueries';
 
 interface Branch {
   id: string;
@@ -27,6 +28,8 @@ interface UserFormData {
   firstName: string;
   lastName: string;
   role: UserRole;
+  roleId?: string;
+  permissions?: string;
   selectedBranchIds: string[];
   assignAllBranches?: boolean;
 }
@@ -48,12 +51,15 @@ export function UserForm({
   branches,
   isLoading = false,
 }: UserFormProps) {
-  const { canManageAllData, canManageUserData, isOwner } = useRoleCheck();
+  const { canManageAllData, canManageUserData, isOwner: isCurrentUserOwner } = useRoleCheck();
+  const { roles } = useRoles();
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
     firstName: '',
     lastName: '',
     role: 'read',
+    roleId: '',
+    permissions: '',
     selectedBranchIds: [],
     assignAllBranches: false,
   });
@@ -65,13 +71,18 @@ export function UserForm({
       const hasAllBranches = activeBranchIds.length > 0 && 
         activeBranchIds.every(id => userBranchIds.includes(id));
       
-      const userRole = user.user_organizations?.[0]?.role || 'read';
+      const userOrg = user.user_organizations?.[0];
+      const userRole = userOrg?.role || 'read';
+      const userRoleId = userOrg?.role_id;
+      const userPermissions = userOrg?.permissions;
       
       setFormData({
         email: user.profile.email || '',
         firstName: user.profile.first_name || '',
         lastName: user.profile.last_name || '',
         role: userRole,
+        roleId: userRoleId,
+        permissions: userPermissions || undefined,
         selectedBranchIds: userBranchIds.filter((id): id is string => id !== null),
         assignAllBranches: hasAllBranches,
       });
@@ -81,34 +92,36 @@ export function UserForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate that branches are selected for write, read, and branch_admin users
+    // Validate that branches are selected for all roles except owner
     if (
-      ['write', 'read', 'branch_admin'].includes(formData.role) &&
+      ['write', 'read', 'branch_admin', 'admin'].includes(formData.role) &&
       formData.selectedBranchIds.length === 0 &&
       !formData.assignAllBranches
     ) {
       return; // Form validation should handle this
     }
 
-    // Admin users don't need branch validation as they get all branches automatically
-
     onSubmit(formData);
   };
 
-  const handleRoleChange = (role: UserRole) => {
+  const handleRoleChange = (roleId: string) => {
+    const selectedRole = roles?.find(r => r.id === roleId);
+    if (!selectedRole) return;
+
     setFormData((prev) => ({
       ...prev,
-      role,
-      // Clear branches for admin roles (they get all branches automatically)
-      // Keep existing branches for other roles
-      assignAllBranches: role === 'admin' ? false : prev.assignAllBranches,
-      selectedBranchIds: role === 'admin' ? [] : prev.selectedBranchIds,
+      role: selectedRole.type as UserRole,
+      roleId: selectedRole.id,
+      permissions: selectedRole.permissions,
+      // Default to assignAllBranches=true for admin/owner for convenience
+      assignAllBranches: (selectedRole.type === 'admin' || selectedRole.type === 'owner') ? true : (['branch_admin', 'write', 'read'].includes(selectedRole.type as UserRole) ? prev.assignAllBranches : false),
+      selectedBranchIds: (selectedRole.type === 'admin' || selectedRole.type === 'owner') ? [] : prev.selectedBranchIds,
     }));
   };
 
-  const requiresBranch = ['write', 'read', 'branch_admin'].includes(formData.role) && !formData.assignAllBranches;
+  const requiresBranch = ['write', 'read', 'branch_admin', 'admin'].includes(formData.role) && !formData.assignAllBranches;
   
-  const canBeAssignedAllBranches = ['branch_admin', 'write', 'read'].includes(formData.role);
+  const canBeAssignedAllBranches = ['branch_admin', 'write', 'read', 'admin'].includes(formData.role);
   
   const handleAssignAllBranchesChange = (checked: boolean) => {
     const activeBranchIds = branches.filter(b => b.is_active).map(b => b.id);
@@ -168,32 +181,26 @@ export function UserForm({
 
       <div className='space-y-1'>
         <Label htmlFor="role">Role</Label>
-        <Select key={`role-${formData.role}-${mode}`} value={formData.role} onValueChange={handleRoleChange}>
+        <Select key={`role-${formData.roleId}-${mode}`} value={formData.roleId} onValueChange={handleRoleChange}>
           <SelectTrigger className='w-[250px]'>
-            <SelectValue />
+            <SelectValue placeholder="Select Role" />
           </SelectTrigger>
           <SelectContent>
-            {canManageAllData() && (
-              <>
-                {isOwner() && <SelectItem value="admin">Admin</SelectItem>}
-                <SelectItem value="branch_admin">Branch Admin</SelectItem>
-                <SelectItem value="write">Write</SelectItem>
-                <SelectItem value="read">Read</SelectItem>
-              </>
-            )}
-            {!canManageAllData() && canManageUserData() && (
-              <>
-                {/* Branch admins can only assign write and read roles to others */}
-                <SelectItem value="write">Editor</SelectItem>
-                <SelectItem value="read">Viewer</SelectItem>
-              </>
-            )}
-            {/* Fallback: Show current user's role if it's not in the available options */}
-            {mode === 'edit' && user && !canManageAllData() && !canManageUserData() && (
-              <SelectItem value={formData.role} disabled>
-                {formData.role.charAt(0).toUpperCase() + formData.role.slice(1).replace('_', ' ')}
+            {roles?.filter(role => {
+               // Owners see all roles
+               if (isCurrentUserOwner()) return true;
+               // Admins see all except owner
+               if (role.type === 'owner') return false;
+               // Branch admins see write/read only
+               if (!canManageAllData() && canManageUserData()) {
+                 return ['write', 'read'].includes(role.type);
+               }
+               return true;
+            }).map((role) => (
+              <SelectItem key={role.id} value={role.id}>
+                {role.name}
               </SelectItem>
-            )}
+            ))}
           </SelectContent>
         </Select>
       </div>

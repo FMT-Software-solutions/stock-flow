@@ -12,6 +12,7 @@ import { UserPagination } from '@/components/user-management/UserPagination';
 import { UserTable } from '@/components/user-management/UserTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useBranchContext } from '@/contexts/BranchContext';
 import { useUserBranches } from '@/hooks/useBranchQueries';
 import { useUserActions } from '@/hooks/useUserActions';
 import { useUserQueries } from '@/hooks/useUserQueries';
@@ -25,12 +26,27 @@ import {
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { buildUserPermissions } from '@/modules/permissions/utils';
+import type { UserRole } from '@/lib/auth';
 import { useDebounceValue } from '@/hooks/useDebounce';
 
 export default function UserManagement() {
-  const { canManageUserData, isBranchAdmin, canManageAllData } = useRoleCheck();
+  const { checkPermission, isBranchAdmin, isOwner, isAdmin } = useRoleCheck();
   const { currentOrganization } = useOrganization();
+  const { selectedBranchIds } = useBranchContext();
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Permission checks
+  const canView = checkPermission('user_management', 'view'); // Or just 'user_management' scope check implied by view
+  const canCreate = checkPermission('user_management', 'create');
+  const canEdit = checkPermission('user_management', 'edit');
+  const canDelete = checkPermission('user_management', 'delete');
+  const canDeactivate = checkPermission(
+    'user_management',
+    'activate_deactivate'
+  );
 
   // State for dialogs and forms
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -78,28 +94,28 @@ export default function UserManagement() {
 
   // Get user's assigned branch IDs for branch admin restrictions
   const userAssignedBranchIds = useMemo(() => {
-    if (!isBranchAdmin() || !userBranches) return [];
+    if ((!isBranchAdmin() && !isAdmin()) || !userBranches) return [];
     return userBranches.map((ub) => ub.branch_id).filter(Boolean) as string[];
-  }, [userBranches, isBranchAdmin]);
+  }, [userBranches, isBranchAdmin, isAdmin]);
 
   // Filter branches based on user role - branch admins only see their assigned branches
   const availableBranches = useMemo(() => {
     if (!branches) return [];
-    if (canManageAllData()) return branches; // Owners and admins see all branches
-    if (isBranchAdmin()) {
-      // Branch admins only see their assigned branches
+    if (isOwner()) return branches; // Owners see all branches
+    if (isBranchAdmin() || isAdmin()) {
+      // Branch admins and Admins only see their assigned branches
       return branches.filter((branch) =>
         userAssignedBranchIds.includes(branch.id)
       );
     }
     return branches; // Other roles see all branches
-  }, [branches, canManageAllData, isBranchAdmin, userAssignedBranchIds]);
+  }, [branches, isOwner, isBranchAdmin, isAdmin, userAssignedBranchIds]);
 
   // Check if branch admin can perform action on user
   const canPerformUserAction = (user: any) => {
-    if (canManageAllData()) return true; // Owners and admins can act on all users
-    if (isBranchAdmin() && userAssignedBranchIds.length > 0) {
-      // Branch admins can only act on users from their assigned branches
+    if (isOwner()) return true; // Owners can act on all users
+    if ((isBranchAdmin() || isAdmin()) && userAssignedBranchIds.length > 0) {
+      // Branch admins and Admins can only act on users from their assigned branches
       const userBranches = user.user_branches || [];
       return userBranches.some(
         (ub: any) =>
@@ -119,8 +135,9 @@ export default function UserManagement() {
 
     switch (action) {
       case 'edit':
-        setEditingUser(user);
-        setIsEditDialogOpen(true);
+        // setEditingUser(user);
+        // setIsEditDialogOpen(true);
+        navigate(`/users/${user.id}`);
         break;
       case 'deactivate':
         // Show confirmation dialog for deactivation
@@ -163,10 +180,10 @@ export default function UserManagement() {
   };
 
   const handleCreateUser = (userData: any) => {
-    // For branch admins, restrict branch assignments to only their assigned branches
+    // For non-owners, restrict branch assignments to only their assigned branches
     let allowedBranchIds = userData.selectedBranchIds || [];
-    if (isBranchAdmin() && userAssignedBranchIds.length > 0) {
-      // Filter selected branches to only include those the branch admin is assigned to
+    if (!isOwner() && userAssignedBranchIds.length > 0) {
+      // Filter selected branches to only include those the user is assigned to
       allowedBranchIds = allowedBranchIds.filter((branchId: string) =>
         userAssignedBranchIds.includes(branchId)
       );
@@ -177,13 +194,21 @@ export default function UserManagement() {
       ...userData,
       // Handle branch assignments based on role and form data
       branchIds: userData.assignAllBranches
-        ? isBranchAdmin()
+        ? !isOwner()
           ? userAssignedBranchIds
-          : availableBranches?.filter((b: any) => b.is_active).map((b: any) => b.id) || []
+          : availableBranches
+              ?.filter((b: any) => b.is_active)
+              .map((b: any) => b.id) || []
         : allowedBranchIds || (userData.branchId ? [userData.branchId] : []),
       // Remove the form-specific fields
       assignAllBranches: undefined,
       selectedBranchIds: undefined,
+      // Pass roleId if available
+      roleId: userData.roleId,
+      // Use provided permissions (from role selection) or build defaults
+      permissions:
+        userData.permissions ||
+        JSON.stringify(buildUserPermissions(userData.role as UserRole)),
     };
 
     createUser.mutate(transformedData, {
@@ -241,11 +266,7 @@ export default function UserManagement() {
   };
 
   // Use custom hook for filtering, sorting, and pagination
-  const {
-    paginatedUsers,
-    totalUsers,
-    totalPages,
-  } = useUserFiltering({
+  const { paginatedUsers, totalUsers, totalPages } = useUserFiltering({
     users,
     searchTerm: debouncedSearchTerm,
     filters,
@@ -255,12 +276,13 @@ export default function UserManagement() {
     pageSize,
     isBranchAdmin,
     userAssignedBranchIds,
+    selectedBranchIds,
   });
 
   // Event handlers
 
   // Access control check
-  if (!canManageUserData()) {
+  if (!canView) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -283,13 +305,15 @@ export default function UserManagement() {
             Manage users and their permissions
           </p>
         </div>
-        <UserAddDialog
-          isOpen={isCreateDialogOpen}
-          onOpenChange={setIsCreateDialogOpen}
-          onSubmit={handleCreateUser}
-          branches={availableBranches || []}
-          isLoading={createUser.isPending}
-        />
+        {canCreate && (
+          <UserAddDialog
+            isOpen={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+            onSubmit={handleCreateUser}
+            branches={availableBranches || []}
+            isLoading={createUser.isPending}
+          />
+        )}
       </div>
 
       {/* Search and Display Controls */}
@@ -315,7 +339,6 @@ export default function UserManagement() {
           filters={filters}
           sortBy={sortBy}
           sortOrder={sortOrder}
-          branches={availableBranches || []}
           onFiltersChange={updateFilters}
           onSortChange={(newSortBy, newSortOrder) => {
             setSortBy(newSortBy);
@@ -326,8 +349,8 @@ export default function UserManagement() {
       </div>
 
       {/* User Display - Hide when status filter is 'inactive' */}
-      {filters.status !== 'inactive' && (
-        isLoading ? (
+      {filters.status !== 'inactive' &&
+        (isLoading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
             <p className="mt-2 text-muted-foreground">Loading users...</p>
@@ -340,6 +363,9 @@ export default function UserManagement() {
                 currentUserId={user?.id}
                 onUserAction={handleUserActionLocal}
                 branches={branches || []}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                canDeactivate={canDeactivate}
               />
             ) : (
               <UserGrid
@@ -347,6 +373,9 @@ export default function UserManagement() {
                 currentUserId={user?.id}
                 onUserAction={handleUserActionLocal}
                 branches={branches || []}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                canDeactivate={canDeactivate}
               />
             )}
 
@@ -360,12 +389,11 @@ export default function UserManagement() {
               onPageSizeChange={setPageSize}
             />
           </>
-        )
-      )}
+        ))}
 
       {/* Inactive Users Section - Show based on status filter */}
       {(filters.status === 'all' || filters.status === 'inactive') && (
-        <InactiveUsersSection 
+        <InactiveUsersSection
           filters={filters}
           searchTerm={debouncedSearchTerm}
           isDefaultOpen={filters.status === 'inactive'}

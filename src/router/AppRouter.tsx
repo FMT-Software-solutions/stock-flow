@@ -4,6 +4,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { MainLayout } from '../components/layout/MainLayout';
 import { AuthProvider } from '../contexts/AuthContext';
 import { OrganizationProvider } from '../contexts/OrganizationContext';
+import { BranchProvider } from '../contexts/BranchContext';
 import { PaletteProvider } from '../contexts/PaletteContext';
 
 // Auth pages
@@ -19,8 +20,10 @@ import { Branches } from '../pages/Branches';
 import { Dashboard } from '../pages/Dashboard';
 import { Profile } from '../pages/Profile';
 import { Settings } from '../pages/Settings';
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { OrganizationSelectionProtectedRoute } from '@/components/auth/OrganizationSelectionProtectedRoute';
 import UserManagement from '@/pages/UserManagement';
+import UserDetails from '@/pages/UserDetails';
 
 function AppRoutes() {
   return (
@@ -77,10 +80,39 @@ function AppRoutes() {
         <Route path="dashboard" element={<Dashboard />} />
 
         {/* Main application routes */}
-        <Route path="branches" element={<Branches />} />
+        <Route
+          path="branches"
+          element={
+            <PermissionGuard scope="branch_management">
+              <Branches />
+            </PermissionGuard>
+          }
+        />
         <Route path="profile" element={<Profile />} />
-        <Route path="user-management" element={<UserManagement />} />
-        <Route path="settings" element={<Settings />} />
+        <Route
+          path="user-management"
+          element={
+            <PermissionGuard scope="user_management">
+              <UserManagement />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="users/:userId"
+          element={
+            <PermissionGuard scope="user_management">
+              <UserDetails />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <PermissionGuard scope="settings">
+              <Settings />
+            </PermissionGuard>
+          }
+        />
       </Route>
 
       {/* Catch-all route - redirect to dashboard if authenticated, login if not */}
@@ -94,9 +126,11 @@ export function AppRouter() {
     <HashRouter>
       <AuthProvider>
         <OrganizationProvider>
-          <PaletteProvider>
-            <AppRoutes />
-          </PaletteProvider>
+          <BranchProvider>
+            <PaletteProvider>
+              <AppRoutes />
+            </PaletteProvider>
+          </BranchProvider>
         </OrganizationProvider>
       </AuthProvider>
     </HashRouter>

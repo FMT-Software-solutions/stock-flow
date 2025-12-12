@@ -32,6 +32,14 @@ export function useUserOrganizations(userId: string | undefined) {
         .select(`
           id,
           role,
+          permissions,
+          role_id,
+          organization_role:organization_roles(
+            id,
+            name,
+            type,
+            permissions
+          ),
           created_at,
           updated_at,
           organization:organizations!inner(
@@ -57,10 +65,54 @@ export function useUserOrganizations(userId: string | undefined) {
       if (error) throw error;
 
       const organizations: OrganizationWithRole[] = data
-        ?.map(item => ({
-          ...(item.organization as any),
-          user_role: item.role as OrganizationRole,
-        })) || [];
+        ?.map(item => {
+          // Determine effective permissions:
+          // 1. If organization_role exists, use its permissions
+          // 2. Fallback to direct permissions column
+          // 3. Fallback to role defaults (handled in types or wherever used)
+          
+          const orgRole = Array.isArray(item.organization_role) 
+            ? item.organization_role[0] 
+            : item.organization_role;
+
+          let effectivePermissions = item.permissions;
+          if (orgRole?.permissions) {
+            // Merge logic:
+            // 1. Parse role permissions (Base)
+            // 2. Parse user permissions (Override)
+            // 3. For each scope, use Role's enabled state
+            // 4. For each scope, use User's actions if defined, else Role's actions
+            
+            try {
+              const rolePerms = JSON.parse(orgRole.permissions);
+              const userPerms = item.permissions ? JSON.parse(item.permissions) : {};
+              const mergedPerms: any = {};
+
+              Object.keys(rolePerms).forEach(scope => {
+                const roleScope = rolePerms[scope];
+                const userScope = userPerms[scope];
+
+                mergedPerms[scope] = {
+                  enabled: roleScope.enabled, // Page access locked to Role
+                  actions: userScope?.actions ?? roleScope.actions // Actions fallback to Role if not defined by User
+                };
+              });
+              
+              effectivePermissions = JSON.stringify(mergedPerms);
+            } catch (e) {
+              console.error('Error merging permissions', e);
+              effectivePermissions = orgRole.permissions;
+            }
+          }
+
+          return {
+            ...(item.organization as any),
+            user_role: (orgRole?.type || item.role) as OrganizationRole, // Use role type (owner/custom/etc) or legacy role
+            role_id: item.role_id,
+            role_name: orgRole?.name,
+            permissions: effectivePermissions,
+          };
+        }) || [];
 
       return organizations;
     },

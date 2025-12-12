@@ -37,6 +37,8 @@ import { toast } from 'sonner';
 import type { UserRole } from '@/lib/auth';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 
+import { useBranchContext } from '@/contexts/BranchContext';
+
 interface InactiveUser {
   id: string;
   user_id: string;
@@ -76,6 +78,7 @@ export default function InactiveUsersSection({
 }: InactiveUsersSectionProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
+  const { selectedBranchIds } = useBranchContext();
 
   const { isBranchAdmin, canViewAllData } = useRoleCheck();
 
@@ -135,19 +138,26 @@ export default function InactiveUsersSection({
       });
     }
 
+    // Global Branch Selection Filter
+    if (selectedBranchIds.length > 0) {
+      filteredData = filteredData.filter((user) => {
+        const userRole = user.role;
+        // Owners are always visible regardless of branch selection
+        if (userRole !== 'owner') {
+          const userBranches = user.user_branches || [];
+          // If user has branches, at least one must be in the selected branches
+          const hasOverlap = userBranches.some((ub: any) =>
+            selectedBranchIds.includes(ub.branch_id)
+          );
+          if (!hasOverlap) return false;
+        }
+        return true;
+      });
+    }
+
     // Apply role filter
     if (filters.role) {
       filteredData = filteredData.filter((user) => user.role === filters.role);
-    }
-
-    // Apply branch filter
-    if (filters.branchId && filters.branchId !== 'all') {
-      filteredData = filteredData.filter((user) => {
-        const userBranches = user.user_branches || [];
-        return userBranches.some(
-          (ub: any) => ub.branch_id === filters.branchId
-        );
-      });
     }
 
     return filteredData as InactiveUser[];
@@ -157,6 +167,7 @@ export default function InactiveUsersSection({
     userAssignedBranchIds,
     searchTerm,
     filters,
+    selectedBranchIds,
   ]);
 
   // Use reactivate user mutation from useUserQueries with custom success/error handling

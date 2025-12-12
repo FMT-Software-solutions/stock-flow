@@ -8,21 +8,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X, SortAsc, SortDesc } from 'lucide-react';
-import type { UserFilters, UserSortField, SortOrder } from '@/types/user-management';
+import type {
+  UserFilters,
+  UserSortField,
+  SortOrder,
+} from '@/types/user-management';
 import { USER_SORT_OPTIONS } from '@/types/user-management';
 import type { UserRole } from '@/lib/auth';
-
-interface Branch {
-  id: string;
-  name: string;
-  is_active: boolean;
-}
 
 interface UserFiltersControlsProps {
   filters: UserFilters;
   sortBy: UserSortField;
   sortOrder: SortOrder;
-  branches: Branch[];
   onFiltersChange: (filters: Partial<UserFilters>) => void;
   onSortChange: (sortBy: UserSortField, sortOrder: SortOrder) => void;
   onResetFilters: () => void;
@@ -45,31 +42,28 @@ export function UserFiltersControls({
   filters,
   sortBy,
   sortOrder,
-  branches,
   onFiltersChange,
   onSortChange,
   onResetFilters,
 }: UserFiltersControlsProps) {
-  const hasActiveFilters = 
-    filters.status !== 'all' || 
-    filters.role !== undefined || 
-    filters.branchId !== undefined;
+  const hasActiveFilters =
+    filters.status !== 'all' || filters.role !== undefined;
 
   const handleSortToggle = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     onSortChange(sortBy, newOrder);
   };
 
-  const activeBranches = branches.filter(branch => branch.is_active);
-
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Status Filter */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Status:</span>
+        <span className="text-sm font-medium text-muted-foreground">
+          Status:
+        </span>
         <Select
           value={filters.status}
-          onValueChange={(value) => 
+          onValueChange={(value) =>
             onFiltersChange({ status: value as 'all' | 'active' | 'inactive' })
           }
         >
@@ -91,8 +85,10 @@ export function UserFiltersControls({
         <span className="text-sm font-medium text-muted-foreground">Role:</span>
         <Select
           value={filters.role || 'all'}
-          onValueChange={(value) => 
-            onFiltersChange({ role: value === 'all' ? undefined : value as UserRole })
+          onValueChange={(value) =>
+            onFiltersChange({
+              role: value === 'all' ? undefined : (value as UserRole),
+            })
           }
         >
           <SelectTrigger className="w-36">
@@ -109,37 +105,16 @@ export function UserFiltersControls({
         </Select>
       </div>
 
-      {/* Branch Filter */}
-      {activeBranches.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Branch:</span>
-          <Select
-            value={filters.branchId || 'all'}
-            onValueChange={(value) => 
-              onFiltersChange({ branchId: value === 'all' ? undefined : value })
-            }
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Branches</SelectItem>
-              {activeBranches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       {/* Sort Controls */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Sort by:</span>
+        <span className="text-sm font-medium text-muted-foreground">
+          Sort by:
+        </span>
         <Select
           value={sortBy}
-          onValueChange={(value) => onSortChange(value as UserSortField, sortOrder)}
+          onValueChange={(value) =>
+            onSortChange(value as UserSortField, sortOrder)
+          }
         >
           <SelectTrigger className="w-36">
             <SelectValue />
@@ -184,17 +159,13 @@ export function UserFiltersControls({
         <div className="flex items-center gap-1 ml-2">
           {filters.status !== 'all' && (
             <Badge variant="secondary" className="text-xs">
-              Status: {STATUS_OPTIONS.find(s => s.value === filters.status)?.label}
+              Status:{' '}
+              {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
             </Badge>
           )}
           {filters.role && (
             <Badge variant="secondary" className="text-xs">
-              Role: {ROLE_OPTIONS.find(r => r.value === filters.role)?.label}
-            </Badge>
-          )}
-          {filters.branchId && (
-            <Badge variant="secondary" className="text-xs">
-              Branch: {activeBranches.find(b => b.id === filters.branchId)?.name}
+              Role: {ROLE_OPTIONS.find((r) => r.value === filters.role)?.label}
             </Badge>
           )}
         </div>

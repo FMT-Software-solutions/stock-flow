@@ -20,19 +20,33 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Branch } from '@/types';
 import { useBranchesPreferences } from '@/hooks/useBranchesPreferences';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function Branches() {
+  const { checkPermission } = useRoleCheck();
+  const canView = checkPermission('branch_management', 'view');
+  const canCreate = checkPermission('branch_management', 'create');
+  const canEdit = checkPermission('branch_management', 'edit');
+  const canDelete = checkPermission('branch_management', 'delete');
+
   const { currentOrganization } = useOrganization();
   const { data: branches = [], isLoading } = useBranches(
     currentOrganization?.id
   );
+  const { selectedBranchIds } = useBranchContext();
   const [selectedBranch, setSelectedBranch] = useState<Branch | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<
     'all' | 'active' | 'inactive'
   >('all');
-  const { displayMode, setDisplayMode, pageSize, setPageSize } = useBranchesPreferences();
+  const {
+    displayMode,
+    setDisplayMode,
+    pageSize,
+    setPageSize,
+  } = useBranchesPreferences();
   const [currentPage, setCurrentPage] = useState(1);
 
   const handleSuccess = () => {
@@ -74,7 +88,14 @@ export function Branches() {
       paginatedBranches: paginated,
       totalPages,
     };
-  }, [branches, search, statusFilter, currentPage, pageSize]);
+  }, [
+    branches,
+    search,
+    statusFilter,
+    currentPage,
+    pageSize,
+    selectedBranchIds,
+  ]);
 
   // Reset to first page when filters change
   const handleSearchChange = (value: string) => {
@@ -100,6 +121,19 @@ export function Branches() {
         ) : (
           <BranchTable branches={[]} isLoading={true} />
         )}
+      </div>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-muted-foreground">
+            You don't have permission to access branch management.
+          </p>
+        </div>
       </div>
     );
   }
@@ -141,36 +175,51 @@ export function Branches() {
               displayMode={displayMode}
               onDisplayModeChange={setDisplayMode}
             />
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleCreate}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedBranch ? 'Edit Branch' : 'Create New Branch'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedBranch
-                      ? 'Update the branch information below.'
-                      : 'Fill in the details to create a new branch.'}
-                  </DialogDescription>
-                </DialogHeader>
-                <BranchForm branch={selectedBranch} onSuccess={handleSuccess} />
-              </DialogContent>
-            </Dialog>
+            {canCreate && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={handleCreate}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {selectedBranch ? 'Edit Branch' : 'Create New Branch'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {selectedBranch
+                        ? 'Update the branch information below.'
+                        : 'Fill in the details to create a new branch.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <BranchForm
+                    branch={selectedBranch}
+                    onSuccess={handleSuccess}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
       </div>
 
       <div className="space-y-6">
         {displayMode === 'grid' ? (
-          <BranchGrid branches={paginatedBranches} isLoading={isLoading} />
+          <BranchGrid
+            branches={paginatedBranches}
+            isLoading={isLoading}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
         ) : (
-          <BranchTable branches={paginatedBranches} isLoading={isLoading} />
+          <BranchTable
+            branches={paginatedBranches}
+            isLoading={isLoading}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
         )}
 
         {filteredBranches.length > 0 && (

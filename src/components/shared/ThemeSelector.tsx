@@ -1,3 +1,14 @@
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useDebounce } from '@/hooks/useDebounce';
+import { hexToOklch, oklchToHex } from '@/lib/utils';
+import { useTheme } from 'next-themes';
+import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { usePalette } from '../../contexts/PaletteContext';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import {
   Select,
   SelectContent,
@@ -5,16 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Label } from '../ui/label';
-import { usePalette } from '../../contexts/PaletteContext';
-import { useTheme } from 'next-themes';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { Input } from '../ui/input';
-import { oklchToHex, hexToOklch } from '@/lib/utils';
-import { Button } from '../ui/button';
-import { useDebounce } from '@/hooks/useDebounce';
 
 export function ThemeSelector() {
   const { resolvedTheme } = useTheme();
@@ -26,15 +27,30 @@ export function ThemeSelector() {
     updateThemeColor,
     resetToOrganizationTheme,
   } = usePalette();
-  const { updateOrganization, selectedOrgId, currentOrganization } = useOrganization();
+  const {
+    updateOrganization,
+    selectedOrgId,
+    currentOrganization,
+  } = useOrganization();
+  const { checkPermission } = useRoleCheck();
   const [isSavingTheme, setIsSavingTheme] = useState(false);
   const [themeError, setThemeError] = useState<string | null>(null);
+
+  const canManageAppearance = checkPermission(
+    'settings',
+    'manage_org_appearance_prefs'
+  );
 
   const handleThemeSelect = async (themeKey: string) => {
     applySelectedTheme(themeKey);
   };
 
   const saveSelectedTheme = async () => {
+    if (!canManageAppearance) {
+      toast.error('You do not have permission to save organization themes');
+      return;
+    }
+
     setIsSavingTheme(true);
     setThemeError(null);
 
@@ -308,8 +324,9 @@ export function ThemeSelector() {
         </div>
         <div className="flex justify-between items-center">
           {/* Reset button - show when theme is custom or different from org theme */}
-          {(selectedThemeKey === 'custom' || 
-            (currentOrganization?.brand_colors && selectedThemeKey !== currentOrganization.brand_colors.id)) && (
+          {(selectedThemeKey === 'custom' ||
+            (currentOrganization?.brand_colors &&
+              selectedThemeKey !== currentOrganization.brand_colors.id)) && (
             <Button
               variant="outline"
               onClick={resetToOrganizationTheme}
@@ -319,13 +336,17 @@ export function ThemeSelector() {
             </Button>
           )}
           <div className="flex-1" />
-          <Button
-            onClick={saveSelectedTheme}
-            disabled={isSavingTheme}
-            className="mt-4"
-          >
-            {isSavingTheme ? 'Saving...' : 'Save Theme'}
-          </Button>
+          {canManageAppearance ? (
+            <Button
+              onClick={saveSelectedTheme}
+              disabled={isSavingTheme}
+              className="mt-4"
+            >
+              {isSavingTheme ? 'Saving...' : 'Save Theme'}
+            </Button>
+          ) : (
+            <div className="mt-4 text-sm text-muted-foreground italic"></div>
+          )}
         </div>
         {themeError && (
           <p className="text-sm text-destructive mt-2">{themeError}</p>

@@ -7,7 +7,6 @@ interface UseUserFilteringProps {
   filters: {
     status?: 'all' | 'active' | 'inactive';
     role?: string;
-    branchId?: string;
   };
   sortBy: string;
   sortOrder: 'asc' | 'desc';
@@ -15,6 +14,7 @@ interface UseUserFilteringProps {
   pageSize: number;
   isBranchAdmin: () => boolean;
   userAssignedBranchIds: string[];
+  selectedBranchIds?: string[];
 }
 
 interface UseUserFilteringReturn {
@@ -37,12 +37,27 @@ export function useUserFiltering({
   pageSize,
   isBranchAdmin,
   userAssignedBranchIds,
+  selectedBranchIds = [],
 }: UseUserFilteringProps): UseUserFilteringReturn {
   // Filter and search users
   const filteredUsers = useMemo(() => {
     if (!users) return [];
 
     return users.filter((user: any) => {
+      // Global Branch Selection Filter
+      if (selectedBranchIds.length > 0) {
+        const userRole = user.user_organizations?.[0]?.role;
+        // Owners are always visible regardless of branch selection
+        if (userRole !== 'owner') {
+          const userBranches = user.user_branches || [];
+          // If user has branches, at least one must be in the selected branches
+          const hasOverlap = userBranches.some((ub: any) => 
+            selectedBranchIds.includes(ub.branch_id)
+          );
+          if (!hasOverlap) return false;
+        }
+      }
+
       // Branch admin restriction: only show users from assigned branches
       if (isBranchAdmin() && userAssignedBranchIds.length > 0) {
         const userBranches = user.user_branches || [];
@@ -77,18 +92,9 @@ export function useUserFiltering({
         if (userRole !== filters.role) return false;
       }
 
-      // Branch filter
-      if (filters.branchId) {
-        const userBranches = user.user_branches || [];
-        const hasBranch = userBranches.some(
-          (ub: any) => ub.branch_id === filters.branchId
-        );
-        if (!hasBranch) return false;
-      }
-
       return true;
     });
-  }, [users, searchTerm, filters, isBranchAdmin, userAssignedBranchIds]);
+  }, [users, searchTerm, filters, isBranchAdmin, userAssignedBranchIds, selectedBranchIds]);
 
   // Sort users
   const sortedUsers = useMemo(() => {

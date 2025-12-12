@@ -18,20 +18,24 @@ import {
 import { BranchForm } from '@/components/forms/BranchForm';
 import { MapPin, Calendar, Edit, Lock } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useBranchContext } from '@/contexts/BranchContext';
 import type { Branch } from '@/types';
 
 interface BranchGridProps {
   branches: Branch[];
   isLoading?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export function BranchGrid({ branches, isLoading }: BranchGridProps) {
-  const { canManageAllData } = useRoleCheck();
+export function BranchGrid({
+  branches,
+  isLoading,
+  canEdit = false,
+}: BranchGridProps) {
+  const { isOwner, userBranches } = useBranchContext();
   const [selectedBranch, setSelectedBranch] = useState<Branch | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const isAdmin = canManageAllData();
 
   const handleSuccess = () => {
     setIsDialogOpen(false);
@@ -47,10 +51,7 @@ export function BranchGrid({ branches, isLoading }: BranchGridProps) {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-48 bg-gray-100 animate-pulse rounded-lg"
-          />
+          <div key={i} className="h-48 bg-gray-100 animate-pulse rounded-lg" />
         ))}
       </div>
     );
@@ -61,7 +62,8 @@ export function BranchGrid({ branches, isLoading }: BranchGridProps) {
       <TooltipProvider>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {branches.map((branch) => {
-            const canEdit = isAdmin || branch.is_active;
+            const isAssigned = userBranches.some((ub) => ub.id === branch.id);
+            const userCanEdit = canEdit && (isOwner || isAssigned);
             const isInactive = !branch.is_active;
 
             return (
@@ -92,7 +94,7 @@ export function BranchGrid({ branches, isLoading }: BranchGridProps) {
                       >
                         {branch.is_active ? 'Active' : 'Inactive'}
                       </Badge>
-                      {canEdit ? (
+                      {userCanEdit ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -115,7 +117,7 @@ export function BranchGrid({ branches, isLoading }: BranchGridProps) {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              Only owners and admins can edit inactive branches
+                              You do not have permission to edit this branch
                             </p>
                           </TooltipContent>
                         </Tooltip>

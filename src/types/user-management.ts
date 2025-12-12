@@ -41,7 +41,15 @@ export interface UserWithRelations extends AuthUserWithProfile {
     id: string;
     organization_id: string;
     role: OrganizationRole;
+    role_id?: string;
+    organization_role?: {
+      id: string;
+      name: string;
+      type: OrganizationRole;
+      permissions: string;
+    };
     is_active: boolean;
+    permissions?: string | null; // Stored as stringified JSON
     created_at: string;
     updated_at: string;
     organization: {
@@ -150,7 +158,6 @@ export type UserDisplayMode = 'table' | 'grid';
 export interface UserFilters {
   status: 'all' | 'active' | 'inactive';
   role?: OrganizationRole;
-  branchId?: string;
 }
 
 // Pagination and sorting

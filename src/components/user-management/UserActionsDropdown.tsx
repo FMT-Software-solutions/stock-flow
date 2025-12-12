@@ -16,18 +16,22 @@ import type { UserWithRelations, UserAction } from '@/types/user-management';
 
 interface UserActionsDropdownProps {
   user: UserWithRelations;
-  isAdmin: boolean;
+  canEdit: boolean;
   canDelete: boolean;
+  canDeactivate: boolean;
   onAction: (action: UserAction, user: UserWithRelations) => void;
 }
 
 export function UserActionsDropdown({
   user,
-  isAdmin,
+  canEdit,
   canDelete,
+  canDeactivate,
   onAction,
 }: UserActionsDropdownProps) {
-  if (!isAdmin) {
+  const hasAnyAction = canEdit || canDelete || canDeactivate;
+
+  if (!hasAnyAction) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -35,13 +39,13 @@ export function UserActionsDropdown({
             variant="ghost"
             size="sm"
             disabled
-            className="h-8 w-8 p-0 cursor-not-allowed"
+            className="h-8 w-8 p-0 cursor-not-allowed opacity-50"
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Only owners and admins can manage users</p>
+          <p>Read-only view</p>
         </TooltipContent>
       </Tooltip>
     );
@@ -55,16 +59,14 @@ export function UserActionsDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onAction('edit', user)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit User
-        </DropdownMenuItem>
-        {/* <DropdownMenuItem onClick={() => onAction('regenerate-password', user)}>
-          <Key className="mr-2 h-4 w-4" />
-          Regenerate Password
-        </DropdownMenuItem> */}
+        {canEdit && (
+          <DropdownMenuItem onClick={() => onAction('edit', user)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit User
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
-        {user.is_active ? (
+        {canDeactivate && user.is_active && (
           <DropdownMenuItem
             onClick={() => onAction('deactivate', user)}
             className="text-orange-600"
@@ -72,26 +74,24 @@ export function UserActionsDropdown({
             <UserX className="mr-2 h-4 w-4" />
             Deactivate
           </DropdownMenuItem>
-        ) : (
+        )}
+        {canDeactivate && !user.is_active && (
           <DropdownMenuItem
             onClick={() => onAction('reactivate', user)}
             className="text-green-600"
           >
             <UserCheck className="mr-2 h-4 w-4" />
-            Reactivate
+            Activate
           </DropdownMenuItem>
         )}
         {canDelete && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onAction('delete', user)}
-              className="text-red-600"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem
+            onClick={() => onAction('delete', user)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -38,12 +38,30 @@ import { ModernFileUpload } from '../components/shared/ModernFileUpload';
 import { OrganizationLogo } from '../components/shared/OrganizationLogo';
 import { ThemeSelector } from '../components/shared/ThemeSelector';
 import { ThemeSwitcher } from '../components/shared/ThemeSwitcher';
+import { RolesSettings } from './settings/RolesSettings';
 import { UpdateSettings } from '../modules/auto-update/UpdateSettings';
 import type { UpdateOrganizationData } from '../types/organizations';
 import { toast } from 'sonner';
+import { isElectron } from '../utils/asset-path';
+import { useRoleCheck } from '../components/auth/RoleGuard';
+import { Shield } from 'lucide-react';
 
 export function Settings() {
   const { currentOrganization, updateOrganization } = useOrganization();
+  const { checkPermission, isOwner } = useRoleCheck();
+
+  const canManageOrgDetails = checkPermission('settings', 'manage_org_details');
+  const canViewAppearance = checkPermission(
+    'settings',
+    'view_org_appearance_prefs'
+  );
+  const canManageNotifications = checkPermission(
+    'settings',
+    'manage_notifications'
+  );
+
+  // Only owners can manage roles and permissions configuration
+  const canManageRoles = isOwner();
 
   const [orgData, setOrgData] = useState({
     name: '',
@@ -282,6 +300,24 @@ export function Settings() {
       setIsUploadingLogo(false);
     }
   };
+
+  const visibleTabsCount = [
+    canManageOrgDetails,
+    canViewAppearance,
+    canManageRoles,
+    canManageNotifications,
+    isElectron(),
+  ].filter(Boolean).length;
+
+  const gridColsClass =
+    {
+      1: 'grid-cols-1',
+      2: 'grid-cols-2',
+      3: 'grid-cols-3',
+      4: 'grid-cols-4',
+      5: 'grid-cols-5',
+    }[visibleTabsCount] || 'grid-cols-4';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -293,348 +329,409 @@ export function Settings() {
         </div>
       </div>
 
-      <Tabs defaultValue="organization" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger
-            value="organization"
-            className="flex items-center space-x-2"
-          >
-            <Building2 className="h-4 w-4" />
-            <span>Organization Details</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="appearance"
-            className="flex items-center space-x-2"
-          >
-            <Palette className="h-4 w-4" />
-            <span>Appearance</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="notifications"
-            className="flex items-center space-x-2"
-          >
-            <Bell className="h-4 w-4" />
-            <span>Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger value="updates" className="flex items-center space-x-2">
-            <Download className="h-4 w-4" />
-            <span>Updates</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="organization" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Details</CardTitle>
-              <CardDescription>
-                Basic information about your organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Organization Name</Label>
-                  <Input
-                    id="name"
-                    value={orgData.name}
-                    onChange={(e) =>
-                      setOrgData((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    placeholder="Enter organization name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={orgData.email}
-                    onChange={(e) =>
-                      setOrgData((prev) => ({ ...prev, email: e.target.value }))
-                    }
-                    placeholder="Enter organization email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={orgData.phone}
-                    onChange={(e) =>
-                      setOrgData((prev) => ({ ...prev, phone: e.target.value }))
-                    }
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select
-                    value={orgData.currency}
-                    onValueChange={(value) =>
-                      setOrgData((prev) => ({ ...prev, currency: value }))
-                    }
-                  >
-                    <SelectTrigger className="min-w-[200px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GHS">GHS</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={orgData.address}
-                  onChange={(e) =>
-                    setOrgData((prev) => ({ ...prev, address: e.target.value }))
-                  }
-                  placeholder="Enter organization address"
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Logo Cropper Dialog */}
-          <LogoCropper
-            isOpen={isCropperOpen}
-            onClose={handleCropperClose}
-            onCropComplete={handleCropComplete}
-            imageFile={selectedImageFile}
-            isUploading={isUploadingLogo}
-          />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Logo</CardTitle>
-              <CardDescription>
-                Upload and configure your organization's logo
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-start space-x-6">
-                <div className="flex flex-col items-center space-y-4">
-                  <OrganizationLogo
-                    src={currentOrganization?.logo}
-                    fallback={<Building2 />}
-                    size="xl"
-                    orientation="square"
-                    backgroundSize="contain"
-                    className="border-2 border-dashed border-border"
-                  />
-                </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <ModernFileUpload
-                      onFileSelect={handleLogoFileSelect}
-                      accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
-                      disabled={isUploadingLogo}
-                      maxSize={2}
-                      className="mt-2 max-w-[300px]"
-                      variant="compact"
-                    >
-                      {isUploadingLogo && (
-                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
-                          <div className="text-sm text-primary font-medium">
-                            Uploading logo...
-                          </div>
-                        </div>
-                      )}
-                    </ModernFileUpload>
-
-                    {logoError && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md mt-2">
-                        {logoError}
-                      </div>
-                    )}
-                  </div>
-                  {currentOrganization?.logo && (
-                    <Button
-                      variant="outline"
-                      onClick={handleRemoveLogo}
-                      disabled={isUploadingLogo}
-                      className="flex items-center space-x-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span>Remove Logo</span>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSaveOrganizationDetails}
-              disabled={isSavingOrgData}
+      <Tabs
+        defaultValue={
+          canManageOrgDetails
+            ? 'organization'
+            : canViewAppearance
+            ? 'appearance'
+            : canManageNotifications
+            ? 'notifications'
+            : 'organization'
+        }
+        className="space-y-6"
+      >
+        <TabsList className={`grid w-full ${gridColsClass}`}>
+          {canManageOrgDetails && (
+            <TabsTrigger
+              value="organization"
               className="flex items-center space-x-2"
             >
-              <Save className="h-4 w-4" />
-              <span>{isSavingOrgData ? 'Saving...' : 'Save Changes'}</span>
-            </Button>
-          </div>
-        </TabsContent>
+              <Building2 className="h-4 w-4" />
+              <span>Organization Details</span>
+            </TabsTrigger>
+          )}
+          {canViewAppearance && (
+            <TabsTrigger
+              value="appearance"
+              className="flex items-center space-x-2"
+            >
+              <Palette className="h-4 w-4" />
+              <span>Appearance</span>
+            </TabsTrigger>
+          )}
 
-        <TabsContent value="appearance" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Theme Settings</CardTitle>
-              <CardDescription>
-                Switch between light and dark modes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ThemeSwitcher />
-            </CardContent>
-          </Card>
+          {canManageRoles && (
+            <TabsTrigger value="roles" className="flex items-center space-x-2">
+              <Shield className="h-4 w-4" />
+              <span>Roles & Permissions</span>
+            </TabsTrigger>
+          )}
+          {canManageNotifications && (
+            <TabsTrigger
+              value="notifications"
+              className="flex items-center space-x-2"
+            >
+              <Bell className="h-4 w-4" />
+              <span>Notifications</span>
+            </TabsTrigger>
+          )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Theme Selection</CardTitle>
-              <CardDescription>
-                Choose from predefined themes, custom themes, or create custom
-                colors
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <ThemeSelector />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          {isElectron() && (
+            <TabsTrigger
+              value="updates"
+              className="flex items-center space-x-2"
+            >
+              <Download className="h-4 w-4" />
+              <span>Updates</span>
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Configure which notifications you want to receive
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label
-                    htmlFor="roleChanges"
-                    className="text-base font-medium"
+        {canManageOrgDetails && (
+          <TabsContent value="organization" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization Details</CardTitle>
+                <CardDescription>
+                  Basic information about your organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Organization Name</Label>
+                    <Input
+                      id="name"
+                      value={orgData.name}
+                      onChange={(e) =>
+                        setOrgData((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter organization name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={orgData.email}
+                      onChange={(e) =>
+                        setOrgData((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter organization email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={orgData.phone}
+                      onChange={(e) =>
+                        setOrgData((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select
+                      value={orgData.currency}
+                      onValueChange={(value) =>
+                        setOrgData((prev) => ({ ...prev, currency: value }))
+                      }
+                    >
+                      <SelectTrigger className="min-w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GHS">GHS</SelectItem>
+                        {/* <SelectItem value="USD">USD</SelectItem> */}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Textarea
+                    id="address"
+                    value={orgData.address}
+                    onChange={(e) =>
+                      setOrgData((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter organization address"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSaveOrganizationDetails}
+                    disabled={isSavingOrgData}
+                    className="flex items-center space-x-2"
                   >
-                    Role Changes
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when user roles are modified
-                  </p>
+                    <Save className="h-4 w-4" />
+                    <span>
+                      {isSavingOrgData ? 'Saving...' : 'Save Changes'}
+                    </span>
+                  </Button>
                 </div>
-                <Switch
-                  id="roleChanges"
-                  checked={notificationSettings.roleChanges}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((prev) => ({
-                      ...prev,
-                      roleChanges: checked,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label
-                    htmlFor="securityAlerts"
-                    className="text-base font-medium"
-                  >
-                    Security Alerts
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Important security notifications and alerts
-                  </p>
-                </div>
-                <Switch
-                  id="securityAlerts"
-                  checked={notificationSettings.securityAlerts}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((prev) => ({
-                      ...prev,
-                      securityAlerts: checked,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="appUpdates" className="text-base font-medium">
-                    App Updates
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Notifications about new features and updates
-                  </p>
-                </div>
-                <Switch
-                  id="appUpdates"
-                  checked={notificationSettings.appUpdates}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((prev) => ({
-                      ...prev,
-                      appUpdates: checked,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label
-                    htmlFor="newUserAdded"
-                    className="text-base font-medium"
-                  >
-                    New Users
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when new users join the organization
-                  </p>
-                </div>
-                <Switch
-                  id="newUserAdded"
-                  checked={notificationSettings.newUserAdded}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((prev) => ({
-                      ...prev,
-                      newUserAdded: checked,
-                    }))
-                  }
-                />
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleUpdateNotificationSettings}
-                  disabled={isSavingOrgData}
-                  className="flex items-center space-x-2"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>
-                    {isSavingOrgData ? 'Updating...' : 'Update Settings'}
-                  </span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* Logo Cropper Dialog */}
+            <LogoCropper
+              isOpen={isCropperOpen}
+              onClose={handleCropperClose}
+              onCropComplete={handleCropComplete}
+              imageFile={selectedImageFile}
+              isUploading={isUploadingLogo}
+            />
 
-        <TabsContent value="updates" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Software Updates</CardTitle>
-              <CardDescription>
-                Check for application updates and install new versions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UpdateSettings />
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization Logo</CardTitle>
+                <CardDescription>
+                  Upload and configure your organization's logo
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-start space-x-6">
+                  <div className="flex flex-col items-center space-y-4">
+                    <OrganizationLogo
+                      src={currentOrganization?.logo}
+                      fallback={<Building2 />}
+                      size="xl"
+                      orientation="square"
+                      backgroundSize="contain"
+                      className="border-2 border-dashed border-border"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <ModernFileUpload
+                        onFileSelect={handleLogoFileSelect}
+                        accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                        disabled={isUploadingLogo}
+                        maxSize={2}
+                        className="mt-2 max-w-[300px]"
+                        variant="compact"
+                      >
+                        {isUploadingLogo && (
+                          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                            <div className="text-sm text-primary font-medium">
+                              Uploading logo...
+                            </div>
+                          </div>
+                        )}
+                      </ModernFileUpload>
+
+                      {logoError && (
+                        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md mt-2">
+                          {logoError}
+                        </div>
+                      )}
+                    </div>
+                    {currentOrganization?.logo && (
+                      <Button
+                        variant="outline"
+                        onClick={handleRemoveLogo}
+                        disabled={isUploadingLogo}
+                        className="flex items-center space-x-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Remove Logo</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {canViewAppearance && (
+          <TabsContent value="appearance" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Theme Settings</CardTitle>
+                <CardDescription>
+                  Switch between light and dark modes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ThemeSwitcher />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Theme Selection</CardTitle>
+                <CardDescription>
+                  Choose from predefined themes, custom themes, or create custom
+                  colors
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <ThemeSelector />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {canManageNotifications && (
+          <TabsContent value="notifications" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Preferences</CardTitle>
+                <CardDescription>
+                  Configure which notifications you want to receive
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label
+                      htmlFor="roleChanges"
+                      className="text-base font-medium"
+                    >
+                      Role Changes
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get notified when user roles are modified
+                    </p>
+                  </div>
+                  <Switch
+                    id="roleChanges"
+                    checked={notificationSettings.roleChanges}
+                    onCheckedChange={(checked) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        roleChanges: checked,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label
+                      htmlFor="securityAlerts"
+                      className="text-base font-medium"
+                    >
+                      Security Alerts
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Important security notifications and alerts
+                    </p>
+                  </div>
+                  <Switch
+                    id="securityAlerts"
+                    checked={notificationSettings.securityAlerts}
+                    onCheckedChange={(checked) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        securityAlerts: checked,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label
+                      htmlFor="appUpdates"
+                      className="text-base font-medium"
+                    >
+                      App Updates
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notifications about new features and updates
+                    </p>
+                  </div>
+                  <Switch
+                    id="appUpdates"
+                    checked={notificationSettings.appUpdates}
+                    onCheckedChange={(checked) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        appUpdates: checked,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label
+                      htmlFor="newUserAdded"
+                      className="text-base font-medium"
+                    >
+                      New User Added
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get notified when a new user joins the organization
+                    </p>
+                  </div>
+                  <Switch
+                    id="newUserAdded"
+                    checked={notificationSettings.newUserAdded}
+                    onCheckedChange={(checked) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        newUserAdded: checked,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button
+                    onClick={handleUpdateNotificationSettings}
+                    disabled={isSavingOrgData}
+                    className="flex items-center space-x-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>
+                      {isSavingOrgData ? 'Saving...' : 'Save Changes'}
+                    </span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {canManageRoles && (
+          <TabsContent value="roles" className="space-y-6">
+            <RolesSettings />
+          </TabsContent>
+        )}
+
+        {isElectron() && (
+          <TabsContent value="updates" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Software Updates</CardTitle>
+                <CardDescription>
+                  Check for application updates and install new versions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UpdateSettings />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

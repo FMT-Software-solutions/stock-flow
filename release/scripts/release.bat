@@ -1,7 +1,7 @@
 @echo off
 echo.
 echo ========================================
-echo   FMT Template Release Script
+echo   stock-flow Release Script
 echo ========================================
 echo.
 

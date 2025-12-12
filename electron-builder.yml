@@ -1,8 +1,8 @@
-appId: com.fmtsoftware.appname
-productName: FMT Template
+appId: com.fmtsoftware.stock-flow
+productName: stock-flow
 copyright: Copyright © 2025 FMT Software Solutions
 
-artifactName: fmt-template-setup-${version}.${ext}
+artifactName: stock-flow-setup-${version}.${ext}
 directories:
   output: release/build
 files:
@@ -30,14 +30,14 @@ nsis:
   allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: FMT Template
+  shortcutName: stock-flow
   installerIcon: release/assets/favicon.ico
   uninstallerIcon: release/assets/favicon.ico
   installerHeaderIcon: release/assets/favicon.ico
   installerSidebar: release/assets/fmt-sidebar-banner.bmp
   deleteAppDataOnUninstall: false
   runAfterFinish: true
-  menuCategory: 'FMT Template'
+  menuCategory: 'stock-flow'
   displayLanguageSelector: false
   installerLanguages:
     - en_US

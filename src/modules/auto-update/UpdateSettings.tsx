@@ -322,7 +322,7 @@ export function UpdateSettings({ className }: UpdateSettingsProps) {
       const url = new URL(versionInfo.download_url);
       const fileName =
         url.pathname.split('/').pop() ||
-        `FMT-Template-${versionInfo.version}-Setup.exe`;
+        `stock-flow-${versionInfo.version}-Setup.exe`;
 
       toast.info('Starting update download...');
 

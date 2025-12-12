@@ -114,8 +114,8 @@ function initializeManifest() {
       releases: [],
       metadata: {
         created: new Date().toISOString(),
-        project: 'FMT Template',
-      description: 'Release manifest for FMT Template application',
+        project: 'stock-flow',
+      description: 'Release manifest for stock-flow application',
       },
     };
     

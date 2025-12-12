@@ -8,7 +8,7 @@
 
 module.exports = {
   // Version information
-  version: "1.1.1",
+  version: "1.0.0",
   
   // Release notes in markdown format
   releaseNotes: `### Added
@@ -26,7 +26,7 @@ module.exports = {
       architecture: "x64",
       installerPath: "release/build", // Directory containing the installer
       installerPattern: "*setup*.exe", // Pattern to match installer file
-      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/sales-track-pro/releases/download/v{version}/sales-track-pro-setup-{version}.exe",
+      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/stock-flow/releases/download/v{version}/stock-flow-setup-{version}.exe",
       fileSize: 85000000,
       status: "published", // 'draft' or 'published'
       isCritical: false, // Whether this is a critical update for this platform
@@ -36,7 +36,7 @@ module.exports = {
       architecture: "x64",
       installerPath: "release/build", // Directory containing the installer
       installerPattern: "*.dmg", // Pattern to match installer file
-      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/sales-track-pro/releases/download/v{version}/sales-track-pro-{version}.dmg",
+      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/stock-flow/releases/download/v{version}/stock-flow-{version}.dmg",
       fileSize: 90000000,
       status: "draft", // 'draft' or 'published'
       isCritical: false, // Whether this is a critical update for this platform
@@ -46,7 +46,7 @@ module.exports = {
       architecture: "x64",
       installerPath: "release/build", // Directory containing the installer
       installerPattern: "*.AppImage", // Pattern to match installer file
-      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/sales-track-pro/releases/download/v{version}/sales-track-pro-{version}.AppImage",
+      downloadUrlTemplate: "https://github.com/FMT-Software-solutions/stock-flow/releases/download/v{version}/stock-flow-{version}.AppImage",
       fileSize: 80000000,
       status: "draft", // 'draft' or 'published'
       isCritical: false, // Whether this is a critical update for this platform
@@ -61,7 +61,7 @@ module.exports = {
     uploadAssets: true,
     token: process.env.GH_TOKEN,
     owner: 'FMT-Software-solutions',
-    repo: 'sales-track-pro'
+    repo: 'stock-flow'
   },
 
   // Supabase publishing configuration
@@ -87,7 +87,7 @@ module.exports = {
     createCommit: true,
     createTag: true,
     pushChanges: true, // Set to true to automatically push
-    commitMessage: "Release v1.1.1"
+    commitMessage: "Release v1.0.0"
   },
 
   // Validation rules
@@ -100,8 +100,8 @@ module.exports = {
 
   // Additional metadata
   metadata: {
-    appName: "FMT Template",
-    description: "Professional Sales tracking application for businesses",
+    appName: "stock-flow",
+    description: "Inventory management system for businesses",
     author: "Shadrack Ankomahene",
     homepage: "https://fmtsoftware.com",
     supportEmail: "support@fmtsoftware.com"

@@ -74,7 +74,7 @@ export function HelpDrawer({ children }: HelpDrawerProps) {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <h4 className="font-medium">FMT Template Application</h4>
+                      <h4 className="font-medium">stock-flow</h4>
                       <p className="text-sm text-muted-foreground">
                         Version 1.0.0
                       </p>
@@ -83,7 +83,7 @@ export function HelpDrawer({ children }: HelpDrawerProps) {
                     <div>
                       <h4 className="font-medium">Description</h4>
                       <p className="text-sm text-muted-foreground">
-                        A reusable project template for FMT Software solutions.
+                        Stock or Inventory Tracking System for businesses
                         Built with React, Electron, and modern web technologies.
                       </p>
                     </div>

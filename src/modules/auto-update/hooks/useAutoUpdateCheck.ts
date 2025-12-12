@@ -52,7 +52,7 @@ export function useAutoUpdateCheck() {
               
               // Extract filename from URL or use version info
               const url = new URL(result.latestVersion.download_url);
-              const fileName = url.pathname.split('/').pop() || `FMT-Template-${result.latestVersion.version}-Setup.exe`;
+              const fileName = url.pathname.split('/').pop() || `stock-flow-${result.latestVersion.version}-Setup.exe`;
               
               await window.electron.downloadUpdateToTemp(
                 result.latestVersion.download_url,

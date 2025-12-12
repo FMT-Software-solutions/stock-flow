@@ -1,6 +1,6 @@
-# FMT Template Release Process
+# stock-flow Release Process
 
-This directory contains the automated release system for FMT Template Electron application.
+This directory contains the automated release system for stock-flow Electron application.
 
 ## Overview
 

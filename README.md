@@ -1,6 +1,6 @@
-# FMT Template 1
+# Stock Flow
 
-A comprehensive React application template for FMT Software Solutions that can be packaged as both an Electron desktop app and a web application. This template includes user management, app versioning system, and a complete Supabase backend setup.
+A comprehensive React application project for FMT Software Solutions that can be packaged as both an Electron desktop app and a web application. This project includes user management, app versioning system, and a complete Supabase backend setup.
 
 ## 🚀 Features
 
@@ -31,7 +31,7 @@ A comprehensive React application template for FMT Software Solutions that can b
 
 ```bash
 git clone <repository-url>
-cd fmt-template-1
+cd stock-flow
 ```
 
 ### 2. Run Setup Script
@@ -83,6 +83,7 @@ supabase db reset
 4. Execute the SQL
 
 **What's Included in dump.sql:**
+
 - All database tables (user_profiles, auth_users, app_versions, etc.)
 - Row Level Security (RLS) policies
 - Database functions and triggers
@@ -114,6 +115,7 @@ Edge functions in this template use **Supabase Auth tokens** for security:
    ```
 
 2. **Create Storage Bucket:**
+
    - Go to your Supabase project dashboard
    - Navigate to Storage
    - Create a new bucket (e.g., "org-logos" or as needed by your application)
@@ -152,13 +154,14 @@ Edge functions in this template use **Supabase Auth tokens** for security:
 #### Setup Steps:
 
 1. **Create a Cloudinary Account:**
+
    - Sign up at [Cloudinary.com](https://cloudinary.com)
    - Get your Cloud Name, API Key, and API Secret from the dashboard
 
 2. **Configure Edge Function Secrets:**
-   
+
    In your Supabase project dashboard, go to Edge Functions → Settings and add these secrets:
-   
+
    ```
    CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
    CLOUDINARY_API_KEY=your_cloudinary_api_key
@@ -166,7 +169,7 @@ Edge functions in this template use **Supabase Auth tokens** for security:
    ```
 
 3. **Deploy the submit-issue Function:**
-   
+
    ```bash
    supabase functions deploy submit-issue
    ```
@@ -455,22 +458,26 @@ When using this template for a new application, several files contain template-s
 ### Automated Updates (via setup.js)
 
 The setup script will prompt you for:
+
 - **Project Name**: Your application's display name
 - **Project Description**: A brief description of your application
 
 It will then automatically update the following files:
 
 #### 1. Package Configuration
+
 - **`package.json`**:
   - `name`: Updated to kebab-case version of your project name
   - `description`: Updated with your project description
 
 #### 2. Web Application Files
+
 - **`index.html`**:
   - `<title>`: Updated with your project name
   - `<meta name="description">`: Updated with your project description
 
 #### 3. Electron Configuration
+
 - **`electron-builder.yml`**:
   - `productName`: Updated with your project name
   - `appId`: Updated to `com.fmtsoftware.{your-project-kebab-case}`
@@ -479,20 +486,24 @@ It will then automatically update the following files:
   - `menuCategory`: Updated with your project name
 
 #### 4. Application UI
+
 - **`src/components/shared/HelpDrawer.tsx`**:
   - Application title in the help drawer
   - Application description text
 
 #### 5. Error Pages
+
 - **`electron-app/error.html`**:
   - Page title updated to `{Your Project Name} - Error`
   - Error message updated to reference your project name
 
 #### 6. Electron Main Process
+
 - **`electron-app/main.ts`**:
   - Temporary directory name for updates changed from `fmt-template-updates` to `{your-project-kebab-case}-updates`
 
 #### 7. Documentation
+
 - **`README.md`**:
   - Main title updated from "FMT Template 1" to your project name
   - Project description in the first paragraph

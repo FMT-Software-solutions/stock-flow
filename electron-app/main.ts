@@ -87,7 +87,7 @@ let downloadProgress: any = null
 // Helper function to get temporary download directory
 function getTempDownloadPath(): string {
   const tempDir = app.isPackaged 
-    ? path.join(os.tmpdir(), 'fmt-template-updates')
+    ? path.join(os.tmpdir(), 'stock-flow-updates')
     : path.join(__dirname, '../../temp-updates')
   
   // Ensure directory exists

@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { Calendar, Lock, Mail, MapPin } from 'lucide-react';
 import { UserActionsDropdown } from './UserActionsDropdown';
 import { processAvatarUrl } from '@/utils/asset-path';
+import { useRoleCheck } from '../auth/RoleGuard';
 
 interface UserGridProps {
   users: UserWithRelations[];
@@ -31,6 +32,8 @@ export function UserGrid({
   canDelete = false,
   canDeactivate = false,
 }: UserGridProps) {
+  const { isBranchAdmin } = useRoleCheck();
+
   const handleAction = (action: UserAction, user: UserWithRelations) => {
     onUserAction?.(action, user);
   };
@@ -111,6 +114,8 @@ export function UserGrid({
           const userRole = getUserRole(user);
           const userBranches = getUserBranches(user);
           const fullName = getFullName(user.profile);
+          const hasLowerRole =
+            isBranchAdmin() && ['owner', 'admin'].includes(userRole);
 
           return (
             <Card
@@ -149,15 +154,17 @@ export function UserGrid({
                       </Badge>
                     </div>
                   </div>
-                  {currentUserId !== user.id && (
-                    <UserActionsDropdown
-                      user={user}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                      canDeactivate={canDeactivate}
-                      onAction={handleAction}
-                    />
-                  )}
+                  {userRole !== 'owner' &&
+                    currentUserId !== user.id &&
+                    !hasLowerRole && (
+                      <UserActionsDropdown
+                        user={user}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canDeactivate={canDeactivate}
+                        onAction={handleAction}
+                      />
+                    )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">

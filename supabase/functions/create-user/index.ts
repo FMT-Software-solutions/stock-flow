@@ -20,24 +20,20 @@ function getNewUserInvitationTemplate(userName: string, email: string, organizat
   };
   
   return {
-    subject: `Welcome to ${organizationName} - Your Account Details`,
+    subject: `User Account Details - ${organizationName}`,
     html: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to ${organizationName}</title>
+  <title>User Account -  ${organizationName}</title>
 </head>
 <body style="font-family: Arial, sans-serif; background-color: #f6f9fc; margin: 0; padding: 20px;">
   <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <!-- Header -->
     <div style="padding: 32px 24px 24px; border-bottom: 1px solid #f0f0f0;">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 48px; height: 48px; background-color: ${colors.primary}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold;">${organizationName.charAt(0)}</div>
-        <h1 style="margin: 0; font-size: 24px; color: ${colors.foreground};">${organizationName}</h1>
-      </div>
-      <h2 style="margin: 16px 0 0 0; font-size: 20px; color: ${colors.foreground};">Welcome to the Team!</h2>
+      <h2 style="margin: 16px 0 0 0; font-size: 20px; color: ${colors.foreground};">Your user account has been created for ${organizationName}</h2>
     </div>
     
     <!-- Content -->

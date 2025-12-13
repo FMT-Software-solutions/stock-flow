@@ -16,6 +16,7 @@ import { ROLE_DISPLAY_NAMES } from '@/types/organizations';
 import type { UserWithRelations, UserAction } from '@/types/user-management';
 import { getFullName } from '@/types/user-management';
 import { processAvatarUrl } from '@/utils/asset-path';
+import { useRoleCheck } from '../auth/RoleGuard';
 
 interface UserTableProps {
   users: UserWithRelations[];
@@ -38,6 +39,8 @@ export function UserTable({
   canDelete = false,
   canDeactivate = false,
 }: UserTableProps) {
+  const { isBranchAdmin } = useRoleCheck();
+
   const handleAction = (action: UserAction, user: UserWithRelations) => {
     onUserAction?.(action, user);
   };
@@ -154,6 +157,8 @@ export function UserTable({
               const userRole = getUserRole(user);
               const userBranches = getUserBranches(user);
               const fullName = getFullName(user.profile);
+              const hasLowerRole =
+                isBranchAdmin() && ['owner', 'admin'].includes(userRole);
 
               return (
                 <TableRow
@@ -236,15 +241,17 @@ export function UserTable({
                     </span>
                   </TableCell>
                   <TableCell>
-                    {userRole !== 'owner' && currentUserId !== user.id && (
-                      <UserActionsDropdown
-                        user={user}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canDeactivate={canDeactivate}
-                        onAction={handleAction}
-                      />
-                    )}
+                    {userRole !== 'owner' &&
+                      currentUserId !== user.id &&
+                      !hasLowerRole && (
+                        <UserActionsDropdown
+                          user={user}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          canDeactivate={canDeactivate}
+                          onAction={handleAction}
+                        />
+                      )}
                   </TableCell>
                 </TableRow>
               );

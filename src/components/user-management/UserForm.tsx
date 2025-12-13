@@ -51,7 +51,7 @@ export function UserForm({
   branches,
   isLoading = false,
 }: UserFormProps) {
-  const { canManageAllData, canManageUserData, isOwner: isCurrentUserOwner } = useRoleCheck();
+  const { canManageAllData, canManageUserData, isBranchAdmin } = useRoleCheck();
   const { roles } = useRoles();
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
@@ -113,15 +113,14 @@ export function UserForm({
       role: selectedRole.type as UserRole,
       roleId: selectedRole.id,
       permissions: selectedRole.permissions,
-      // Default to assignAllBranches=true for admin/owner for convenience
-      assignAllBranches: (selectedRole.type === 'admin' || selectedRole.type === 'owner') ? true : (['branch_admin', 'write', 'read'].includes(selectedRole.type as UserRole) ? prev.assignAllBranches : false),
-      selectedBranchIds: (selectedRole.type === 'admin' || selectedRole.type === 'owner') ? [] : prev.selectedBranchIds,
+      assignAllBranches: false,
+      selectedBranchIds: prev.selectedBranchIds,
     }));
   };
 
-  const requiresBranch = ['write', 'read', 'branch_admin', 'admin'].includes(formData.role) && !formData.assignAllBranches;
+  const requiresBranch = formData.role !== 'owner' && !formData.assignAllBranches;
   
-  const canBeAssignedAllBranches = ['branch_admin', 'write', 'read', 'admin'].includes(formData.role);
+  const canBeAssignedAllBranches = formData.role !== 'owner';
   
   const handleAssignAllBranchesChange = (checked: boolean) => {
     const activeBranchIds = branches.filter(b => b.is_active).map(b => b.id);
@@ -187,13 +186,13 @@ export function UserForm({
           </SelectTrigger>
           <SelectContent>
             {roles?.filter(role => {
-               // Owners see all roles
-               if (isCurrentUserOwner()) return true;
                // Admins see all except owner
                if (role.type === 'owner') return false;
+
+               if(isBranchAdmin() && (role.type === 'admin' || role.type === 'branch_admin')) return false;
                // Branch admins see write/read only
                if (!canManageAllData() && canManageUserData()) {
-                 return ['write', 'read'].includes(role.type);
+                 return ['custom'].includes(role.type);
                }
                return true;
             }).map((role) => (

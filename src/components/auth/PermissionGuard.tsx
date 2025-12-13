@@ -1,5 +1,9 @@
 import { useRoleCheck } from '@/components/auth/RoleGuard';
-import type { PermissionAction, PermissionScope } from '@/modules/permissions/types';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import type {
+  PermissionAction,
+  PermissionScope,
+} from '@/modules/permissions/types';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -18,7 +22,14 @@ export function PermissionGuard({
   fallback,
   redirectTo = '/dashboard',
 }: PermissionGuardProps) {
+  const { currentOrganization, isLoading } = useOrganization();
   const { checkPermission } = useRoleCheck();
+
+  // Wait for organization to be loaded to avoid race conditions on page refresh
+  if (isLoading || !currentOrganization) {
+    return null;
+  }
+
   const hasAccess = checkPermission(scope, action);
 
   if (!hasAccess) {

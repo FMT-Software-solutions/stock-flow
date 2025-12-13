@@ -20,6 +20,7 @@ interface BranchContextType {
   // Selection
   selectedBranchIds: string[];
   selectBranch: (branchId: string) => void; // Toggle selection
+  selectSingleBranch: (branchId: string) => void; // Select only this branch
   selectAllBranches: () => void; // For owners
   deselectBranch: (branchId: string) => void;
 
@@ -134,6 +135,10 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const selectSingleBranch = useCallback((branchId: string) => {
+    setSelectedBranchIds([branchId]);
+  }, []);
+
   const deselectBranch = useCallback((branchId: string) => {
     setSelectedBranchIds((prev) => {
       if (prev.length <= 1) return prev; // Cannot deselect last one
@@ -153,6 +158,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     availableBranches,
     selectedBranchIds,
     selectBranch,
+    selectSingleBranch,
     selectAllBranches,
     deselectBranch,
     isLoading: isLoadingAllBranches || isLoadingUserBranches,

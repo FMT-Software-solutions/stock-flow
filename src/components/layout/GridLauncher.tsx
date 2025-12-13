@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { navItems } from '@/config/navigation';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface GridLauncherProps {
   onItemClick: () => void;
@@ -22,8 +23,7 @@ export function GridLauncher({ onItemClick }: GridLauncherProps) {
   return (
     <div className="container mx-auto p-8 max-w-5xl animate-in fade-in zoom-in duration-300">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold tracking-tight mb-4">Welcome Back</h1>
-        <p className="text-muted-foreground text-lg">
+        <p className="font-bold text-xl">
           Select an application module to continue
         </p>
       </div>
@@ -43,7 +43,12 @@ export function GridLauncher({ onItemClick }: GridLauncherProps) {
                   <CardTitle className="text-xl font-medium">
                     {item.label}
                   </CardTitle>
-                  <Icon className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <Icon
+                    className={cn(
+                      item.iconClassName,
+                      'h-8 w-8 group-hover:text-primary transition-colors'
+                    )}
+                  />
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground mt-4">

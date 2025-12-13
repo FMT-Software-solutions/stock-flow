@@ -15,6 +15,7 @@ export interface NavItem {
     scope: PermissionScope;
     action?: PermissionAction;
   };
+  iconClassName?: string;
 }
 
 export const navItems: NavItem[] = [
@@ -23,23 +24,27 @@ export const navItems: NavItem[] = [
     icon: Home,
     label: 'Dashboard',
     permission: { scope: 'dashboard' },
+    iconClassName: 'text-blue-500',
   },
   {
     to: '/branches',
     icon: MapPin,
     label: 'Branches',
     permission: { scope: 'branch_management' },
+    iconClassName: 'text-green-500',
   },
   {
     to: '/user-management',
     icon: Users,
     label: 'Users',
     permission: { scope: 'user_management' },
+    iconClassName: 'text-orange-500',
   },
   {
     to: '/settings',
     icon: Settings,
     label: 'Settings',
     permission: { scope: 'settings' },
+    iconClassName: 'text-purple-500',
   },
 ];

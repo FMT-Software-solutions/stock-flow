@@ -7,6 +7,9 @@ export * from './app-versions';
 export * from './user-management';
 export * from './organizations';
 export * from './branches';
+export * from './inventory';
+export * from './expenses';
+
 
 // Add other type exports here as the application grows
 // export * from './user-types';

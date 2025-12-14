@@ -102,7 +102,7 @@ export function BranchSelector() {
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={(e: Event) => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     selectSingleBranch(branch.id);
                   }}

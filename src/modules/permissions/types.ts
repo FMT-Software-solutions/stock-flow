@@ -5,7 +5,17 @@ export type PermissionScope =
   | 'dashboard'
   | 'user_management'
   | 'branch_management'
+  | 'inventory'
+  | 'orders'
+  | 'customers'
+  | 'suppliers'
+  | 'reports'
+  | 'expenses'
   | 'settings';
+
+
+
+
 
 // 2. Child permissions (Actions)
 export type PermissionAction = 

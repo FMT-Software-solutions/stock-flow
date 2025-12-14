@@ -18,7 +18,18 @@ import { OrganizationSelection } from '../pages/OrganizationSelection';
 // Protected pages
 import { Branches } from '../pages/Branches';
 import { Dashboard } from '../pages/Dashboard';
+import { Inventory } from '../pages/Inventory';
+import { ProductForm } from '../pages/inventory/ProductForm';
+import { Orders } from '../pages/Orders';
+import { OrderForm } from '../pages/orders/OrderForm';
+import { Customers } from '../pages/Customers';
+import { CustomerForm } from '../pages/customers/CustomerForm';
+import { Suppliers } from '../pages/Suppliers';
+import { SupplierForm } from '../pages/suppliers/SupplierForm';
+import { Reports } from '../pages/Reports';
+import { Expenses } from '../pages/Expenses';
 import { Profile } from '../pages/Profile';
+
 import { Settings } from '../pages/Settings';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { OrganizationSelectionProtectedRoute } from '@/components/auth/OrganizationSelectionProtectedRoute';
@@ -78,8 +89,121 @@ function AppRoutes() {
         {/* Dashboard - default route */}
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route
+          path="inventory"
+          element={
+            <PermissionGuard scope="inventory">
+              <Inventory />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="inventory/new"
+          element={
+            <PermissionGuard scope="inventory" action="create">
+              <ProductForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="inventory/:id"
+          element={
+            <PermissionGuard scope="inventory" action="edit">
+              <ProductForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="orders"
+          element={
+            <PermissionGuard scope="orders">
+              <Orders />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="orders/new"
+          element={
+            <PermissionGuard scope="orders" action="create">
+              <OrderForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="orders/:id"
+          element={
+            <PermissionGuard scope="orders" action="edit">
+              <OrderForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="customers"
+          element={
+            <PermissionGuard scope="customers">
+              <Customers />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="customers/new"
+          element={
+            <PermissionGuard scope="customers" action="create">
+              <CustomerForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="customers/:id"
+          element={
+            <PermissionGuard scope="customers" action="edit">
+              <CustomerForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="suppliers"
+          element={
+            <PermissionGuard scope="suppliers">
+              <Suppliers />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="suppliers/new"
+          element={
+            <PermissionGuard scope="suppliers" action="create">
+              <SupplierForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="suppliers/:id"
+          element={
+            <PermissionGuard scope="suppliers" action="edit">
+              <SupplierForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <PermissionGuard scope="reports">
+              <Reports />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="expenses"
+          element={
+            <PermissionGuard scope="expenses">
+              <Expenses />
+            </PermissionGuard>
+          }
+        />
 
         {/* Main application routes */}
+
         <Route
           path="branches"
           element={

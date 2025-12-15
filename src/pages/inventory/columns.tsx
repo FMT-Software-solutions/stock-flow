@@ -1,5 +1,5 @@
 import { type ColumnDef } from "@tanstack/react-table"
-import { type Product } from "@/types/inventory"
+import { type Product, type InventoryEntry } from "@/types/inventory"
 import { DataTableColumnHeader } from "@/components/shared/data-table/data-table-column-header"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,6 +16,35 @@ import {
 import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay"
 
 import { Link } from "react-router-dom"
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  return `${dateFormatter.format(date)}, ${timeFormatter.format(date)}`
+}
+
+const formatRelativeTime = (value: string) => {
+  const now = new Date().getTime()
+  const then = new Date(value).getTime()
+  const diffMs = now - then
+  const diffSeconds = Math.floor(diffMs / 1000)
+  if (diffSeconds < 60) return `${diffSeconds}s ago`
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) return `${diffMinutes}min ago`
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours}hr${diffHours > 1 ? 's' : ''} ago`
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ago`
+}
 
 export const columns: ColumnDef<Product>[] = [
   {
@@ -61,7 +90,8 @@ export const columns: ColumnDef<Product>[] = [
     }
   },
   {
-    accessorKey: "category",
+    id: "category",
+    accessorFn: (row) => row.category?.name || "Uncategorized",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Category" />
     ),
@@ -134,13 +164,29 @@ export const columns: ColumnDef<Product>[] = [
     },
   },
   {
+    accessorKey: "createdByName",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Created By" />
+    ),
+    cell: ({ row }) => {
+      return <div className="text-muted-foreground">{row.getValue("createdByName") || "Unknown"}</div>
+    },
+  },
+  {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Created At" />
     ),
     cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt"))
-      return <div className="text-muted-foreground">{date.toLocaleDateString()}</div>
+      const value = row.getValue("createdAt") as string
+      return (
+        <div className="flex flex-col text-xs">
+          <span>{formatDateTime(value)}</span>
+          <span className="text-muted-foreground">
+            {formatRelativeTime(value)}
+          </span>
+        </div>
+      )
     },
     filterFn: (row, id, value) => {
         const rowDate = new Date(row.getValue(id))
@@ -189,6 +235,106 @@ export const columns: ColumnDef<Product>[] = [
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      )
+    },
+  },
+]
+
+export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "productName",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Product" />
+    ),
+    cell: ({ row }) => {
+      const sku = row.original.sku
+      const branchName = row.original.branchName
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{row.original.productName}</span>
+          <span className="text-xs text-muted-foreground">
+            {sku}
+            {branchName ? ` • ${branchName}` : ''}
+          </span>
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "quantity",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Stock" />
+    ),
+    cell: ({ row }) => {
+      const quantity = row.getValue("quantity") as number
+      const minStock = row.original.minStockLevel
+      let color =
+        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+      if (quantity <= 0) {
+        color =
+          "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+      } else if (quantity <= minStock) {
+        color =
+          "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+      }
+      return (
+        <Badge variant="outline" className={color}>
+          {quantity} {row.original.unit}
+        </Badge>
+      )
+    },
+  },
+  {
+    accessorKey: "location",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Location" />
+    ),
+  },
+  {
+    accessorKey: "createdByName",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Created By" />
+    ),
+    cell: ({ row }) => {
+      return <div className="text-muted-foreground">{row.getValue("createdByName") || "Unknown"}</div>
+    },
+  },
+  {
+    accessorKey: "lastUpdated",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Last Updated" />
+    ),
+    cell: ({ row }) => {
+      const value = row.getValue("lastUpdated") as string
+      return (
+        <div className="flex flex-col text-xs">
+          <span>{formatDateTime(value)}</span>
+          <span className="text-muted-foreground">
+            {formatRelativeTime(value)}
+          </span>
+        </div>
       )
     },
   },

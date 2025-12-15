@@ -24,10 +24,9 @@ import {
 } from 'recharts';
 import { useCurrency } from '@/hooks/useCurrency';
 import { mockOrders } from '@/data/mock-orders';
-
-import { mockProducts } from '@/data/mock-inventory';
 import { mockCustomers } from '@/data/mock-customers';
-import { mockSuppliers } from '@/data/mock-suppliers';
+import { useProducts, useSuppliers } from '@/hooks/useInventoryQueries';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Mock Data Generators
 const getMonthlyRevenue = () => [
@@ -56,6 +55,9 @@ const COLORS = [
 
 export function Reports() {
   const { formatCurrency, currency } = useCurrency();
+  const { currentOrganization } = useOrganization();
+  const { data: products = [] } = useProducts(currentOrganization?.id);
+  const { data: suppliers = [] } = useSuppliers(currentOrganization?.id);
 
   return (
     <div className="space-y-6">
@@ -110,7 +112,7 @@ export function Reports() {
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{mockProducts.length}</div>
+                <div className="text-2xl font-bold">{products.length}</div>
                 <p className="text-xs text-muted-foreground">
                   +2 new items added
                 </p>
@@ -138,7 +140,7 @@ export function Reports() {
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{mockSuppliers.length}</div>
+                <div className="text-2xl font-bold">{suppliers.length}</div>
                 <p className="text-xs text-muted-foreground">
                   Stable relationships
                 </p>
@@ -243,7 +245,7 @@ export function Reports() {
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={mockProducts.slice(0, 10)}
+                    data={products.slice(0, 10)}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                   >

@@ -20,6 +20,7 @@ import { Branches } from '../pages/Branches';
 import { Dashboard } from '../pages/Dashboard';
 import { Inventory } from '../pages/Inventory';
 import { ProductForm } from '../pages/inventory/ProductForm';
+import { InventoryForm } from '../pages/inventory/InventoryForm';
 import { Orders } from '../pages/Orders';
 import { OrderForm } from '../pages/orders/OrderForm';
 import { Customers } from '../pages/Customers';
@@ -102,6 +103,14 @@ function AppRoutes() {
           element={
             <PermissionGuard scope="inventory" action="create">
               <ProductForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="inventory/stock/new"
+          element={
+            <PermissionGuard scope="inventory" action="create">
+              <InventoryForm />
             </PermissionGuard>
           }
         />

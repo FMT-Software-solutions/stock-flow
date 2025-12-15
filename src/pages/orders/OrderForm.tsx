@@ -14,8 +14,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Trash2, Plus } from 'lucide-react';
-import { mockProducts } from '@/data/mock-inventory';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useProducts } from '@/hooks/useInventoryQueries';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const orderSchema = z.object({
   customerName: z.string().min(2, 'Customer name is required'),
@@ -43,6 +44,8 @@ export function OrderForm() {
   const { id } = useParams();
   const isEditing = !!id;
   const { formatCurrency } = useCurrency();
+  const { currentOrganization } = useOrganization();
+  const { data: products = [] } = useProducts(currentOrganization?.id);
 
   const form = useForm({
     resolver: zodResolver(orderSchema),
@@ -74,7 +77,7 @@ export function OrderForm() {
 
   // Helper to update unit price when product changes
   const handleProductChange = (index: number, productId: string) => {
-    const product = mockProducts.find((p) => p.id === productId);
+    const product = products.find((p) => p.id === productId);
     if (product) {
       form.setValue(`items.${index}.unitPrice`, product.sellingPrice);
     }
@@ -130,7 +133,7 @@ export function OrderForm() {
                                 <SelectValue placeholder="Select product" />
                               </SelectTrigger>
                               <SelectContent>
-                                {mockProducts.map((product) => (
+                                {products.map((product) => (
                                   <SelectItem
                                     key={product.id}
                                     value={product.id}

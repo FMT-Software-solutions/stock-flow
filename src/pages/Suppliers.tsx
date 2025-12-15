@@ -1,12 +1,17 @@
 import { DataTable } from "@/components/shared/data-table/data-table"
 import { columns } from "./suppliers/columns"
-import { mockSuppliers } from "@/data/mock-suppliers"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useSuppliers } from "@/hooks/useInventoryQueries"
+import { useOrganization } from "@/contexts/OrganizationContext"
 
 export function Suppliers() {
   const navigate = useNavigate()
+  const { currentOrganization } = useOrganization()
+  const { data: suppliers = [], isLoading } = useSuppliers(currentOrganization?.id)
+
+  if (isLoading) return <div>Loading...</div>
 
   return (
     <div className="space-y-6">
@@ -22,7 +27,7 @@ export function Suppliers() {
         </Button>
       </div>
       
-      <DataTable columns={columns} data={mockSuppliers} searchKey="name" />
+      <DataTable columns={columns} data={suppliers} searchKey="name" />
     </div>
   )
 }

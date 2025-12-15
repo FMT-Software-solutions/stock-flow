@@ -13,7 +13,6 @@ import {
   TrendingDown,
   ClipboardList,
 } from 'lucide-react';
-import { mockProducts } from '@/data/mock-inventory';
 import { mockOrders } from '@/data/mock-orders';
 import { mockCustomers } from '@/data/mock-customers';
 import { Area, AreaChart } from 'recharts';
@@ -24,6 +23,8 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/hooks/useCurrency';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
+import { useProducts } from '@/hooks/useInventoryQueries';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Mock data for charts
 const revenueData = [
@@ -157,13 +158,15 @@ function SalesActivityCard({ value, label, icon: Icon, color }: any) {
 
 export function Dashboard() {
   const { formatCurrency } = useCurrency();
-  // Calculations
-  const totalProducts = mockProducts.reduce((acc, p) => acc + p.quantity, 0);
+  const { currentOrganization } = useOrganization();
+  const { data: products = [] } = useProducts(currentOrganization?.id);
 
-  const lowStockCount = mockProducts.filter(
-    (p) => p.quantity <= p.minStockLevel
-  ).length;
-  const lowStockItems = mockProducts
+  // Calculations
+  const totalProducts = products.reduce((acc, p) => acc + p.quantity, 0);
+
+  const lowStockCount = products.filter((p) => p.quantity <= p.minStockLevel)
+    .length;
+  const lowStockItems = products
     .filter((p) => p.quantity <= p.minStockLevel)
     .slice(0, 3);
 
@@ -348,7 +351,7 @@ export function Dashboard() {
               <div className="col-span-2">Price</div>
             </div>
             <div className="space-y-3">
-              {mockProducts.slice(0, 4).map((product, i) => (
+              {products.slice(0, 4).map((product, i) => (
                 <div
                   key={product.id}
                   className="grid grid-cols-6 gap-2 text-sm items-center"

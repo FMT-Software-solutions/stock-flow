@@ -24,12 +24,23 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, X, Loader2, Wand2, AlertCircle } from 'lucide-react';
 
 import { Switch } from '@/components/ui/switch';
 import { ModernFileUpload } from '@/components/shared/ModernFileUpload';
-import { X } from 'lucide-react';
+import { useCreateProduct, useUpdateProduct } from '@/hooks/useInventoryQueries';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { uploadImageToCloudinary, deleteImageFromCloudinary } from '@/utils/cloudinary';
+import { useState } from 'react';
+import type { Product, Category, Supplier } from '@/types/inventory';
+import {
+  ProductVariations,
+  type GeneratedVariant,
+} from './components/ProductVariations';
+import { toast } from 'sonner';
+import { useProductForm } from './hooks/useProductForm';
 
 const productSchema = z.object({
   name: z.string().min(2, {
@@ -38,9 +49,10 @@ const productSchema = z.object({
   sku: z.string().min(1, {
     message: 'SKU is required.',
   }),
-  category: z.string().min(1, {
+  categoryId: z.string().min(1, {
     message: 'Category is required.',
   }),
+  supplierId: z.string().optional(),
   description: z.string().optional(),
   sellingPrice: z.coerce.number().min(0),
   costPrice: z.coerce.number().min(0),
@@ -57,41 +69,224 @@ const productSchema = z.object({
       value: z.coerce.number().min(0).default(0),
     })
     .optional(),
+  hasVariations: z.boolean().default(false),
 });
 
+interface ProductFormInnerProps {
+  isEditing: boolean;
+  id?: string;
+  orgId?: string;
+  product: Product | null;
+  categories: Category[];
+  suppliers: Supplier[];
+  defaultValues: z.infer<typeof productSchema>;
+  initialVariants: GeneratedVariant[];
+}
+
 export function ProductForm() {
-  const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
+  const { currentOrganization, isLoading: isOrgLoading } = useOrganization();
+  const orgId = currentOrganization?.id;
+
+  const {
+    isLoading,
+    product,
+    categories,
+    suppliers,
+    defaultValues,
+    initialVariants,
+  } = useProductForm({ id, organizationId: orgId, isOrgLoading });
+
+  if (isEditing && isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <ProductFormInner
+      key={isEditing ? id ?? 'new-product' : 'new-product'}
+      isEditing={isEditing}
+      id={id}
+      orgId={orgId}
+      product={product ?? null}
+      categories={categories}
+      suppliers={suppliers}
+      defaultValues={defaultValues}
+      initialVariants={initialVariants}
+    />
+  );
+}
+
+function ProductFormInner({
+  isEditing,
+  id,
+  orgId,
+  product,
+  categories,
+  suppliers,
+  defaultValues,
+  initialVariants,
+}: ProductFormInnerProps) {
+  const navigate = useNavigate();
+
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+
+  const [isUploadingMain, setIsUploadingMain] = useState(false);
+  const [isUploadingAdditional, setIsUploadingAdditional] = useState(false);
+  const [variants, setVariants] = useState<GeneratedVariant[]>(initialVariants);
+
+  const isUploading = isUploadingMain || isUploadingAdditional;
 
   const form = useForm({
     resolver: zodResolver(productSchema),
-    defaultValues: {
-      name: '',
-      sku: '',
-      category: '',
-      description: '',
-      sellingPrice: 0,
-      costPrice: 0,
-      quantity: 0,
-      minStockLevel: 5,
-      unit: 'pcs',
-      status: 'published',
-      imageUrl: '',
-      additionalImages: [],
-      discount: {
-        enabled: false,
-        type: 'percentage',
-        value: 0,
-      },
-    },
+    defaultValues,
   });
 
-  function onSubmit(values: z.infer<typeof productSchema>) {
-    // In a real app, we would send this to the backend
-    console.log(values);
-    navigate('/inventory');
+  async function onSubmit(values: z.infer<typeof productSchema>) {
+    if (!orgId) return;
+
+    if (values.hasVariations && variants.length === 0) {
+      toast.error(
+        'Please configure at least one variation or disable variations'
+      );
+      return;
+    }
+
+    try {
+      if (isEditing && id) {
+        await updateProduct.mutateAsync({
+          id,
+          updates: {
+            ...values,
+            organizationId: orgId,
+            variants: values.hasVariations ? variants as any : undefined,
+          },
+          oldImageUrl: product?.imageUrl,
+        });
+        toast.success('Product updated successfully');
+      } else {
+        await createProduct.mutateAsync({
+          ...values,
+          organizationId: orgId,
+          variants: values.hasVariations ? variants : undefined,
+        });
+        toast.success('Product created successfully');
+      }
+      navigate('/inventory');
+    } catch (error) {
+      console.error('Failed to save product:', error);
+      toast.error('Failed to save product');
+    }
   }
+
+  const handleMainImageUpload = async (
+    file: File,
+    onChange: (url: string) => void
+  ) => {
+    try {
+      setIsUploadingMain(true);
+      const url = await uploadImageToCloudinary(file);
+      onChange(url);
+    } catch (error) {
+      console.error('Upload failed', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploadingMain(false);
+    }
+  };
+
+  const handleAdditionalImagesUpload = async (
+    files: File[],
+    currentImages: string[],
+    onChange: (urls: string[]) => void
+  ) => {
+    try {
+      setIsUploadingAdditional(true);
+      // Upload all images concurrently
+      const uploadPromises = files.map(file => uploadImageToCloudinary(file));
+      const newUrls = await Promise.all(uploadPromises);
+      
+      onChange([...currentImages, ...newUrls]);
+    } catch (error) {
+      console.error('Upload failed', error);
+      toast.error('Failed to upload some images');
+    } finally {
+      setIsUploadingAdditional(false);
+    }
+  };
+
+  const handleRemoveImage = async (
+    urlToRemove: string,
+    currentImages: string[],
+    onChange: (urls: string[]) => void
+  ) => {
+    // Optimistically update the UI first? Or wait for deletion?
+    // User requested: "even if we've not saved the images to our db yet, we can still delete them"
+    // So we should try to delete from cloudinary.
+    
+    // Remove from UI immediately to feel responsive
+    const newImages = currentImages.filter(url => url !== urlToRemove);
+    onChange(newImages);
+
+    // Delete from Cloudinary in background
+    try {
+      await deleteImageFromCloudinary(urlToRemove);
+    } catch (error) {
+      console.error('Failed to delete image from Cloudinary', error);
+      // We don't necessarily need to revert the UI change if it fails, 
+      // but logging it is good.
+    }
+  };
+
+  const handleRemoveMainImage = async (
+    urlToRemove: string,
+    onChange: (url: string) => void
+  ) => {
+    onChange('');
+    try {
+      await deleteImageFromCloudinary(urlToRemove);
+    } catch (error) {
+      console.error('Failed to delete image from Cloudinary', error);
+    }
+  };
+
+  const watchedHasVariations = form.watch('hasVariations');
+  const watchedSellingPrice = form.watch('sellingPrice');
+  const watchedSku = form.watch('sku');
+  const watchedQuantity = form.watch('quantity');
+
+  // Calculate total variant quantity
+  const totalVariantQuantity = variants.reduce((acc, v) => acc + (v.quantity || 0), 0);
+  const showQuantityWarning = watchedHasVariations && variants.length > 0 && totalVariantQuantity !== Number(watchedQuantity);
+
+  const generateSku = () => {
+    const name = form.getValues('name');
+    if (!name) {
+      toast.error('Please enter a product name first to generate SKU');
+      return;
+    }
+    
+    // Generate SKU: First 3 letters of name (or first letter of each word) + Random 4 digits
+    const cleanName = name.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
+    const words = cleanName.split(/\s+/);
+    let prefix = '';
+    
+    if (words.length > 1) {
+      prefix = words.slice(0, 3).map(w => w[0]).join('');
+    } else {
+      prefix = cleanName.substring(0, 3);
+    }
+    
+    // Ensure prefix is at least 3 chars
+    prefix = prefix.padEnd(3, 'X').substring(0, 3);
+    
+    const random = Math.floor(1000 + Math.random() * 9000);
+    const sku = `${prefix}-${random}`;
+    
+    form.setValue('sku', sku, { shouldValidate: true, shouldDirty: true });
+    toast.success(`Generated SKU: ${sku}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -117,95 +312,280 @@ export function ProductForm() {
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Details</CardTitle>
-              <CardDescription>
-                Basic information about the product
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Controller
-                control={form.control}
-                name="name"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={!!fieldState.error}>
-                    <FieldLabel htmlFor="name">Product Name</FieldLabel>
-                    <Input id="name" placeholder="iPhone 14 Pro" {...field} />
-                    {fieldState.error && (
-                      <FieldError>{fieldState.error.message}</FieldError>
-                    )}
-                  </Field>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
+
+          <div className='space-y-4'>
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Details</CardTitle>
+                <CardDescription>
+                  Basic information about the product
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <Controller
                   control={form.control}
-                  name="sku"
+                  name="name"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel htmlFor="sku">SKU</FieldLabel>
-                      <Input id="sku" placeholder="IP14PRO-128" {...field} />
+                      <FieldLabel htmlFor="name">Product Name</FieldLabel>
+                      <Input id="name" placeholder="iPhone 14 Pro" {...field} />
                       {fieldState.error && (
                         <FieldError>{fieldState.error.message}</FieldError>
                       )}
                     </Field>
                   )}
                 />
-                <Controller
-                  control={form.control}
-                  name="category"
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={!!fieldState.error}>
+                <div className="grid grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="sku"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
+                        <FieldLabel htmlFor="sku">SKU</FieldLabel>
+                        <div className="flex gap-2">
+                          <Input id="sku" placeholder="IP14PRO-128" {...field} />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            title="Generate SKU from Name"
+                            onClick={generateSku}
+                          >
+                            <Wand2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {fieldState.error && (
+                          <FieldError>{fieldState.error.message}</FieldError>
+                        )}
+                      </Field>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="categoryId"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
                       <FieldLabel>Category</FieldLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {fieldState.error && (
+                          <FieldError>{fieldState.error.message}</FieldError>
+                        )}
+                      </Field>
+                    )}
+                  />
+                  
+                </div>
+
+                <Controller
+                  control={form.control}
+                  name="supplierId"
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={!!fieldState.error}>
+                      <FieldLabel>Supplier</FieldLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
+                          <SelectValue placeholder="Select supplier" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="electronics">
-                            Electronics
-                          </SelectItem>
-                          <SelectItem value="clothing">Clothing</SelectItem>
-                          <SelectItem value="home">Home & Garden</SelectItem>
-                          <SelectItem value="toys">Toys</SelectItem>
+                          {suppliers.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                    </Field>
+                  )}
+                />
+
+                <Controller
+                  control={form.control}
+                  name="description"
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={!!fieldState.error}>
+                      <FieldLabel htmlFor="description">Description</FieldLabel>
+                      <Textarea
+                        id="description"
+                        placeholder="Product description..."
+                        className="resize-none"
+                        {...field}
+                      />
                       {fieldState.error && (
                         <FieldError>{fieldState.error.message}</FieldError>
                       )}
                     </Field>
                   )}
                 />
-              </div>
-              <Controller
-                control={form.control}
-                name="description"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={!!fieldState.error}>
-                    <FieldLabel htmlFor="description">Description</FieldLabel>
-                    <Textarea
-                      id="description"
-                      placeholder="Product description..."
-                      className="resize-none"
-                      {...field}
-                    />
-                    {fieldState.error && (
-                      <FieldError>{fieldState.error.message}</FieldError>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Pricing & Unit <var></var></CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="sellingPrice"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
+                        <FieldLabel htmlFor="sellingPrice">
+                          Selling Price
+                        </FieldLabel>
+                        <Input
+                          id="sellingPrice"
+                          type="number"
+                          {...field}
+                          value={(field.value as number) ?? ''}
+                        />
+                        {fieldState.error && (
+                          <FieldError>{fieldState.error.message}</FieldError>
+                        )}
+                      </Field>
                     )}
-                  </Field>
+                  />
+                  <Controller
+                    control={form.control}
+                    name="costPrice"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
+                        <FieldLabel htmlFor="costPrice">Cost Price</FieldLabel>
+                        <Input
+                          id="costPrice"
+                          type="number"
+                          {...field}
+                          value={(field.value as number) ?? ''}
+                        />
+                        {fieldState.error && (
+                          <FieldError>{fieldState.error.message}</FieldError>
+                        )}
+                      </Field>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="unit"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
+                        <FieldLabel htmlFor="unit">Unit</FieldLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pcs">Pieces (pcs)</SelectItem>
+                            <SelectItem value="kg">Kilogram (kg)</SelectItem>
+                            <SelectItem value="l">Liter (l)</SelectItem>
+                            <SelectItem value="m">Meter (m)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Controller
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FieldLabel>Status</FieldLabel>
+                        <FieldDescription>
+                          Product visibility status
+                        </FieldDescription>
+                      </div>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="published">Published</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="hasVariations"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FieldLabel>Has Variations</FieldLabel>
+                        <FieldDescription>
+                          Does this product have variants (e.g. size, color)?
+                        </FieldDescription>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {watchedHasVariations && (
+              <div className="col-span-2 space-y-4">
+                <ProductVariations
+                  basePrice={Number(watchedSellingPrice) || 0}
+                  baseSku={String(watchedSku || '')}
+                  onChange={setVariants}
+                  initialVariants={variants}
+                />
+                
+                {showQuantityWarning && (
+                  <Alert variant="default" className="border-yellow-200/30 text-yellow-500 shadow-sm">
+                    <AlertCircle className="h-4 w-4 text-yellow-800" />
+                    <AlertTitle>Quantity Mismatch</AlertTitle>
+                    <AlertDescription>
+                      The total quantity from variations ({totalVariantQuantity}) does not match the product quantity ({Number(watchedQuantity)}).
+                    </AlertDescription>
+                  </Alert>
                 )}
-              />
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          
+          </div>
 
           <Card>
             <CardHeader>
               <CardTitle>Product Images</CardTitle>
-              <CardDescription>Upload your product images.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Controller
@@ -226,17 +606,26 @@ export function ProductForm() {
                           variant="destructive"
                           size="icon"
                           className="absolute right-2 top-2 h-6 w-6"
-                          onClick={() => field.onChange('')}
+                          onClick={() => handleRemoveMainImage(field.value!, field.onChange)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ) : (
-                      <ModernFileUpload
-                        onFileSelect={(file) =>
-                          field.onChange(URL.createObjectURL(file))
-                        }
-                      />
+                      <div className="relative">
+                        <ModernFileUpload
+                          onFileSelect={(file) =>
+                            handleMainImageUpload(file, field.onChange)
+                          }
+                          disabled={isUploadingMain}
+                        />
+                        {isUploadingMain && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 text-sm font-medium">
+                            <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                            <span>Uploading...</span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -264,241 +653,40 @@ export function ProductForm() {
                             variant="destructive"
                             size="icon"
                             className="absolute right-1 top-1 h-5 w-5"
-                            onClick={() => {
-                              const newImages = [...(field.value || [])];
-                              newImages.splice(index, 1);
-                              field.onChange(newImages);
-                            }}
+                            onClick={() => handleRemoveImage(url, field.value || [], field.onChange)}
                           >
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
                       ))}
-                      <ModernFileUpload
-                        variant="compact"
-                        className="aspect-square h-full w-full"
-                        onFileSelect={(file) => {
-                          field.onChange([
-                            ...(field.value || []),
-                            URL.createObjectURL(file),
-                          ]);
-                        }}
-                      >
-                        <div className="flex h-full w-full flex-col items-center justify-center text-xs text-muted-foreground">
-                          <span>Add</span>
-                        </div>
-                      </ModernFileUpload>
+                      <div className="relative aspect-square h-full w-full">
+                        <ModernFileUpload
+                          variant="compact"
+                          className="h-full w-full"
+                          multiple={true}
+                          onFilesSelect={(files) => 
+                            handleAdditionalImagesUpload(files, field.value || [], field.onChange)
+                          }
+                          onFileSelect={(file) =>
+                            handleAdditionalImagesUpload([file], field.value || [], field.onChange)
+                          }
+                          disabled={isUploadingAdditional}
+                        />
+                          
+                          
+                        {isUploadingAdditional && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 text-xs font-medium text-center p-2">
+                            <Loader2 className="h-5 w-5 animate-spin mb-1" />
+                            <span>Uploading...</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
               />
             </CardContent>
           </Card>
-
-          <div className="space-y-6 col-span-2 grid grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing & Stock</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Controller
-                    control={form.control}
-                    name="sellingPrice"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="sellingPrice">
-                          Selling Price
-                        </FieldLabel>
-                        <Input
-                          id="sellingPrice"
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          value={(field.value as number) ?? ''}
-                        />
-                        {fieldState.error && (
-                          <FieldError>{fieldState.error.message}</FieldError>
-                        )}
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="costPrice"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="costPrice">Cost Price</FieldLabel>
-                        <Input
-                          id="costPrice"
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          value={(field.value as number) ?? ''}
-                        />
-                        {fieldState.error && (
-                          <FieldError>{fieldState.error.message}</FieldError>
-                        )}
-                      </Field>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Controller
-                    control={form.control}
-                    name="quantity"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="quantity">
-                          Current Stock
-                        </FieldLabel>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          {...field}
-                          value={(field.value as number) ?? ''}
-                        />
-                        {fieldState.error && (
-                          <FieldError>{fieldState.error.message}</FieldError>
-                        )}
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="minStockLevel"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="minStockLevel">
-                          Low Stock Alert
-                        </FieldLabel>
-                        <Input
-                          id="minStockLevel"
-                          type="number"
-                          {...field}
-                          value={(field.value as number) ?? ''}
-                        />
-                        <FieldDescription>
-                          Alert when stock reaches this level
-                        </FieldDescription>
-                        {fieldState.error && (
-                          <FieldError>{fieldState.error.message}</FieldError>
-                        )}
-                      </Field>
-                    )}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Discount</CardTitle>
-                <CardDescription>
-                  Apply discounts to this product
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Controller
-                  control={form.control}
-                  name="discount.enabled"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FieldLabel className="text-base">
-                          Enable Discount
-                        </FieldLabel>
-                        <FieldDescription>
-                          Apply a discount to the selling price.
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-
-                {form.watch('discount.enabled') && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <Controller
-                      control={form.control}
-                      name="discount.type"
-                      render={({ field }) => (
-                        <Field>
-                          <FieldLabel>Type</FieldLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="percentage">
-                                Percentage (%)
-                              </SelectItem>
-                              <SelectItem value="fixed">
-                                Fixed Amount
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      )}
-                    />
-                    <Controller
-                      control={form.control}
-                      name="discount.value"
-                      render={({ field }) => (
-                        <Field>
-                          <FieldLabel>Value</FieldLabel>
-                          <Input
-                            type="number"
-                            {...field}
-                            value={(field.value as number) ?? ''}
-                          />
-                        </Field>
-                      )}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Controller
-                  control={form.control}
-                  name="status"
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel>Product Status</FieldLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="published">Published</SelectItem>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && (
-                        <FieldError>{fieldState.error.message}</FieldError>
-                      )}
-                    </Field>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </div>
         </div>
 
         <div className="flex justify-end space-x-4">
@@ -509,8 +697,19 @@ export function ProductForm() {
           >
             Cancel
           </Button>
-          <Button type="submit">
-            {isEditing ? 'Update Product' : 'Create Product'}
+          <Button
+            type="submit"
+            disabled={
+              isUploading ||
+              createProduct.isPending ||
+              updateProduct.isPending ||
+              form.formState.isSubmitting
+            }
+          >
+            {(createProduct.isPending || updateProduct.isPending) && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {isEditing ? 'Save Changes' : 'Create Product'}
           </Button>
         </div>
       </form>

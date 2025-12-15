@@ -13,6 +13,8 @@ interface ModernFileUploadProps {
   className?: string;
   children?: React.ReactNode;
   variant?: UploadVariant;
+  multiple?: boolean;
+  onFilesSelect?: (files: File[]) => void;
 }
 
 export function ModernFileUpload({
@@ -23,6 +25,8 @@ export function ModernFileUpload({
   className,
   children,
   variant = 'default',
+  multiple = false,
+  onFilesSelect,
 }: ModernFileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +44,10 @@ export function ModernFileUpload({
         if (type === 'image/*') {
           return file.type.startsWith('image/');
         }
-        return file.type === type || file.name.toLowerCase().endsWith(type.replace('*', ''));
+        return (
+          file.type === type ||
+          file.name.toLowerCase().endsWith(type.replace('*', ''))
+        );
       });
 
       if (!isValidType) {
@@ -65,13 +72,38 @@ export function ModernFileUpload({
     [onFileSelect, validateFile]
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!disabled) {
-      setIsDragOver(true);
-    }
-  }, [disabled]);
+  const handleFilesSelect = useCallback(
+    (files: File[]) => {
+      setError(null);
+      const validFiles: File[] = [];
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+        validFiles.push(file);
+      }
+
+      if (onFilesSelect) {
+        onFilesSelect(validFiles);
+      } else if (validFiles.length > 0) {
+        onFileSelect(validFiles[0]);
+      }
+    },
+    [onFilesSelect, onFileSelect, validateFile]
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) {
+        setIsDragOver(true);
+      }
+    },
+    [disabled]
+  );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -89,22 +121,30 @@ export function ModernFileUpload({
 
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        handleFileSelect(files[0]);
+        if (multiple) {
+          handleFilesSelect(files);
+        } else {
+          handleFileSelect(files[0]);
+        }
       }
     },
-    [disabled, handleFileSelect]
+    [disabled, handleFileSelect, handleFilesSelect, multiple]
   );
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        handleFileSelect(files[0]);
+        if (multiple) {
+          handleFilesSelect(Array.from(files));
+        } else {
+          handleFileSelect(files[0]);
+        }
       }
       // Clear the input
       e.target.value = '';
     },
-    [handleFileSelect]
+    [handleFileSelect, handleFilesSelect, multiple]
   );
 
   const clearError = () => setError(null);
@@ -114,8 +154,8 @@ export function ModernFileUpload({
       <div
         className={cn(
           'relative border-2 border-dashed rounded-lg transition-colors cursor-pointer',
-          'hover:border-primary/50 hover:bg-accent/50',
-          isDragOver && 'border-primary bg-accent',
+          'hover:border-primary/50 hover:bg-accent/5',
+          isDragOver && 'border-primary bg-accent/30',
           disabled && 'opacity-50 cursor-not-allowed',
           error && 'border-destructive',
           variant === 'default' ? 'p-6' : 'p-4'
@@ -127,23 +167,28 @@ export function ModernFileUpload({
         <input
           type="file"
           accept={accept}
+          multiple={multiple}
           onChange={handleInputChange}
           disabled={disabled}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         />
-        
+
         {variant === 'default' ? (
           <div className="flex flex-col items-center justify-center text-center space-y-3">
-            <div className={cn(
-              'w-12 h-12 rounded-full flex items-center justify-center',
-              'bg-primary/10 text-primary'
-            )}>
+            <div
+              className={cn(
+                'w-12 h-12 rounded-full flex items-center justify-center',
+                'bg-primary/10 text-primary'
+              )}
+            >
               <Upload className="w-6 h-6" />
             </div>
-            
+
             <div className="space-y-1">
               <p className="text-sm font-medium">
-                {isDragOver ? 'Drop your file here' : 'Drag & drop your file here'}
+                {isDragOver
+                  ? 'Drop your file here'
+                  : 'Drag & drop your file here'}
               </p>
               <p className="text-xs text-muted-foreground">
                 or{' '}
@@ -156,23 +201,25 @@ export function ModernFileUpload({
                 </Button>
               </p>
             </div>
-            
+
             <p className="text-xs text-muted-foreground">
               Max {maxSize}MB • {accept.replace(/image\//g, '').toUpperCase()}
             </p>
           </div>
         ) : (
-          <div className="flex items-center space-x-3">
-            <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-              'bg-primary/10 text-primary'
-            )}>
+          <div className="flex items-center space-x-2">
+            <div
+              className={cn(
+                'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+                'bg-primary/10 text-primary'
+              )}
+            >
               <Upload className="w-4 h-4" />
             </div>
-            
+
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {isDragOver ? 'Drop your file here' : 'Drag & drop your file here'}
+              <p className="text-xs font-medium truncate">
+                {isDragOver ? 'Drop your file here' : 'Drag & drop file here'}
               </p>
               <p className="text-xs text-muted-foreground">
                 or{' '}
@@ -182,16 +229,18 @@ export function ModernFileUpload({
                   disabled={disabled}
                 >
                   browse files
-                </Button>
-                {' '}• Max {maxSize}MB
+                </Button>{' '}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Max {maxSize}MB
               </p>
             </div>
           </div>
         )}
-        
+
         {children}
       </div>
-      
+
       {error && (
         <div className="flex items-center justify-between bg-destructive/10 text-destructive text-sm p-3 rounded-md">
           <span>{error}</span>

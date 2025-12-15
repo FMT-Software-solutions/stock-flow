@@ -2,12 +2,14 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  category: string;
+  branchId?: string;
+  categoryId?: string;
+  category?: { id: string; name: string };
   description?: string;
   costPrice: number;
   sellingPrice: number;
   quantity: number;
-  minStockLevel: number; // For low stock alerts
+  minStockLevel: number;
   unit: string;
   status: 'published' | 'draft' | 'inactive';
   imageUrl?: string;
@@ -18,18 +20,23 @@ export interface Product {
     value: number;
   };
   supplierId?: string;
+  supplier?: { id: string; name: string };
   taxRate?: number;
   barcode?: string;
-  location?: string; // e.g. Aisle 3, Shelf B
+  location?: string;
   createdAt: string;
   updatedAt: string;
+  hasVariations?: boolean;
+  variants?: ProductVariant[];
+  organizationId?: string;
+  createdByName?: string;
 }
 
 export interface Category {
   id: string;
   name: string;
   description?: string;
-  parentId?: string; // For nested categories
+  parentId?: string;
   image?: string;
   productCount: number;
 }
@@ -42,6 +49,41 @@ export interface Supplier {
   phone?: string;
   address?: string;
   website?: string;
+  organizationId?: string;
+}
+
+export interface VariationType {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    organizationId?: string;
+}
+
+export interface VariationOption {
+    id: string;
+    variationTypeId: string;
+    value: string;
+    organizationId?: string;
+}
+
+export interface ProductVariant {
+    id: string;
+    productId: string;
+    sku: string;
+    price: number;
+    attributes: Record<string, string>;
+    organizationId: string;
+    quantity?: number;
+    minStockLevel?: number;
+    location?: string;
+}
+
+export interface ProductVariantInput {
+    id?: string;
+    sku: string;
+    price: number;
+    quantity: number;
+    attributes: Record<string, string>;
 }
 
 export interface Order {
@@ -55,6 +97,33 @@ export interface Order {
   paymentStatus: 'paid' | 'unpaid' | 'partial' | 'refunded';
   paymentMethod?: string;
   items: OrderItem[];
+}
+
+export interface InventoryEntry {
+  id: string;
+  productId: string;
+  variantId?: string;
+  branchId?: string;
+  productName: string;
+  sku: string;
+  unit?: string;
+  branchName?: string;
+  quantity: number;
+  minStockLevel: number;
+  location?: string;
+  organizationId: string;
+  lastUpdated: string;
+  createdByName?: string;
+}
+
+export interface InventoryEntryInput {
+  productId: string;
+  variantId?: string;
+  branchId: string;
+  quantity: number;
+  minStockLevel?: number;
+  location?: string;
+  organizationId: string;
 }
 
 export interface OrderItem {

@@ -17,60 +17,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, X, Loader2, Wand2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, X, Loader2, Wand2 } from 'lucide-react';
 
-import { Switch } from '@/components/ui/switch';
 import { ModernFileUpload } from '@/components/shared/ModernFileUpload';
-import { useCreateProduct, useUpdateProduct } from '@/hooks/useInventoryQueries';
+import {
+  useCreateProduct,
+  useUpdateProduct,
+} from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { uploadImageToCloudinary, deleteImageFromCloudinary } from '@/utils/cloudinary';
+import {
+  uploadImageToCloudinary,
+  deleteImageFromCloudinary,
+} from '@/utils/cloudinary';
 import { useState } from 'react';
 import type { Product, Category, Supplier } from '@/types/inventory';
-import {
-  ProductVariations,
-  type GeneratedVariant,
-} from './components/ProductVariations';
 import { toast } from 'sonner';
 import { useProductForm } from './hooks/useProductForm';
-
-const productSchema = z.object({
-  name: z.string().min(2, {
-    message: 'Product name must be at least 2 characters.',
-  }),
-  sku: z.string().min(1, {
-    message: 'SKU is required.',
-  }),
-  categoryId: z.string().min(1, {
-    message: 'Category is required.',
-  }),
-  supplierId: z.string().optional(),
-  description: z.string().optional(),
-  sellingPrice: z.coerce.number().min(0),
-  costPrice: z.coerce.number().min(0),
-  quantity: z.coerce.number().min(0),
-  minStockLevel: z.coerce.number().min(0),
-  unit: z.string().default('pcs'),
-  status: z.enum(['published', 'draft', 'inactive']).default('published'),
-  imageUrl: z.string().optional(),
-  additionalImages: z.array(z.string()).optional(),
-  discount: z
-    .object({
-      enabled: z.boolean().default(false),
-      type: z.enum(['percentage', 'fixed']).default('percentage'),
-      value: z.coerce.number().min(0).default(0),
-    })
-    .optional(),
-  hasVariations: z.boolean().default(false),
-});
+import { productSchema } from './form-schema/product-form-schema';
+import { AiGeneratorButton } from '@/components/shared/AiGeneratorButton';
 
 interface ProductFormInnerProps {
   isEditing: boolean;
@@ -80,7 +46,6 @@ interface ProductFormInnerProps {
   categories: Category[];
   suppliers: Supplier[];
   defaultValues: z.infer<typeof productSchema>;
-  initialVariants: GeneratedVariant[];
 }
 
 export function ProductForm() {
@@ -95,7 +60,6 @@ export function ProductForm() {
     categories,
     suppliers,
     defaultValues,
-    initialVariants,
   } = useProductForm({ id, organizationId: orgId, isOrgLoading });
 
   if (isEditing && isLoading) {
@@ -112,7 +76,6 @@ export function ProductForm() {
       categories={categories}
       suppliers={suppliers}
       defaultValues={defaultValues}
-      initialVariants={initialVariants}
     />
   );
 }
@@ -125,7 +88,6 @@ function ProductFormInner({
   categories,
   suppliers,
   defaultValues,
-  initialVariants,
 }: ProductFormInnerProps) {
   const navigate = useNavigate();
 
@@ -134,7 +96,6 @@ function ProductFormInner({
 
   const [isUploadingMain, setIsUploadingMain] = useState(false);
   const [isUploadingAdditional, setIsUploadingAdditional] = useState(false);
-  const [variants, setVariants] = useState<GeneratedVariant[]>(initialVariants);
 
   const isUploading = isUploadingMain || isUploadingAdditional;
 
@@ -146,13 +107,6 @@ function ProductFormInner({
   async function onSubmit(values: z.infer<typeof productSchema>) {
     if (!orgId) return;
 
-    if (values.hasVariations && variants.length === 0) {
-      toast.error(
-        'Please configure at least one variation or disable variations'
-      );
-      return;
-    }
-
     try {
       if (isEditing && id) {
         await updateProduct.mutateAsync({
@@ -160,7 +114,6 @@ function ProductFormInner({
           updates: {
             ...values,
             organizationId: orgId,
-            variants: values.hasVariations ? variants as any : undefined,
           },
           oldImageUrl: product?.imageUrl,
         });
@@ -169,7 +122,6 @@ function ProductFormInner({
         await createProduct.mutateAsync({
           ...values,
           organizationId: orgId,
-          variants: values.hasVariations ? variants : undefined,
         });
         toast.success('Product created successfully');
       }
@@ -204,9 +156,9 @@ function ProductFormInner({
     try {
       setIsUploadingAdditional(true);
       // Upload all images concurrently
-      const uploadPromises = files.map(file => uploadImageToCloudinary(file));
+      const uploadPromises = files.map((file) => uploadImageToCloudinary(file));
       const newUrls = await Promise.all(uploadPromises);
-      
+
       onChange([...currentImages, ...newUrls]);
     } catch (error) {
       console.error('Upload failed', error);
@@ -224,9 +176,9 @@ function ProductFormInner({
     // Optimistically update the UI first? Or wait for deletion?
     // User requested: "even if we've not saved the images to our db yet, we can still delete them"
     // So we should try to delete from cloudinary.
-    
+
     // Remove from UI immediately to feel responsive
-    const newImages = currentImages.filter(url => url !== urlToRemove);
+    const newImages = currentImages.filter((url) => url !== urlToRemove);
     onChange(newImages);
 
     // Delete from Cloudinary in background
@@ -234,7 +186,7 @@ function ProductFormInner({
       await deleteImageFromCloudinary(urlToRemove);
     } catch (error) {
       console.error('Failed to delete image from Cloudinary', error);
-      // We don't necessarily need to revert the UI change if it fails, 
+      // We don't necessarily need to revert the UI change if it fails,
       // but logging it is good.
     }
   };
@@ -251,39 +203,33 @@ function ProductFormInner({
     }
   };
 
-  const watchedHasVariations = form.watch('hasVariations');
-  const watchedSellingPrice = form.watch('sellingPrice');
-  const watchedSku = form.watch('sku');
-  const watchedQuantity = form.watch('quantity');
-
-  // Calculate total variant quantity
-  const totalVariantQuantity = variants.reduce((acc, v) => acc + (v.quantity || 0), 0);
-  const showQuantityWarning = watchedHasVariations && variants.length > 0 && totalVariantQuantity !== Number(watchedQuantity);
-
   const generateSku = () => {
     const name = form.getValues('name');
     if (!name) {
       toast.error('Please enter a product name first to generate SKU');
       return;
     }
-    
+
     // Generate SKU: First 3 letters of name (or first letter of each word) + Random 4 digits
     const cleanName = name.replace(/[^a-zA-Z0-9\s]/g, '').toUpperCase();
     const words = cleanName.split(/\s+/);
     let prefix = '';
-    
+
     if (words.length > 1) {
-      prefix = words.slice(0, 3).map(w => w[0]).join('');
+      prefix = words
+        .slice(0, 3)
+        .map((w) => w[0])
+        .join('');
     } else {
       prefix = cleanName.substring(0, 3);
     }
-    
+
     // Ensure prefix is at least 3 chars
     prefix = prefix.padEnd(3, 'X').substring(0, 3);
-    
+
     const random = Math.floor(1000 + Math.random() * 9000);
     const sku = `${prefix}-${random}`;
-    
+
     form.setValue('sku', sku, { shouldValidate: true, shouldDirty: true });
     toast.success(`Generated SKU: ${sku}`);
   };
@@ -299,27 +245,18 @@ function ProductFormInner({
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditing ? 'Edit Product' : 'New Product'}
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isEditing ? 'Edit Product' : 'Create New Product'}
           </h1>
-          <p className="text-muted-foreground">
-            {isEditing
-              ? 'Make changes to your product details'
-              : 'Add a new product to your inventory'}
-          </p>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <div className="grid gap-6 md:grid-cols-2">
-
-          <div className='space-y-4'>
+          <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Product Details</CardTitle>
-                <CardDescription>
-                  Basic information about the product
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Controller
@@ -343,7 +280,11 @@ function ProductFormInner({
                       <Field data-invalid={!!fieldState.error}>
                         <FieldLabel htmlFor="sku">SKU</FieldLabel>
                         <div className="flex gap-2">
-                          <Input id="sku" placeholder="IP14PRO-128" {...field} />
+                          <Input
+                            id="sku"
+                            placeholder="IP14PRO-128"
+                            {...field}
+                          />
                           <Button
                             type="button"
                             variant="outline"
@@ -365,11 +306,11 @@ function ProductFormInner({
                     name="categoryId"
                     render={({ field, fieldState }) => (
                       <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel>Category</FieldLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                        <FieldLabel>Category</FieldLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
@@ -387,7 +328,6 @@ function ProductFormInner({
                       </Field>
                     )}
                   />
-                  
                 </div>
 
                 <Controller
@@ -396,7 +336,10 @@ function ProductFormInner({
                   render={({ field, fieldState }) => (
                     <Field data-invalid={!!fieldState.error}>
                       <FieldLabel>Supplier</FieldLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select supplier" />
                         </SelectTrigger>
@@ -417,7 +360,20 @@ function ProductFormInner({
                   name="description"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={!!fieldState.error}>
-                      <FieldLabel htmlFor="description">Description</FieldLabel>
+                      <div className="flex items-center justify-between">
+                        <FieldLabel htmlFor="description" className="mb-0">
+                          Description
+                        </FieldLabel>
+                        <AiGeneratorButton
+                          context={{
+                            productName: form.watch('name'),
+                            categoryName: categories.find(
+                              (c) => c.id === form.watch('categoryId')
+                            )?.name,
+                          }}
+                          onGenerate={(text) => field.onChange(text)}
+                        />
+                      </div>
                       <Textarea
                         id="description"
                         placeholder="Product description..."
@@ -435,7 +391,7 @@ function ProductFormInner({
 
             <Card>
               <CardHeader>
-                <CardTitle>Pricing & Unit <var></var></CardTitle>
+                <CardTitle>Pricing</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -478,35 +434,9 @@ function ProductFormInner({
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <Controller
-                    control={form.control}
-                    name="unit"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel htmlFor="unit">Unit</FieldLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pcs">Pieces (pcs)</SelectItem>
-                            <SelectItem value="kg">Kilogram (kg)</SelectItem>
-                            <SelectItem value="l">Liter (l)</SelectItem>
-                            <SelectItem value="m">Meter (m)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    )}
-                  />
-                </div>
               </CardContent>
             </Card>
 
-            
             <Card>
               <CardHeader>
                 <CardTitle>Settings</CardTitle>
@@ -539,48 +469,8 @@ function ProductFormInner({
                     </div>
                   )}
                 />
-                <Controller
-                  control={form.control}
-                  name="hasVariations"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FieldLabel>Has Variations</FieldLabel>
-                        <FieldDescription>
-                          Does this product have variants (e.g. size, color)?
-                        </FieldDescription>
-                      </div>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
               </CardContent>
             </Card>
-
-            {watchedHasVariations && (
-              <div className="col-span-2 space-y-4">
-                <ProductVariations
-                  basePrice={Number(watchedSellingPrice) || 0}
-                  baseSku={String(watchedSku || '')}
-                  onChange={setVariants}
-                  initialVariants={variants}
-                />
-                
-                {showQuantityWarning && (
-                  <Alert variant="default" className="border-yellow-200/30 text-yellow-500 shadow-sm">
-                    <AlertCircle className="h-4 w-4 text-yellow-800" />
-                    <AlertTitle>Quantity Mismatch</AlertTitle>
-                    <AlertDescription>
-                      The total quantity from variations ({totalVariantQuantity}) does not match the product quantity ({Number(watchedQuantity)}).
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            )}
-          
           </div>
 
           <Card>
@@ -606,7 +496,9 @@ function ProductFormInner({
                           variant="destructive"
                           size="icon"
                           className="absolute right-2 top-2 h-6 w-6"
-                          onClick={() => handleRemoveMainImage(field.value!, field.onChange)}
+                          onClick={() =>
+                            handleRemoveMainImage(field.value!, field.onChange)
+                          }
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -653,7 +545,13 @@ function ProductFormInner({
                             variant="destructive"
                             size="icon"
                             className="absolute right-1 top-1 h-5 w-5"
-                            onClick={() => handleRemoveImage(url, field.value || [], field.onChange)}
+                            onClick={() =>
+                              handleRemoveImage(
+                                url,
+                                field.value || [],
+                                field.onChange
+                              )
+                            }
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -664,16 +562,23 @@ function ProductFormInner({
                           variant="compact"
                           className="h-full w-full"
                           multiple={true}
-                          onFilesSelect={(files) => 
-                            handleAdditionalImagesUpload(files, field.value || [], field.onChange)
+                          onFilesSelect={(files) =>
+                            handleAdditionalImagesUpload(
+                              files,
+                              field.value || [],
+                              field.onChange
+                            )
                           }
                           onFileSelect={(file) =>
-                            handleAdditionalImagesUpload([file], field.value || [], field.onChange)
+                            handleAdditionalImagesUpload(
+                              [file],
+                              field.value || [],
+                              field.onChange
+                            )
                           }
                           disabled={isUploadingAdditional}
                         />
-                          
-                          
+
                         {isUploadingAdditional && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 text-xs font-medium text-center p-2">
                             <Loader2 className="h-5 w-5 animate-spin mb-1" />

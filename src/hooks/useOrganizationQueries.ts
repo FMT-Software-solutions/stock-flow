@@ -55,7 +55,8 @@ export function useUserOrganizations(userId: string | undefined) {
             logo_settings,
             brand_colors,
             notification_settings,
-            is_active
+            is_active,
+            ai_daily_limit
           )
         `)
         .eq('user_id', userId)

@@ -21,7 +21,11 @@ export function BranchFormSelector({
   disabled,
   placeholder = 'Select branch',
 }: BranchFormSelectorProps) {
-  const { availableBranches, selectedBranchIds, isLoading } = useBranchContext();
+  const {
+    availableBranches,
+    selectedBranchIds,
+    isLoading,
+  } = useBranchContext();
 
   const hasSingleGlobalSelection = selectedBranchIds.length === 1;
   const userHasSingleBranch = availableBranches.length === 1;
@@ -30,12 +34,11 @@ export function BranchFormSelector({
     ? availableBranches.filter((b) => selectedBranchIds.includes(b.id))
     : availableBranches;
 
-  const defaultBranchId =
-    hasSingleGlobalSelection
-      ? selectedBranchIds[0]
-      : userHasSingleBranch
-      ? availableBranches[0]?.id
-      : undefined;
+  const defaultBranchId = hasSingleGlobalSelection
+    ? selectedBranchIds[0]
+    : userHasSingleBranch
+    ? availableBranches[0]?.id
+    : undefined;
 
   useEffect(() => {
     if (!value && defaultBranchId) {
@@ -56,7 +59,7 @@ export function BranchFormSelector({
   if (options.length === 0) {
     return (
       <Select disabled>
-        <SelectTrigger>
+        <SelectTrigger className="w-full">
           <SelectValue placeholder="No branches" />
         </SelectTrigger>
       </Select>
@@ -64,12 +67,8 @@ export function BranchFormSelector({
   }
 
   return (
-    <Select
-      value={value}
-      onValueChange={onChange}
-      disabled={disabled}
-    >
-      <SelectTrigger>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -82,4 +81,3 @@ export function BranchFormSelector({
     </Select>
   );
 }
-

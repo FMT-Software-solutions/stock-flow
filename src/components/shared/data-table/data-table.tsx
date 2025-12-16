@@ -4,6 +4,7 @@ import {
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
+  type PaginationState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -29,6 +30,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   searchKey?: string
   filterFields?: DataTableFilterField[]
+  onRowClick?: (row: TData) => void
+  storageKey?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -36,14 +39,58 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   filterFields,
+  onRowClick,
+  storageKey,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+    React.useState<VisibilityState>(() => {
+      if (storageKey) {
+        try {
+          const item = window.localStorage.getItem(`${storageKey}-visibility`)
+          return item ? JSON.parse(item) : {}
+        } catch (e) {
+          return {}
+        }
+      }
+      return {}
+    })
   const [rowSelection, setRowSelection] = React.useState({})
+  const [pagination, setPagination] = React.useState<PaginationState>(() => {
+    if (storageKey) {
+      try {
+        const item = window.localStorage.getItem(`${storageKey}-pagination`)
+        if (item) {
+          const parsed = JSON.parse(item)
+          return { pageIndex: 0, pageSize: parsed.pageSize || 10 }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return { pageIndex: 0, pageSize: 10 }
+  })
+
+  React.useEffect(() => {
+    if (storageKey) {
+      window.localStorage.setItem(
+        `${storageKey}-visibility`,
+        JSON.stringify(columnVisibility)
+      )
+    }
+  }, [columnVisibility, storageKey])
+
+  React.useEffect(() => {
+    if (storageKey) {
+      window.localStorage.setItem(
+        `${storageKey}-pagination`,
+        JSON.stringify({ pageSize: pagination.pageSize })
+      )
+    }
+  }, [pagination.pageSize, storageKey])
 
   const table = useReactTable({
     data,
@@ -56,11 +103,13 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      pagination,
     },
   })
 
@@ -97,6 +146,8 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  onClick={() => onRowClick?.(row.original)}
+                  className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

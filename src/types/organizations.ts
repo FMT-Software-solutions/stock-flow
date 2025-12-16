@@ -47,6 +47,7 @@ export interface Organization {
   notification_settings: NotificationSettings;
   theme_name?: string | null;
   is_active: boolean;
+  ai_daily_limit: number;
 }
 
 export interface OrganizationRoleEntity {

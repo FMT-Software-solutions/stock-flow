@@ -31,6 +31,7 @@ const mapProductFromDB = (data: any): Product => ({
   hasVariations: data.has_variations,
   organizationId: data.organization_id,
   createdByName: data.created_by_name,
+  isDeleted: data.is_deleted,
 });
 
 const mapCategoryFromDB = (data: any): Category => ({
@@ -65,6 +66,8 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
       productName = `${productName} (${attributeString})`;
     }
     sku = data.variant.sku || sku;
+  } else if (data.custom_label) {
+    productName = `${productName} (${data.custom_label})`;
   }
 
   return {
@@ -82,6 +85,15 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     organizationId: data.organization_id,
     lastUpdated: data.last_updated,
     createdByName: data.creator ? `${data.creator.first_name || ''} ${data.creator.last_name || ''}`.trim() : undefined,
+    customLabel: data.custom_label,
+    priceOverride: data.price_override ? Number(data.price_override) : undefined,
+    type: data.type,
+    imageUrl: data.image_url,
+    productPrice: data.product?.selling_price ? Number(data.product.selling_price) : undefined,
+    variantPrice: data.variant?.price ? Number(data.variant.price) : undefined,
+    productImage: data.product?.image_url,
+    categoryName: data.product?.category?.name,
+    isDeleted: data.is_deleted,
   };
 };
 
@@ -96,6 +108,7 @@ export function useProducts(organizationId?: string) {
         .from('products_view')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -113,7 +126,8 @@ export function useProductInventory(productId?: string) {
       const { data, error } = await supabase
         .from('inventory')
         .select('*')
-        .eq('product_id', productId);
+        .eq('product_id', productId)
+        .eq('is_deleted', false);
 
       if (error) throw error;
       return data; // Returns raw DB shape, sufficient for checking existence
@@ -136,6 +150,10 @@ export function useCreateInventoryEntry() {
           min_stock_level: entry.minStockLevel || 0,
           location: entry.location,
           organization_id: entry.organizationId,
+          custom_label: entry.customLabel,
+          price_override: entry.priceOverride,
+          type: entry.type || 'variant',
+          image_url: entry.imageUrl,
         })
         .select()
         .single();
@@ -150,6 +168,37 @@ export function useCreateInventoryEntry() {
   });
 }
 
+export function useUpdateInventoryEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: Partial<InventoryEntryInput> & { id: string }) => {
+      const { id, ...data } = updates;
+      
+      const updateData: any = {};
+      if (data.quantity !== undefined) updateData.quantity = data.quantity;
+      if (data.minStockLevel !== undefined) updateData.min_stock_level = data.minStockLevel;
+      if (data.location !== undefined) updateData.location = data.location;
+      if (data.customLabel !== undefined) updateData.custom_label = data.customLabel;
+      if (data.priceOverride !== undefined) updateData.price_override = data.priceOverride;
+      if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
+
+      const { data: updated, error } = await supabase
+        .from('inventory')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return updated;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['product_inventory'] });
+    },
+  });
+}
+
 export function useProduct(id?: string) {
   return useQuery({
     queryKey: ['product', id],
@@ -159,6 +208,7 @@ export function useProduct(id?: string) {
         .from('products_view')
         .select('*')
         .eq('id', id)
+        .eq('is_deleted', false)
         .single();
 
       if (error) throw error;
@@ -320,8 +370,6 @@ export function useUpdateProduct() {
                 sku: variant.sku,
                 price: variant.price,
                 attributes: variant.attributes,
-                quantity: variant.quantity,
-                min_stock_level: updates.minStockLevel || 0
               })
               .eq('id', variant.id);
             
@@ -347,8 +395,6 @@ export function useUpdateProduct() {
                 price: variant.price,
                 attributes: variant.attributes,
                 organization_id: updates.organizationId,
-                quantity: variant.quantity,
-                min_stock_level: updates.minStockLevel || 0
               })
               .select()
               .single();
@@ -404,20 +450,40 @@ export function useUpdateProduct() {
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, imageUrl }: { id: string; imageUrl?: string }) => {
-      if (imageUrl) {
-        await deleteImageFromCloudinary(imageUrl);
-      }
+    mutationFn: async ({ id }: { id: string; imageUrl?: string }) => {
+      // For soft delete, we don't delete the image yet
+      // if (imageUrl) {
+      //   await deleteImageFromCloudinary(imageUrl);
+      // }
 
       const { error } = await supabase
         .from('products')
-        .delete()
+        .update({ is_deleted: true })
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] }); // Invalidate inventory too as it cascades
+    },
+  });
+}
+
+export function useDeleteInventoryEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('inventory')
+        .update({ is_deleted: true })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // Products view aggregates inventory, so update it
     },
   });
 }
@@ -508,12 +574,12 @@ export function useCreateSupplier() {
   });
 }
 
-export function useInventoryEntries(organizationId?: string) {
+export function useInventoryEntries(organizationId?: string, branchIds?: string[]) {
   return useQuery({
-    queryKey: ['inventory_entries', organizationId],
+    queryKey: ['inventory_entries', organizationId, branchIds],
     queryFn: async () => {
       if (!organizationId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('inventory')
         .select(`
           id,
@@ -525,15 +591,25 @@ export function useInventoryEntries(organizationId?: string) {
           location,
           organization_id,
           last_updated,
+          custom_label,
+          price_override,
+          type,
+          image_url,
           product:products (
             id,
             name,
             sku,
-            unit
+            unit,
+            selling_price,
+            image_url,
+            category:product_categories (
+              name
+            )
           ),
           variant:product_variants (
             id,
             sku,
+            price,
             attributes
           ),
           branch:branches (
@@ -546,7 +622,13 @@ export function useInventoryEntries(organizationId?: string) {
           )
         `)
         .eq('organization_id', organizationId)
-        .order('last_updated', { ascending: false });
+        .eq('is_deleted', false);
+
+      if (branchIds && branchIds.length > 0) {
+        query = query.in('branch_id', branchIds);
+      }
+
+      const { data, error } = await query.order('last_updated', { ascending: false });
 
       if (error) throw error;
       return data.map(mapInventoryEntryFromDB);

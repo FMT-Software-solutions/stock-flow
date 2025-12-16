@@ -2,6 +2,7 @@ import { OrganizationSelector } from '../shared/OrganizationSelector';
 import { BranchSelector } from '../shared/BranchSelector';
 import { UserProfileDropdown } from '../shared/UserProfileDropdown';
 import { RestartToUpdateButton } from '../../modules/auto-update/RestartToUpdateButton';
+import { AiUsageIndicator } from '../shared/AiUsageIndicator';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
@@ -24,6 +25,7 @@ export function Header({ className }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4">
+          <AiUsageIndicator />
           <RestartToUpdateButton />
         </div>
 

@@ -4,6 +4,7 @@ import { OrganizationSelector } from '../shared/OrganizationSelector';
 import { BranchSelector } from '../shared/BranchSelector';
 import { UserProfileDropdown } from '../shared/UserProfileDropdown';
 import { RestartToUpdateButton } from '../../modules/auto-update/RestartToUpdateButton';
+import { AiUsageIndicator } from '../shared/AiUsageIndicator';
 import { Button } from '@/components/ui/button';
 import { Grid, ArrowLeft } from 'lucide-react';
 import { GridLauncher } from './GridLauncher';
@@ -61,6 +62,7 @@ export function GridLayout() {
               <div className="h-6 w-px bg-border" />
               <BranchSelector />
             </div>
+            <AiUsageIndicator />
             <RestartToUpdateButton />
             <UserProfileDropdown />
           </div>

@@ -6,6 +6,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { OrganizationProvider } from '../contexts/OrganizationContext';
 import { BranchProvider } from '../contexts/BranchContext';
 import { PaletteProvider } from '../contexts/PaletteContext';
+import { AiUsageProvider } from '../contexts/AiUsageContext';
 
 // Auth pages
 import { Login } from '../pages/auth/Login';
@@ -20,7 +21,7 @@ import { Branches } from '../pages/Branches';
 import { Dashboard } from '../pages/Dashboard';
 import { Inventory } from '../pages/Inventory';
 import { ProductForm } from '../pages/inventory/ProductForm';
-import { InventoryForm } from '../pages/inventory/InventoryForm';
+import { ProductDetails } from '../pages/inventory/ProductDetails';
 import { Orders } from '../pages/Orders';
 import { OrderForm } from '../pages/orders/OrderForm';
 import { Customers } from '../pages/Customers';
@@ -107,15 +108,15 @@ function AppRoutes() {
           }
         />
         <Route
-          path="inventory/stock/new"
+          path="inventory/:id"
           element={
-            <PermissionGuard scope="inventory" action="create">
-              <InventoryForm />
+            <PermissionGuard scope="inventory">
+              <ProductDetails />
             </PermissionGuard>
           }
         />
         <Route
-          path="inventory/:id"
+          path="inventory/:id/edit"
           element={
             <PermissionGuard scope="inventory" action="edit">
               <ProductForm />
@@ -259,11 +260,13 @@ export function AppRouter() {
     <HashRouter>
       <AuthProvider>
         <OrganizationProvider>
-          <BranchProvider>
-            <PaletteProvider>
-              <AppRoutes />
-            </PaletteProvider>
-          </BranchProvider>
+          <AiUsageProvider>
+            <BranchProvider>
+              <PaletteProvider>
+                <AppRoutes />
+              </PaletteProvider>
+            </BranchProvider>
+          </AiUsageProvider>
         </OrganizationProvider>
       </AuthProvider>
     </HashRouter>

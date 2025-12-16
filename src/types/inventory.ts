@@ -30,6 +30,7 @@ export interface Product {
   variants?: ProductVariant[];
   organizationId?: string;
   createdByName?: string;
+  isDeleted?: boolean;
 }
 
 export interface Category {
@@ -114,6 +115,15 @@ export interface InventoryEntry {
   organizationId: string;
   lastUpdated: string;
   createdByName?: string;
+  customLabel?: string;
+  priceOverride?: number;
+  type?: 'variant' | 'custom';
+  imageUrl?: string;
+  productPrice?: number;
+  variantPrice?: number;
+  productImage?: string;
+  categoryName?: string;
+  isDeleted?: boolean;
 }
 
 export interface InventoryEntryInput {
@@ -124,6 +134,10 @@ export interface InventoryEntryInput {
   minStockLevel?: number;
   location?: string;
   organizationId: string;
+  customLabel?: string;
+  priceOverride?: number;
+  type?: 'variant' | 'custom';
+  imageUrl?: string;
 }
 
 export interface OrderItem {

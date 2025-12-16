@@ -3,17 +3,9 @@ import { type Product, type InventoryEntry } from "@/types/inventory"
 import { DataTableColumnHeader } from "@/components/shared/data-table/data-table-column-header"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Edit, Trash, Eye } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay"
+import { InventoryActions } from "./components/InventoryActions"
+import { ProductActions } from "./components/ProductActions"
 
 import { Link } from "react-router-dom"
 
@@ -37,6 +29,7 @@ const formatRelativeTime = (value: string) => {
   const then = new Date(value).getTime()
   const diffMs = now - then
   const diffSeconds = Math.floor(diffMs / 1000)
+  if (diffSeconds < 5) return 'Just now'
   if (diffSeconds < 60) return `${diffSeconds}s ago`
   const diffMinutes = Math.floor(diffSeconds / 60)
   if (diffMinutes < 60) return `${diffMinutes}min ago`
@@ -82,7 +75,9 @@ export const columns: ColumnDef<Product>[] = [
                     <img src={row.original.imageUrl} alt={row.getValue("name")} className="h-8 w-8 rounded-md object-cover" />
                 )}
                 <div className="flex flex-col">
-                    <span className="font-medium">{row.getValue("name")}</span>
+                    <Link to={`/inventory/${row.original.id}`} className="font-medium hover:underline">
+                        {row.getValue("name")}
+                    </Link>
                     <span className="text-xs text-muted-foreground">{row.original.sku}</span>
                 </div>
             </div>
@@ -200,43 +195,7 @@ export const columns: ColumnDef<Product>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const product = row.original
- 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(product.id)}
-            >
-              Copy Product ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-                <Link to={`/inventory/${product.id}`} className="flex items-center">
-                    <Eye className="mr-2 h-4 w-4" /> View Details
-                </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-                <Link to={`/inventory/${product.id}`} className="flex items-center">
-                    <Edit className="mr-2 h-4 w-4" /> Edit
-                </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">
-
-                <Trash className="mr-2 h-4 w-4" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
+    cell: ({ row }) => <ProductActions product={row.original} />,
   },
 ]
 
@@ -271,13 +230,56 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     cell: ({ row }) => {
       const sku = row.original.sku
       const branchName = row.original.branchName
+      const imageUrl = row.original.imageUrl || row.original.productImage
+      
       return (
-        <div className="flex flex-col">
-          <span className="font-medium">{row.original.productName}</span>
-          <span className="text-xs text-muted-foreground">
-            {sku}
-            {branchName ? ` • ${branchName}` : ''}
-          </span>
+        <div className="flex items-center space-x-2">
+          {imageUrl && (
+            <img 
+              src={imageUrl} 
+              alt={row.original.productName} 
+              className="h-8 w-8 rounded-md object-cover" 
+            />
+          )}
+          <div className="flex flex-col">
+            <Link to={`/inventory/${row.original.productId}`} className="font-medium hover:underline">
+                {row.original.productName}
+            </Link>
+            <span className="text-xs text-muted-foreground">
+              {sku}
+              {branchName ? ` • ${branchName}` : ''}
+            </span>
+          </div>
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "categoryName",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Category" />
+    ),
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
+    },
+    enableHiding: true,
+  },
+  {
+    accessorKey: "priceOverride",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Price" />
+    ),
+    cell: ({ row }) => {
+      const priceOverride = row.original.priceOverride
+      const displayPrice = priceOverride ?? row.original.productPrice
+      
+      return (
+        <div className="font-medium">
+          {displayPrice !== undefined ? (
+            <CurrencyDisplay amount={displayPrice} />
+          ) : (
+            <span className="text-muted-foreground text-xs italic">-</span>
+          )}
         </div>
       )
     },
@@ -337,5 +339,9 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
         </div>
       )
     },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => <InventoryActions inventory={row.original} />,
   },
 ]

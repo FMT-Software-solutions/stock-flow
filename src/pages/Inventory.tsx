@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DataTable } from '@/components/shared/data-table/data-table';
 import { columns, inventoryColumns } from './inventory/columns';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DataTableFilterField } from '@/types/data-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,19 +12,38 @@ import { CategoryDialog } from './inventory/CategoryDialog';
 import { VariationTypeDialog } from './inventory/VariationTypeDialog';
 import { useProducts, useInventoryEntries } from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useBranchContext } from '@/contexts/BranchContext';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 export function Inventory() {
   const navigate = useNavigate();
   const { currentOrganization } = useOrganization();
+  const { selectedBranchIds } = useBranchContext();
   const { data: products = [], isLoading } = useProducts(
     currentOrganization?.id
   );
   const { data: inventoryEntries = [] } = useInventoryEntries(
-    currentOrganization?.id
+    currentOrganization?.id,
+    selectedBranchIds
   );
+
   const [activeTab, setActiveTab] = useState('products');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [variationDialogOpen, setVariationDialogOpen] = useState(false);
+  const [openProductSearch, setOpenProductSearch] = useState(false);
 
   const categories = Array.from(
     new Set(products.map((p) => p.category?.name).filter(Boolean))
@@ -70,6 +89,25 @@ export function Inventory() {
     },
   ];
 
+  const inventoryFilterFields: DataTableFilterField[] = [
+    {
+      id: 'categoryName',
+      label: 'Category',
+      type: 'select',
+      options: categories,
+    },
+    {
+      id: 'quantity',
+      label: 'Stock',
+      type: 'number',
+    },
+    {
+      id: 'lastUpdated',
+      label: 'Last Updated',
+      type: 'date-range',
+    },
+  ];
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -102,9 +140,39 @@ export function Inventory() {
             </Button>
           )}
           {activeTab === 'inventory' && (
-            <Button onClick={() => navigate('/inventory/stock/new')}>
-              <Plus className="mr-2 h-4 w-4" /> Add Inventory
-            </Button>
+            <Popover
+              open={openProductSearch}
+              onOpenChange={setOpenProductSearch}
+            >
+              <PopoverTrigger asChild>
+                <Button role="combobox" aria-expanded={openProductSearch}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Inventory
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search product..." />
+                  <CommandList>
+                    <CommandEmpty>No product found.</CommandEmpty>
+                    <CommandGroup>
+                      {products.map((product) => (
+                        <CommandItem
+                          key={product.id}
+                          value={product.name}
+                          onSelect={() => {
+                            setOpenProductSearch(false);
+                            navigate(`/inventory/${product.id}`);
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4 opacity-0')} />
+                          {product.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
           {activeTab === 'categories' && (
             <Button onClick={() => setCategoryDialogOpen(true)}>
@@ -130,6 +198,7 @@ export function Inventory() {
             data={products}
             searchKey="name"
             filterFields={filterFields}
+            storageKey="inventory-products-table"
           />
         </TabsContent>
         <TabsContent value="inventory" className="space-y-4">
@@ -137,6 +206,8 @@ export function Inventory() {
             columns={inventoryColumns}
             data={inventoryEntries}
             searchKey="productName"
+            filterFields={inventoryFilterFields}
+            storageKey="inventory-entries-table"
           />
         </TabsContent>
         <TabsContent value="categories">

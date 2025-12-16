@@ -3,6 +3,7 @@ import { OrganizationSelector } from '../shared/OrganizationSelector';
 import { BranchSelector } from '../shared/BranchSelector';
 import { UserProfileDropdown } from '../shared/UserProfileDropdown';
 import { RestartToUpdateButton } from '../../modules/auto-update/RestartToUpdateButton';
+import { AiUsageIndicator } from '../shared/AiUsageIndicator';
 import { cn } from '@/lib/utils';
 import { navItems } from '@/config/navigation';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
@@ -172,6 +173,7 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4">
+          <AiUsageIndicator />
           <RestartToUpdateButton />
           <UserProfileDropdown />
         </div>

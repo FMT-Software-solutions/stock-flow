@@ -199,6 +199,36 @@ export function useUpdateInventoryEntry() {
   });
 }
 
+export function useBulkUpdateInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, updates }: { ids: string[]; updates: Partial<InventoryEntryInput> }) => {
+      const updateData: any = {};
+      if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
+      if (updates.minStockLevel !== undefined) updateData.min_stock_level = updates.minStockLevel;
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.customLabel !== undefined) updateData.custom_label = updates.customLabel;
+      if (updates.priceOverride !== undefined) updateData.price_override = updates.priceOverride;
+      // Image URL usually unique per item, so maybe skip for bulk, but can allow if needed
+      if (updates.imageUrl !== undefined) updateData.image_url = updates.imageUrl;
+
+      const { data, error } = await supabase
+        .from('inventory')
+        .update(updateData)
+        .in('id', ids)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['product_inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // Updates price/qty which affects product view
+    },
+  });
+}
+
 export function useProduct(id?: string) {
   return useQuery({
     queryKey: ['product', id],
@@ -634,5 +664,47 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
       return data.map(mapInventoryEntryFromDB);
     },
     enabled: !!organizationId,
+  });
+}
+
+export function useBulkUpdateInventoryEntries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      productId,
+      branchIds,
+      updates,
+    }: {
+      productId: string;
+      branchIds: string[];
+      updates: {
+        quantity?: number;
+        minStockLevel?: number;
+        priceOverride?: number;
+      };
+    }) => {
+      const updateData: any = {};
+      // Only include fields that are actually defined/passed
+      if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
+      if (updates.minStockLevel !== undefined)
+        updateData.min_stock_level = updates.minStockLevel;
+      if (updates.priceOverride !== undefined)
+        updateData.price_override = updates.priceOverride;
+
+      if (Object.keys(updateData).length === 0) return;
+
+      const { error } = await supabase
+        .from('inventory')
+        .update(updateData)
+        .eq('product_id', productId)
+        .in('branch_id', branchIds)
+        .eq('is_deleted', false);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['product_inventory'] });
+    },
   });
 }

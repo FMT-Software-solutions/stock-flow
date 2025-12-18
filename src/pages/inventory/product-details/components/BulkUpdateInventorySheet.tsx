@@ -122,7 +122,7 @@ export function BulkUpdateInventorySheet({
           Bulk Update
         </Button>
       </SheetTrigger>
-      <SheetContent className="max-w-[400px] sm:max-w-[540px] p-4">
+      <SheetContent className="max-w-100 sm:max-w-135 p-4">
         <SheetHeader>
           <SheetTitle>Bulk Inventory Update</SheetTitle>
           <SheetDescription>
@@ -151,7 +151,7 @@ export function BulkUpdateInventorySheet({
               </div>
             </div>
 
-            <ScrollArea className="h-[150px] w-full rounded-md border p-4">
+            <ScrollArea className="h-37.5 w-full rounded-md border p-4">
               <div className="space-y-2">
                 {validBranches.map((branch) => (
                   <div key={branch.id} className="flex items-center space-x-2">

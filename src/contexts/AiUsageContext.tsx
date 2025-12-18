@@ -37,9 +37,9 @@ export function AiUsageProvider({ children }: AiUsageProviderProps) {
         .select('request_count')
         .eq('organization_id', currentOrganization.id)
         .eq('usage_date', today)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is no rows found
+      if (error) {
         console.error('Error fetching AI usage:', error);
       }
 

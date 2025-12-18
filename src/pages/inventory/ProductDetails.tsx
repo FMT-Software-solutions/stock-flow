@@ -4,7 +4,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, Edit, Loader2 } from 'lucide-react';
+import { ChevronLeft, Edit, Loader2, AlertCircle } from 'lucide-react';
 import { ProductVariations, type GeneratedVariant } from './components/ProductVariations';
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -194,76 +194,96 @@ export function ProductDetails() {
 
         {/* Right Column: Variations & Inventory */}
         <div className="space-y-6 md:col-span-2">
-          <Tabs defaultValue="inventory" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
-              <TabsTrigger value="variants">Variants</TabsTrigger>
-            </TabsList>
+          {product.status === 'published' ? (
+            <Tabs defaultValue="inventory" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                <TabsTrigger value="variants">Variants</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="variants" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Variant Configuration</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has-variations"
-                      checked={hasVariations}
-                      onCheckedChange={setHasVariations}
-                    />
-                    <Label htmlFor="has-variations">This product has variations</Label>
-                  </div>
-
-                  {hasVariations ? (
-                    <>
-                      <ProductVariations
-                        basePrice={product.sellingPrice}
-                        baseSku={product.sku}
-                        onChange={setVariants}
-                        initialVariants={variants}
+              <TabsContent value="variants" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Variant Configuration</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="has-variations"
+                        checked={hasVariations}
+                        onCheckedChange={setHasVariations}
                       />
-                      <div className="flex justify-end">
-                        <Button 
-                          onClick={handleSaveVariations} 
-                          disabled={isSaving || updateProduct.isPending}
-                        >
-                          {(isSaving || updateProduct.isPending) && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          )}
-                          Save Variations
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
-                      Variations are disabled for this product. 
-                      <br />
-                      Enable them to configure attributes like Color, Size, etc.
+                      <Label htmlFor="has-variations">This product has variations</Label>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            <TabsContent value="inventory" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inventory Management</CardTitle>
-                  <CardDescription>
-                    Manage stock levels for each branch.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                   <ProductInventoryManager 
-                      product={product}
-                      variants={variants} 
-                      currentOrganizationId={currentOrganization?.id || ''}
-                   />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                    {hasVariations ? (
+                      <>
+                        <ProductVariations
+                          basePrice={product.sellingPrice}
+                          baseSku={product.sku}
+                          onChange={setVariants}
+                          initialVariants={variants}
+                        />
+                        <div className="flex justify-end">
+                          <Button 
+                            onClick={handleSaveVariations} 
+                            disabled={isSaving || updateProduct.isPending}
+                          >
+                            {(isSaving || updateProduct.isPending) && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Save Variations
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+                        Variations are disabled for this product. 
+                        <br />
+                        Enable them to configure attributes like Color, Size, etc.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="inventory" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Inventory Management</CardTitle>
+                    <CardDescription>
+                      Manage stock levels for each branch.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                     <ProductInventoryManager 
+                        product={product}
+                        variants={variants} 
+                        currentOrganizationId={currentOrganization?.id || ''}
+                     />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <Card className="h-full border-dashed">
+              <CardContent className="flex flex-col items-center justify-center h-full py-12 space-y-4">
+                <div className="p-3 bg-muted rounded-full">
+                  <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-semibold">Inventory Management Unavailable</h3>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    This product is currently in <strong>{product.status}</strong> status. 
+                    You must publish this product to manage its inventory and variations.
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => navigate(`/inventory/${product.id}/edit`)}>
+                  Edit Product Status
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -40,7 +40,7 @@ export function Inventory() {
     selectedBranchIds
   );
 
-  const [activeTab, setActiveTab] = useState('products');
+  const [activeTab, setActiveTab] = useState('inventory');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [variationDialogOpen, setVariationDialogOpen] = useState(false);
   const [openProductSearch, setOpenProductSearch] = useState(false);
@@ -128,8 +128,8 @@ export function Inventory() {
             className="space-y-0"
           >
             <TabsList>
-              <TabsTrigger value="products">Products</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
+              <TabsTrigger value="products">Products</TabsTrigger>
               <TabsTrigger value="categories">Categories</TabsTrigger>
               <TabsTrigger value="variations">Variations</TabsTrigger>
             </TabsList>
@@ -149,7 +149,7 @@ export function Inventory() {
                   <Plus className="mr-2 h-4 w-4" /> Add Inventory
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0">
+              <PopoverContent className="w-75 p-0">
                 <Command>
                   <CommandInput placeholder="Search product..." />
                   <CommandList>
@@ -192,15 +192,6 @@ export function Inventory() {
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsContent value="products" className="space-y-4">
-          <DataTable
-            columns={columns}
-            data={products}
-            searchKey="name"
-            filterFields={filterFields}
-            storageKey="inventory-products-table"
-          />
-        </TabsContent>
         <TabsContent value="inventory" className="space-y-4">
           <DataTable
             columns={inventoryColumns}
@@ -208,6 +199,15 @@ export function Inventory() {
             searchKey="productName"
             filterFields={inventoryFilterFields}
             storageKey="inventory-entries-table"
+          />
+        </TabsContent>
+        <TabsContent value="products" className="space-y-4">
+          <DataTable
+            columns={columns}
+            data={products}
+            searchKey="name"
+            filterFields={filterFields}
+            storageKey="inventory-products-table"
           />
         </TabsContent>
         <TabsContent value="categories">

@@ -8,6 +8,8 @@ import { InventoryActions } from "./components/InventoryActions"
 import { ProductActions } from "./components/ProductActions"
 
 import { Link } from "react-router-dom"
+import { Copy } from "lucide-react"
+import { toast } from "sonner"
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -221,6 +223,27 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     ),
     enableSorting: false,
     enableHiding: false,
+  },
+  {
+    accessorKey: "inventoryNumber",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Inv #" />
+    ),
+    cell: ({ row }) => (
+      <div 
+        className="font-mono text-xs text-muted-foreground flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors group/copy w-fit"
+        onClick={() => {
+            if (row.original.inventoryNumber) {
+                navigator.clipboard.writeText(row.original.inventoryNumber)
+                toast.success("Copied to clipboard")
+            }
+        }}
+        title="Click to copy"
+      >
+        {row.original.inventoryNumber || '-'}
+        {row.original.inventoryNumber && <Copy className="h-3 w-3 opacity-0 group-hover/copy:opacity-100 transition-opacity" />}
+      </div>
+    ),
   },
   {
     accessorKey: "productName",

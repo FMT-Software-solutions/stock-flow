@@ -19,6 +19,7 @@ import {
   Loader2,
   ExternalLink,
   Upload,
+  Copy,
 } from 'lucide-react';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { useUpdateInventoryEntry } from '@/hooks/useInventoryQueries';
@@ -187,6 +188,22 @@ export function InventoryDetailsDialog({
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     SKU: {inventory.sku}
+                  </p>
+                  <p
+                    className="text-sm text-muted-foreground flex items-center gap-2 group/copy cursor-pointer w-fit"
+                    onClick={() => {
+                      if (inventory.inventoryNumber) {
+                        navigator.clipboard.writeText(
+                          inventory.inventoryNumber
+                        );
+                        toast.success('Copied!');
+                      }
+                    }}
+                  >
+                    Inv #: {inventory.inventoryNumber || '-'}
+                    {inventory.inventoryNumber && (
+                      <Copy className="h-3 w-3 opacity-0 group-hover/copy:opacity-100 transition-opacity" />
+                    )}
                   </p>
                 </div>
                 {!isEditing && (

@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ChevronsDown,
   ChevronsUp,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -356,15 +357,17 @@ export function InventoryList({
               </div>
 
               <CollapsibleContent>
-                <div className="grid grid-cols-12 gap-4 p-2 text-xs font-medium border-b bg-muted/20 text-muted-foreground">
-                  <div className="col-span-5">Variant / Label</div>
+                <div className="grid grid-cols-12 gap-4 p-3 text-xs font-medium border-b bg-muted/50">
+                  <div className="col-span-1"></div>
+                  <div className="col-span-1">Inv #</div>
+                  <div className="col-span-4">Variant / Label</div>
                   <div className="col-span-2 text-right">Qty</div>
                   <div className="col-span-2 text-right">Min Stock</div>
                   <div className="col-span-2 text-right">Price</div>
                   <div className="col-span-1"></div>
                 </div>
 
-                <div className="max-h-[300px] overflow-y-auto">
+                <div className="max-h-75 overflow-y-auto">
                   {items.map((inv) => {
                     const variant = variants.find(
                       (v) => v.id === inv.variant_id
@@ -405,7 +408,26 @@ export function InventoryList({
                         key={inv.id}
                         className="grid grid-cols-12 gap-4 p-3 text-sm items-center border-b last:border-0 hover:bg-muted/20"
                       >
-                        <div className="col-span-5 flex items-center space-x-2">
+                        <div className="col-span-1 text-xs font-mono text-muted-foreground flex items-center">
+                          <div
+                            className="flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors group/copy"
+                            onClick={() => {
+                              if (inv.inventory_number) {
+                                navigator.clipboard.writeText(
+                                  inv.inventory_number
+                                );
+                                toast.success('Copied to clipboard');
+                              }
+                            }}
+                            title="Click to copy"
+                          >
+                            {inv.inventory_number || '-'}
+                            {inv.inventory_number && (
+                              <Copy className="h-3 w-3 opacity-0 group-hover/copy:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-span-4 flex items-center space-x-2">
                           <div
                             className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
                             onClick={() => triggerFileInput(inv.id)}

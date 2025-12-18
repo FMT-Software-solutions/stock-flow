@@ -102,6 +102,7 @@ export interface Order {
 
 export interface InventoryEntry {
   id: string;
+  inventoryNumber?: string;
   productId: string;
   variantId?: string;
   branchId?: string;

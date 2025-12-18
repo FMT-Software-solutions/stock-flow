@@ -72,6 +72,7 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
 
   return {
     id: data.id,
+    inventoryNumber: data.inventory_number,
     productId: data.product_id,
     variantId: data.variant_id || undefined,
     branchId: data.branch_id || undefined,
@@ -613,6 +614,7 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
         .from('inventory')
         .select(`
           id,
+          inventory_number,
           product_id,
           variant_id,
           branch_id,
@@ -625,13 +627,14 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
           price_override,
           type,
           image_url,
-          product:products (
+          product:products!inner (
             id,
             name,
             sku,
             unit,
             selling_price,
             image_url,
+            status,
             category:product_categories (
               name
             )
@@ -652,7 +655,8 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
           )
         `)
         .eq('organization_id', organizationId)
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .eq('product.status', 'published');
 
       if (branchIds && branchIds.length > 0) {
         query = query.in('branch_id', branchIds);

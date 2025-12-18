@@ -27,6 +27,10 @@ import {
   inventoryExportFields,
 } from './inventory/fields/inventoryFields';
 import { getCategoryExportFields } from './inventory/fields/categoryFields';
+import { StatsContainer } from '@/components/shared/stats/StatsContainer';
+import { getProductStatsGroups } from './inventory/fields/productStats';
+import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
+import { useCurrency } from '@/hooks/useCurrency';
 
 import {
   Command,
@@ -47,6 +51,7 @@ export function Inventory() {
   const navigate = useNavigate();
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds } = useBranchContext();
+  const { formatCurrency } = useCurrency();
   const { data: products = [], isLoading } = useProducts(
     currentOrganization?.id
   );
@@ -128,6 +133,9 @@ export function Inventory() {
     inventoryLocations,
     inventoryCreators
   );
+
+  const inventoryStatsGroups = getInventoryStatsGroups(formatCurrency);
+  const productStatsGroups = getProductStatsGroups(formatCurrency);
 
   const categoryExportFields = getCategoryExportFields(products);
 
@@ -223,6 +231,10 @@ export function Inventory() {
         className="space-y-4"
       >
         <TabsContent value="inventory" className="space-y-4">
+          <StatsContainer
+            groups={inventoryStatsGroups}
+            data={inventoryEntries}
+          />
           <DataTable
             columns={inventoryColumns}
             data={inventoryEntries}
@@ -234,6 +246,7 @@ export function Inventory() {
           />
         </TabsContent>
         <TabsContent value="products" className="space-y-4">
+          <StatsContainer groups={productStatsGroups} data={products} />
           <DataTable
             columns={columns}
             data={products}

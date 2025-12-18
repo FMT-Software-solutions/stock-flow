@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -12,11 +13,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useNavigate, useParams } from "react-router-dom"
 import { ChevronLeft } from "lucide-react"
+import { useCreateSupplier, useUpdateSupplier, useSupplier } from "@/hooks/useInventoryQueries"
+import { useOrganization } from "@/contexts/OrganizationContext"
+import { toast } from "sonner"
 
 const supplierSchema = z.object({
   name: z.string().min(2, "Company name is required"),
   contactPerson: z.string().optional(),
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
@@ -26,6 +30,11 @@ export function SupplierForm() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEditing = !!id
+  const { currentOrganization } = useOrganization()
+
+  const { data: supplier, isLoading: isLoadingSupplier } = useSupplier(id)
+  const createSupplier = useCreateSupplier()
+  const updateSupplier = useUpdateSupplier()
 
   const form = useForm({
     resolver: zodResolver(supplierSchema),
@@ -39,9 +48,45 @@ export function SupplierForm() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof supplierSchema>) {
-    console.log(values)
-    navigate("/suppliers")
+  useEffect(() => {
+    if (supplier) {
+      form.reset({
+        name: supplier.name,
+        contactPerson: supplier.contactPerson || "",
+        email: supplier.email || "",
+        phone: supplier.phone || "",
+        address: supplier.address || "",
+        website: supplier.website || "",
+      })
+    }
+  }, [supplier, form])
+
+  async function onSubmit(values: z.infer<typeof supplierSchema>) {
+    if (!currentOrganization?.id) return
+
+    try {
+      if (isEditing && id) {
+        await updateSupplier.mutateAsync({
+          id,
+          updates: values,
+        })
+        toast.success("Supplier updated successfully")
+      } else {
+        await createSupplier.mutateAsync({
+          ...values,
+          organizationId: currentOrganization.id,
+        })
+        toast.success("Supplier created successfully")
+      }
+      navigate("/suppliers")
+    } catch (error) {
+      console.error(error)
+      toast.error(isEditing ? "Failed to update supplier" : "Failed to create supplier")
+    }
+  }
+
+  if (isEditing && isLoadingSupplier) {
+      return <div>Loading...</div>
   }
 
   return (
@@ -147,7 +192,9 @@ export function SupplierForm() {
             >
               Cancel
             </Button>
-            <Button type="submit">{isEditing ? "Update Supplier" : "Create Supplier"}</Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Saving..." : isEditing ? "Update Supplier" : "Create Supplier"}
+            </Button>
         </div>
       </form>
     </div>

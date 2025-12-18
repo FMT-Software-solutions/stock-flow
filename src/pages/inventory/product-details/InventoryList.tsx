@@ -325,7 +325,7 @@ export function InventoryList({
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-3">
         {sortedBranchIds.map((branchId) => {
           const branch = availableBranches.find((b) => b.id === branchId);
           const items = groupedInventory[branchId];
@@ -338,7 +338,12 @@ export function InventoryList({
               onOpenChange={() => toggleBranchCollapse(branchId)}
               className="rounded-md border overflow-hidden"
             >
-              <div className="bg-muted/50 p-3 border-b font-medium text-sm flex justify-between items-center">
+              <div
+                className={cn(
+                  'bg-muted/50 p-2 font-medium text-sm flex justify-between items-center',
+                  !isCollapsed ? 'border-b' : ''
+                )}
+              >
                 <div className="flex items-center gap-2">
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -357,8 +362,7 @@ export function InventoryList({
               </div>
 
               <CollapsibleContent>
-                <div className="grid grid-cols-12 gap-4 p-3 text-xs font-medium border-b bg-muted/50">
-                  <div className="col-span-1"></div>
+                <div className="grid grid-cols-12 gap-4 p-2 text-xs font-medium border-b bg-muted/30">
                   <div className="col-span-1">Inv #</div>
                   <div className="col-span-4">Variant / Label</div>
                   <div className="col-span-2 text-right">Qty</div>

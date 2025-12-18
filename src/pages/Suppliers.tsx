@@ -5,6 +5,7 @@ import { Plus } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useSuppliers } from "@/hooks/useInventoryQueries"
 import { useOrganization } from "@/contexts/OrganizationContext"
+import { supplierExportFields, supplierFilterFields } from "./suppliers/fields"
 
 export function Suppliers() {
   const navigate = useNavigate()
@@ -27,7 +28,14 @@ export function Suppliers() {
         </Button>
       </div>
       
-      <DataTable columns={columns} data={suppliers} searchKey="name" />
+      <DataTable 
+        columns={columns} 
+        data={suppliers} 
+        searchKey="name" 
+        filterFields={supplierFilterFields}
+        exportFields={supplierExportFields}
+        storageKey="suppliers-table"
+      />
     </div>
   )
 }

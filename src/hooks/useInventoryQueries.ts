@@ -607,12 +607,32 @@ export function useSuppliers(organizationId?: string) {
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data.map(mapSupplierFromDB);
     },
     enabled: !!organizationId,
+  });
+}
+
+export function useSupplier(id?: string) {
+  return useQuery({
+    queryKey: ['supplier', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return mapSupplierFromDB(data);
+    },
+    enabled: !!id,
   });
 }
 
@@ -636,6 +656,52 @@ export function useCreateSupplier() {
 
       if (error) throw error;
       return mapSupplierFromDB(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    },
+  });
+}
+
+export function useUpdateSupplier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Supplier> }) => {
+      const supplierData: any = {};
+      if (updates.name !== undefined) supplierData.name = updates.name;
+      if (updates.contactPerson !== undefined) supplierData.contact_person = updates.contactPerson;
+      if (updates.email !== undefined) supplierData.email = updates.email;
+      if (updates.phone !== undefined) supplierData.phone = updates.phone;
+      if (updates.address !== undefined) supplierData.address = updates.address;
+      if (updates.website !== undefined) supplierData.website = updates.website;
+
+      const { data, error } = await supabase
+        .from('suppliers')
+        .update(supplierData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return mapSupplierFromDB(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier'] });
+    },
+  });
+}
+
+export function useDeleteSupplier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('suppliers')
+        .update({ is_deleted: true })
+        .eq('id', id);
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });

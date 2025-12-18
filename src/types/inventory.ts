@@ -51,6 +51,7 @@ export interface Supplier {
   address?: string;
   website?: string;
   organizationId?: string;
+  isDeleted?: boolean;
 }
 
 export interface VariationType {
@@ -149,17 +150,6 @@ export interface OrderItem {
   total: number;
 }
 
-export interface Customer {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  totalOrders: number;
-  totalSpent: number;
-  lastOrderDate?: string;
-}
 
 export interface StockMovement {
   id: string;

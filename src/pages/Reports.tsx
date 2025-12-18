@@ -154,7 +154,7 @@ export function Reports() {
                 <CardTitle>Revenue Over Time</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
-                <div className="h-[300px] w-full">
+                <div className="h-75 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={getMonthlyRevenue()}>
                       <XAxis
@@ -195,7 +195,7 @@ export function Reports() {
                 <CardTitle>Sales by Category</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
+                <div className="h-75 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -242,7 +242,7 @@ export function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px] w-full">
+              <div className="h-100 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={products.slice(0, 10)}
@@ -293,7 +293,7 @@ export function Reports() {
               <CardDescription>Number of orders per month</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px] w-full">
+              <div className="h-100 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={getMonthlyRevenue()}>
                     <CartesianGrid
@@ -338,42 +338,41 @@ export function Reports() {
               <CardContent>
                 <div className="space-y-4">
                   {mockCustomers
-                    .sort((a, b) => b.totalSpent - a.totalSpent)
+                    .sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
                     .slice(0, 5)
-                    .map((customer, i) => (
+                    .map((customer) => (
                       <div
                         key={customer.id}
                         className="flex items-center justify-between"
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="font-bold text-lg text-muted-foreground">
-                            #{i + 1}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium leading-none">
-                              {customer.firstName} {customer.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {customer.email}
-                            </p>
-                          </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {customer.firstName} {customer.lastName}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {customer.totalOrders || 0} orders
+                          </span>
                         </div>
-                        <div className="font-medium">
-                          {formatCurrency(customer.totalSpent)}
+                        <div className="font-bold">
+                          {formatCurrency(customer.totalSpent || 0)}
                         </div>
                       </div>
                     ))}
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Top Customers by Orders</CardTitle>
+                <CardDescription>
+                  Customers with the most orders
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {mockCustomers
-                    .sort((a, b) => b.totalOrders - a.totalOrders)
+                    .sort((a, b) => (b.totalOrders || 0) - (a.totalOrders || 0))
                     .slice(0, 5)
                     .map((customer, i) => (
                       <div
@@ -394,7 +393,7 @@ export function Reports() {
                           </div>
                         </div>
                         <div className="font-medium">
-                          {customer.totalOrders} Orders
+                          {customer.totalOrders || 0} Orders
                         </div>
                       </div>
                     ))}

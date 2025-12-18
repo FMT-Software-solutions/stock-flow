@@ -1,4 +1,4 @@
-import type { Customer } from "@/types/inventory";
+import type { Customer } from "@/types/customer";
 
 
 export const mockCustomers: Customer[] = [
@@ -11,7 +11,8 @@ export const mockCustomers: Customer[] = [
         address: "123 Main St, New York, NY 10001",
         totalOrders: 15,
         totalSpent: 2500.50,
-        lastOrderDate: "2023-10-01T10:30:00Z"
+        lastOrderDate: "2023-10-01T10:30:00Z",
+        organizationId: "org-1"
     },
     {
         id: "102",
@@ -22,7 +23,8 @@ export const mockCustomers: Customer[] = [
         address: "456 Oak Ave, Los Angeles, CA 90001",
         totalOrders: 8,
         totalSpent: 1200.75,
-        lastOrderDate: "2023-10-02T14:15:00Z"
+        lastOrderDate: "2023-10-02T14:15:00Z",
+        organizationId: "org-1"
     },
     {
         id: "103",
@@ -33,7 +35,8 @@ export const mockCustomers: Customer[] = [
         address: "789 Pine Ln, Chicago, IL 60601",
         totalOrders: 3,
         totalSpent: 450.00,
-        lastOrderDate: "2023-09-25T09:00:00Z"
+        lastOrderDate: "2023-09-25T09:00:00Z",
+        organizationId: "org-1"
     },
     {
         id: "104",
@@ -44,7 +47,8 @@ export const mockCustomers: Customer[] = [
         address: "321 Elm St, Houston, TX 60601",
         totalOrders: 22,
         totalSpent: 5600.25,
-        lastOrderDate: "2023-10-04T16:45:00Z"
+        lastOrderDate: "2023-10-04T16:45:00Z",
+        organizationId: "org-1"
     },
     {
         id: "105",
@@ -55,6 +59,7 @@ export const mockCustomers: Customer[] = [
         address: "654 Maple Dr, Phoenix, AZ 85001",
         totalOrders: 5,
         totalSpent: 890.50,
-        lastOrderDate: "2023-10-05T11:20:00Z"
+        lastOrderDate: "2023-10-05T11:20:00Z",
+        organizationId: "org-1"
     }
 ];

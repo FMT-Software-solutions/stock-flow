@@ -10,10 +10,16 @@ import { Categories } from './inventory/Categories';
 import { Variations } from './inventory/Variations';
 import { CategoryDialog } from './inventory/CategoryDialog';
 import { VariationTypeDialog } from './inventory/VariationTypeDialog';
-import { useProducts, useInventoryEntries } from '@/hooks/useInventoryQueries';
+import {
+  useProducts,
+  useInventoryEntries,
+  useCategories,
+} from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
 import type { Category } from '@/types/inventory';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
+import type { ExportField } from '@/hooks/useExport';
 import {
   Command,
   CommandEmpty,
@@ -40,6 +46,7 @@ export function Inventory() {
     currentOrganization?.id,
     selectedBranchIds
   );
+  const { data: categoriesList = [] } = useCategories(currentOrganization?.id);
 
   const [activeTab, setActiveTab] = useState('inventory');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -179,6 +186,12 @@ export function Inventory() {
     },
   ];
 
+  const categoryExportFields: ExportField[] = [
+    { id: 'name', label: 'Name' },
+    { id: 'description', label: 'Description' },
+    { id: 'productCount', label: 'Product Count' },
+  ];
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -246,9 +259,16 @@ export function Inventory() {
             </Popover>
           )}
           {activeTab === 'categories' && (
-            <Button onClick={handleCreateCategory}>
-              <Plus className="mr-2 h-4 w-4" /> Add Category
-            </Button>
+            <div className="flex items-center gap-2">
+              <ExportDialog
+                data={categoriesList}
+                fields={categoryExportFields}
+                defaultFilename="categories-export"
+              />
+              <Button onClick={handleCreateCategory}>
+                <Plus className="mr-2 h-4 w-4" /> Add Category
+              </Button>
+            </div>
           )}
           {activeTab === 'variations' && (
             <Button onClick={() => setVariationDialogOpen(true)}>

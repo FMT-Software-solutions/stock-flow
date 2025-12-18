@@ -1,9 +1,10 @@
-import type { Table } from '@tanstack/react-table';
+import { type Table, type Row } from '@tanstack/react-table';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTableViewOptions } from '@/components/shared/data-table/data-table-view-options';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
 
 import type { DataTableFilterField } from '@/types/data-table';
 import { DataTableFilterSheet } from './data-table-filter-sheet';
@@ -24,6 +25,21 @@ export function DataTableToolbar<TData>({
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
+  const exportFields = table.getAllColumns()
+    .filter(column => column.getIsVisible() && column.id !== 'select' && column.id !== 'actions')
+    .map(column => ({
+      id: column.id,
+      label: column.id.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+      accessorFn: (row: Row<TData>) => {
+        const value = row.getValue(column.id);
+        // Handle arrays (like tags or multi-select values)
+        if (Array.isArray(value)) {
+          return value.join(', ');
+        }
+        return value;
+      }
+    }));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
@@ -37,7 +53,7 @@ export function DataTableToolbar<TData>({
               onChange={(event) =>
                 table.getColumn(searchKey)?.setFilterValue(event.target.value)
               }
-              className="h-8 w-[150px] lg:w-[250px]"
+              className="h-8 w-37.5 lg:w-62.5"
             />
           )}
           {filterFields.length > 0 && (
@@ -55,7 +71,13 @@ export function DataTableToolbar<TData>({
             </Button>
           )}
         </div>
-        <DataTableViewOptions table={table} />
+        <div className="flex items-center gap-2">
+          <ExportDialog 
+            data={table.getFilteredRowModel().rows} 
+            fields={exportFields}
+          />
+          <DataTableViewOptions table={table} />
+        </div>
       </div>
 
       {/* Active Filter Badges */}

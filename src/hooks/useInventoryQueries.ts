@@ -70,6 +70,10 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     productName = `${productName} (${data.custom_label})`;
   }
 
+  const categoryData = Array.isArray(data.product?.category) 
+    ? data.product.category[0] 
+    : data.product?.category;
+
   return {
     id: data.id,
     inventoryNumber: data.inventory_number,
@@ -89,11 +93,11 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     customLabel: data.custom_label,
     priceOverride: data.price_override ? Number(data.price_override) : undefined,
     type: data.type,
-    imageUrl: data.image_url,
+    imageUrl: data.image_url || undefined,
     productPrice: data.product?.selling_price ? Number(data.product.selling_price) : undefined,
     variantPrice: data.variant?.price ? Number(data.variant.price) : undefined,
-    productImage: data.product?.image_url,
-    categoryName: data.product?.category?.name,
+    productImage: data.product?.image_url || undefined,
+    categoryName: categoryData?.name,
     isDeleted: data.is_deleted,
   };
 };
@@ -557,6 +561,40 @@ export function useCreateCategory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates, oldImageUrl }: { id: string; updates: Partial<Category>; oldImageUrl?: string }) => {
+      // Check if image changed and delete old one
+      if (updates.image && oldImageUrl && updates.image !== oldImageUrl) {
+        await deleteImageFromCloudinary(oldImageUrl);
+      }
+
+      const categoryData: any = {};
+      if (updates.name !== undefined) {
+        categoryData.name = updates.name;
+        categoryData.slug = updates.name.toLowerCase().replace(/\s+/g, '-');
+      }
+      if (updates.description !== undefined) categoryData.description = updates.description;
+      if (updates.image !== undefined) categoryData.image_url = updates.image;
+
+      const { data, error } = await supabase
+        .from('product_categories')
+        .update(categoryData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return mapCategoryFromDB(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }

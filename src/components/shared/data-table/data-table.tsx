@@ -32,6 +32,7 @@ interface DataTableProps<TData, TValue> {
   filterFields?: DataTableFilterField[]
   onRowClick?: (row: TData) => void
   storageKey?: string
+  defaultColumnVisibility?: VisibilityState
 }
 
 export function DataTable<TData, TValue>({
@@ -41,6 +42,7 @@ export function DataTable<TData, TValue>({
   filterFields,
   onRowClick,
   storageKey,
+  defaultColumnVisibility = {},
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -51,12 +53,12 @@ export function DataTable<TData, TValue>({
       if (storageKey) {
         try {
           const item = window.localStorage.getItem(`${storageKey}-visibility`)
-          return item ? JSON.parse(item) : {}
+          return item ? { ...defaultColumnVisibility, ...JSON.parse(item) } : defaultColumnVisibility
         } catch (e) {
-          return {}
+          return defaultColumnVisibility
         }
       }
-      return {}
+      return defaultColumnVisibility
     })
   const [rowSelection, setRowSelection] = React.useState({})
   const [pagination, setPagination] = React.useState<PaginationState>(() => {

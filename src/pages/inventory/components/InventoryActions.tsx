@@ -39,10 +39,12 @@ export function InventoryActions({ inventory }: InventoryActionsProps) {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(inventory.id)}
+            onClick={() =>
+              navigator.clipboard.writeText(inventory.inventoryNumber || '')
+            }
           >
             <Copy className="mr-2 h-4 w-4" />
-            Copy Inventory ID
+            Copy Inventory Number
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowDetailsDialog(true)}>

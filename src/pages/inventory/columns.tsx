@@ -2,7 +2,6 @@ import { type ColumnDef } from "@tanstack/react-table"
 import { type Product, type InventoryEntry } from "@/types/inventory"
 import { DataTableColumnHeader } from "@/components/shared/data-table/data-table-column-header"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay"
 import { InventoryActions } from "./components/InventoryActions"
 import { ProductActions } from "./components/ProductActions"
@@ -10,6 +9,7 @@ import { ProductActions } from "./components/ProductActions"
 import { Link } from "react-router-dom"
 import { Copy } from "lucide-react"
 import { toast } from "sonner"
+import { ImagePreview } from "@/components/shared/ImagePreview"
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -42,29 +42,29 @@ const formatRelativeTime = (value: string) => {
 }
 
 export const columns: ColumnDef<Product>[] = [
-  {
-
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
+  // We do not use the select column at the moment, we will enable it back when we need it
+  // {
+  //   id: "select",
+  //   header: ({ table }) => (
+  //     <Checkbox
+  //       checked={
+  //         table.getIsAllPageRowsSelected() ||
+  //         (table.getIsSomePageRowsSelected() && "indeterminate")
+  //       }
+  //       onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+  //       aria-label="Select all"
+  //     />
+  //   ),
+  //   cell: ({ row }) => (
+  //     <Checkbox
+  //       checked={row.getIsSelected()}
+  //       onCheckedChange={(value) => row.toggleSelected(!!value)}
+  //       aria-label="Select row"
+  //     />
+  //   ),
+  //   enableSorting: false,
+  //   enableHiding: false,
+  // },
   {
     accessorKey: "name",
     header: ({ column }) => (
@@ -74,7 +74,7 @@ export const columns: ColumnDef<Product>[] = [
         return (
             <div className="flex items-center space-x-2">
                 {row.original.imageUrl && (
-                    <img src={row.original.imageUrl} alt={row.getValue("name")} className="h-8 w-8 rounded-md object-cover" />
+                    <ImagePreview src={row.original.imageUrl} alt={row.getValue("name")} className="h-8 w-8 rounded-md object-cover" />
                 )}
                 <div className="flex flex-col">
                     <Link to={`/inventory/${row.original.id}`} className="font-medium hover:underline">
@@ -168,6 +168,9 @@ export const columns: ColumnDef<Product>[] = [
     cell: ({ row }) => {
       return <div className="text-muted-foreground">{row.getValue("createdByName") || "Unknown"}</div>
     },
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+    },
   },
   {
     accessorKey: "createdAt",
@@ -203,26 +206,12 @@ export const columns: ColumnDef<Product>[] = [
 
 export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
   {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
+    id: "searchable",
+    accessorFn: (row) => `${row.productName} ${row.sku} ${row.inventoryNumber || ''}`,
+    enableHiding: true,
     enableSorting: false,
-    enableHiding: false,
+    header: () => null,
+    cell: () => null,
   },
   {
     accessorKey: "inventoryNumber",
@@ -250,6 +239,9 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Product" />
     ),
+    filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
+    },
     cell: ({ row }) => {
       const sku = row.original.sku
       const branchName = row.original.branchName
@@ -258,7 +250,7 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
       return (
         <div className="flex items-center space-x-2">
           {imageUrl && (
-            <img 
+            <ImagePreview 
               src={imageUrl} 
               alt={row.original.productName} 
               className="h-8 w-8 rounded-md object-cover" 
@@ -288,7 +280,8 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     enableHiding: true,
   },
   {
-    accessorKey: "priceOverride",
+    id: "effectivePrice",
+    accessorFn: (row) => row.priceOverride ?? row.productPrice,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Price" />
     ),
@@ -305,6 +298,13 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
           )}
         </div>
       )
+    },
+    filterFn: (row, id, value) => {
+        const val = row.getValue(id) as number
+        const [min, max] = value as [number, number]
+        if (min !== undefined && val < min) return false
+        if (max !== undefined && val > max) return false
+        return true
     },
   },
   {

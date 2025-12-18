@@ -93,7 +93,7 @@ export function DataTableFilterSheet<TData>({
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[540px] p-4">
+      <SheetContent className="w-100 sm:w-135 p-4">
         <SheetHeader>
           <SheetTitle>Filters</SheetTitle>
           <SheetDescription>
@@ -163,6 +163,7 @@ export function DataTableFilterSheet<TData>({
                             )
                         }}
                         badgeClassName="bg-secondary text-secondary-foreground"
+                        
                      />
                   )}
 

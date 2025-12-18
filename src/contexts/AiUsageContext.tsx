@@ -37,13 +37,13 @@ export function AiUsageProvider({ children }: AiUsageProviderProps) {
         .select('request_count')
         .eq('organization_id', currentOrganization.id)
         .eq('usage_date', today)
-        .maybeSingle();
+        .limit(1);
 
       if (error) {
         console.error('Error fetching AI usage:', error);
       }
 
-      setUsage(data?.request_count || 0);
+      setUsage(data?.[0]?.request_count || 0);
     } catch (error) {
       console.error('Error in AiUsageProvider:', error);
     } finally {

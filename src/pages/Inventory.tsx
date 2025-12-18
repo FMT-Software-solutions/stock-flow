@@ -13,6 +13,7 @@ import { VariationTypeDialog } from './inventory/VariationTypeDialog';
 import { useProducts, useInventoryEntries } from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
+import type { Category } from '@/types/inventory';
 import {
   Command,
   CommandEmpty,
@@ -44,6 +45,19 @@ export function Inventory() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [variationDialogOpen, setVariationDialogOpen] = useState(false);
   const [openProductSearch, setOpenProductSearch] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+    null
+  );
+
+  const handleCreateCategory = () => {
+    setSelectedCategory(null);
+    setCategoryDialogOpen(true);
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setCategoryDialogOpen(true);
+  };
 
   const categories = Array.from(
     new Set(products.map((p) => p.category?.name).filter(Boolean))
@@ -58,6 +72,34 @@ export function Inventory() {
       value: status,
     })
   );
+
+  const productCreators = Array.from(
+    new Set(products.map((p) => p.createdByName).filter(Boolean))
+  ).map((name) => ({
+    label: name as string,
+    value: name as string,
+  }));
+
+  const inventoryProductNames = Array.from(
+    new Set(inventoryEntries.map((i) => i.productName).filter(Boolean))
+  ).map((name) => ({
+    label: name as string,
+    value: name as string,
+  }));
+
+  const inventoryLocations = Array.from(
+    new Set(inventoryEntries.map((i) => i.location).filter(Boolean))
+  ).map((location) => ({
+    label: location as string,
+    value: location as string,
+  }));
+
+  const inventoryCreators = Array.from(
+    new Set(inventoryEntries.map((i) => i.createdByName).filter(Boolean))
+  ).map((name) => ({
+    label: name as string,
+    value: name as string,
+  }));
 
   const filterFields: DataTableFilterField[] = [
     {
@@ -83,6 +125,12 @@ export function Inventory() {
       type: 'number',
     },
     {
+      id: 'createdByName',
+      label: 'Created By',
+      type: 'select',
+      options: productCreators,
+    },
+    {
       id: 'createdAt',
       label: 'Created At',
       type: 'date-range',
@@ -91,15 +139,38 @@ export function Inventory() {
 
   const inventoryFilterFields: DataTableFilterField[] = [
     {
+      id: 'productName',
+      label: 'Product',
+      type: 'select',
+      options: inventoryProductNames,
+    },
+    {
       id: 'categoryName',
       label: 'Category',
       type: 'select',
       options: categories,
     },
     {
+      id: 'effectivePrice',
+      label: 'Price',
+      type: 'number',
+    },
+    {
       id: 'quantity',
       label: 'Stock',
       type: 'number',
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      type: 'select',
+      options: inventoryLocations,
+    },
+    {
+      id: 'createdByName',
+      label: 'Created By',
+      type: 'select',
+      options: inventoryCreators,
     },
     {
       id: 'lastUpdated',
@@ -175,7 +246,7 @@ export function Inventory() {
             </Popover>
           )}
           {activeTab === 'categories' && (
-            <Button onClick={() => setCategoryDialogOpen(true)}>
+            <Button onClick={handleCreateCategory}>
               <Plus className="mr-2 h-4 w-4" /> Add Category
             </Button>
           )}
@@ -196,9 +267,10 @@ export function Inventory() {
           <DataTable
             columns={inventoryColumns}
             data={inventoryEntries}
-            searchKey="productName"
+            searchKey="searchable"
             filterFields={inventoryFilterFields}
             storageKey="inventory-entries-table"
+            defaultColumnVisibility={{ searchable: false }}
           />
         </TabsContent>
         <TabsContent value="products" className="space-y-4">
@@ -211,7 +283,7 @@ export function Inventory() {
           />
         </TabsContent>
         <TabsContent value="categories">
-          <Categories />
+          <Categories onEditCategory={handleEditCategory} />
         </TabsContent>
         <TabsContent value="variations">
           <Variations />
@@ -221,6 +293,7 @@ export function Inventory() {
       <CategoryDialog
         open={categoryDialogOpen}
         onOpenChange={setCategoryDialogOpen}
+        category={selectedCategory}
       />
       <VariationTypeDialog
         open={variationDialogOpen}

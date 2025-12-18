@@ -217,7 +217,7 @@ export function ProductVariations({
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
             <Select onValueChange={addVariationType}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-50">
                 <SelectValue placeholder="Add Variation Type" />
               </SelectTrigger>
               <SelectContent>
@@ -375,7 +375,7 @@ function VariationTypeRow({
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 border rounded-md">
-      <div className="w-[150px] font-medium">{config.variationTypeName}</div>
+      <div className="w-37.5 font-medium">{config.variationTypeName}</div>
       <div className="flex-1">
         <div className="flex flex-wrap gap-2">
           {allOptions.map((option) => {

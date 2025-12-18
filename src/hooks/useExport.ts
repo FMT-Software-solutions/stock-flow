@@ -10,7 +10,25 @@ export interface ExportField {
   id: string;
   label: string;
   accessorFn?: (row: any) => any;
+  isSelectedByDefault?: boolean;
+  type?: 'text' | 'image' | 'number' | 'currency' | 'date';
 }
+
+const getDataUri = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    return null;
+  }
+};
 
 export interface ExportOptions {
   filename?: string;
@@ -68,7 +86,7 @@ export function useExport() {
     XLSX.writeFile(wb, `${filename}.xlsx`);
   }, []);
 
-  const exportToPdf = useCallback((data: any[], fields: ExportField[], options: ExportOptions = {}) => {
+  const exportToPdf = useCallback(async (data: any[], fields: ExportField[], options: ExportOptions = {}) => {
     const { filename = 'export', title, orientation = 'portrait' } = options;
     const doc = new jsPDF({ orientation });
 
@@ -78,22 +96,46 @@ export function useExport() {
     }
 
     const headers = fields.map(f => f.label);
-    const rows = data.map(row => 
-      fields.map(field => {
+    
+    // Pre-process rows to handle images
+    const rows = await Promise.all(data.map(async row => {
+      return await Promise.all(fields.map(async field => {
         const value = field.accessorFn ? field.accessorFn(row) : row[field.id];
+        
+        if (field.type === 'image' && typeof value === 'string' && value.startsWith('http')) {
+           const base64 = await getDataUri(value);
+           return { content: '', image: base64 };
+        }
+
         if (value instanceof Date) return value.toLocaleDateString();
         if (typeof value === 'object' && value !== null) return JSON.stringify(value);
         return value;
-      })
-    );
+      }));
+    }));
 
     autoTable(doc, {
       head: [headers],
       body: rows,
       startY: title ? 30 : 20,
       theme: 'grid',
-      styles: { fontSize: 8 },
+      styles: { fontSize: 8, minCellHeight: 10 },
       headStyles: { fillColor: [41, 128, 185] },
+      didDrawCell: (data) => {
+        if (data.section === 'body') {
+           const field = fields[data.column.index];
+           if (field.type === 'image') {
+              const cellRaw = data.cell.raw as any;
+              if (cellRaw && cellRaw.image) {
+                 const dim = data.cell.height - 2;
+                 try {
+                   doc.addImage(cellRaw.image, 'JPEG', data.cell.x + 1, data.cell.y + 1, dim, dim);
+                 } catch (e) {
+                   console.error('Error adding image to PDF', e);
+                 }
+              }
+           }
+        }
+      }
     });
 
     doc.save(`${filename}.pdf`);

@@ -44,13 +44,14 @@ export function ExportDialog({
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState<ExportFormat>('excel');
   const [filename, setFilename] = useState(defaultFilename);
+  const [isExporting, setIsExporting] = useState(false);
   
   const { exportToCsv, exportToExcel, exportToPdf, exportToImage } = useExport();
 
-  // Initialize selected fields with all fields by default
+  // Initialize selected fields with default selected fields
   useEffect(() => {
     if (open) {
-      setSelectedFields(fields.map(f => f.id));
+      setSelectedFields(fields.filter(f => f.isSelectedByDefault !== false).map(f => f.id));
     }
   }, [open, fields]);
 
@@ -66,6 +67,7 @@ export function ExportDialog({
       return;
     }
 
+    setIsExporting(true);
     const fieldsToExport = fields.filter(f => selectedFields.includes(f.id));
 
     try {
@@ -77,7 +79,7 @@ export function ExportDialog({
           exportToExcel(data, fieldsToExport, filename);
           break;
         case 'pdf':
-          exportToPdf(data, fieldsToExport, { filename, title: filename });
+          await exportToPdf(data, fieldsToExport, { filename, title: filename });
           break;
         case 'image':
           // For image, we usually need a DOM element.
@@ -108,6 +110,8 @@ export function ExportDialog({
     } catch (error) {
       console.error(error);
       toast.error('Export failed');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -137,7 +141,7 @@ export function ExportDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Export Data</DialogTitle>
           <DialogDescription>
@@ -208,7 +212,7 @@ export function ExportDialog({
                 {selectedFields.length === fields.length ? 'Deselect All' : 'Select All'}
               </Button>
             </div>
-            <ScrollArea className="h-[200px] rounded-md border p-4">
+            <ScrollArea className="h-50 rounded-md border p-4">
               <div className="space-y-4">
                 {fields.map((field) => (
                   <div key={field.id} className="flex items-center space-x-2">
@@ -228,8 +232,10 @@ export function ExportDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleExport}>Export</Button>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isExporting}>Cancel</Button>
+          <Button onClick={handleExport} disabled={isExporting}>
+            {isExporting ? 'Exporting...' : 'Export'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

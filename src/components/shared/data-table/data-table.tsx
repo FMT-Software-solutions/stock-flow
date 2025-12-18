@@ -24,12 +24,14 @@ import {
 import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar } from "./data-table-toolbar"
 import { type DataTableFilterField } from "@/types/data-table"
+import type { ExportField } from "@/hooks/useExport"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   searchKey?: string
   filterFields?: DataTableFilterField[]
+  exportFields?: ExportField[]
   onRowClick?: (row: TData) => void
   storageKey?: string
   defaultColumnVisibility?: VisibilityState
@@ -40,6 +42,7 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   filterFields,
+  exportFields,
   onRowClick,
   storageKey,
   defaultColumnVisibility = {},
@@ -121,6 +124,7 @@ export function DataTable<TData, TValue>({
         table={table}
         searchKey={searchKey}
         filterFields={filterFields}
+        exportFields={exportFields}
       />
       <div className="rounded-md border">
         <Table>

@@ -11,21 +11,24 @@ import { DataTableFilterSheet } from './data-table-filter-sheet';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
+import type { ExportField } from '@/hooks/useExport';
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   filterFields?: DataTableFilterField[];
+  exportFields?: ExportField[];
   searchKey?: string;
 }
 
 export function DataTableToolbar<TData>({
   table,
   filterFields = [],
+  exportFields: customExportFields,
   searchKey,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
-  const exportFields = table.getAllColumns()
+  const exportFields = customExportFields || table.getAllColumns()
     .filter(column => column.getIsVisible() && column.id !== 'select' && column.id !== 'actions')
     .map(column => ({
       id: column.id,

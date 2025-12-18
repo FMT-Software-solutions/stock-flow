@@ -4,7 +4,6 @@ import { columns, inventoryColumns } from './inventory/columns';
 import { Button } from '@/components/ui/button';
 import { Plus, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { DataTableFilterField } from '@/types/data-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Categories } from './inventory/Categories';
 import { Variations } from './inventory/Variations';
@@ -19,7 +18,16 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
 import type { Category } from '@/types/inventory';
 import { ExportDialog } from '@/components/shared/export/ExportDialog';
-import type { ExportField } from '@/hooks/useExport';
+import {
+  getProductFilterFields,
+  productExportFields,
+} from './inventory/fields/productFields';
+import {
+  getInventoryFilterFields,
+  inventoryExportFields,
+} from './inventory/fields/inventoryFields';
+import { getCategoryExportFields } from './inventory/fields/categoryFields';
+
 import {
   Command,
   CommandEmpty,
@@ -108,89 +116,20 @@ export function Inventory() {
     value: name as string,
   }));
 
-  const filterFields: DataTableFilterField[] = [
-    {
-      id: 'category',
-      label: 'Category',
-      type: 'select',
-      options: categories,
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      type: 'select',
-      options: statuses,
-    },
-    {
-      id: 'sellingPrice',
-      label: 'Price',
-      type: 'number',
-    },
-    {
-      id: 'quantity',
-      label: 'Stock',
-      type: 'number',
-    },
-    {
-      id: 'createdByName',
-      label: 'Created By',
-      type: 'select',
-      options: productCreators,
-    },
-    {
-      id: 'createdAt',
-      label: 'Created At',
-      type: 'date-range',
-    },
-  ];
+  const filterFields = getProductFilterFields(
+    categories,
+    statuses,
+    productCreators
+  );
 
-  const inventoryFilterFields: DataTableFilterField[] = [
-    {
-      id: 'productName',
-      label: 'Product',
-      type: 'select',
-      options: inventoryProductNames,
-    },
-    {
-      id: 'categoryName',
-      label: 'Category',
-      type: 'select',
-      options: categories,
-    },
-    {
-      id: 'effectivePrice',
-      label: 'Price',
-      type: 'number',
-    },
-    {
-      id: 'quantity',
-      label: 'Stock',
-      type: 'number',
-    },
-    {
-      id: 'location',
-      label: 'Location',
-      type: 'select',
-      options: inventoryLocations,
-    },
-    {
-      id: 'createdByName',
-      label: 'Created By',
-      type: 'select',
-      options: inventoryCreators,
-    },
-    {
-      id: 'lastUpdated',
-      label: 'Last Updated',
-      type: 'date-range',
-    },
-  ];
+  const inventoryFilterFields = getInventoryFilterFields(
+    inventoryProductNames,
+    categories,
+    inventoryLocations,
+    inventoryCreators
+  );
 
-  const categoryExportFields: ExportField[] = [
-    { id: 'name', label: 'Name' },
-    { id: 'description', label: 'Description' },
-    { id: 'productCount', label: 'Product Count' },
-  ];
+  const categoryExportFields = getCategoryExportFields(products);
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -289,6 +228,7 @@ export function Inventory() {
             data={inventoryEntries}
             searchKey="searchable"
             filterFields={inventoryFilterFields}
+            exportFields={inventoryExportFields}
             storageKey="inventory-entries-table"
             defaultColumnVisibility={{ searchable: false }}
           />
@@ -299,6 +239,7 @@ export function Inventory() {
             data={products}
             searchKey="name"
             filterFields={filterFields}
+            exportFields={productExportFields}
             storageKey="inventory-products-table"
           />
         </TabsContent>

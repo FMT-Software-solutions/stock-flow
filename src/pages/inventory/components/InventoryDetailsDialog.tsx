@@ -126,7 +126,7 @@ export function InventoryDetailsDialog({
         if (!val) setIsEditing(false);
       }}
     >
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-150">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isEditing ? 'Edit Inventory' : 'Inventory Details'}

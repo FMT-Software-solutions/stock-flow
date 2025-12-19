@@ -374,7 +374,9 @@ export function Dashboard() {
         {/* Recent Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl font-bold">Recent orders</CardTitle>
+            <CardTitle className="text-xl font-bold">
+              Recent sales & orders
+            </CardTitle>
             <Link
               to="/orders"
               className="text-xs text-muted-foreground hover:underline"

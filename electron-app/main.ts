@@ -530,6 +530,7 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       devTools:  !app.isPackaged, // Enable devTools only in development
+      plugins: true, // Enable plugins for PDF viewer
     },
   })
 

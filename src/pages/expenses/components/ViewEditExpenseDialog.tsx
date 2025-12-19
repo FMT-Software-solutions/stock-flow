@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { openExternalUrl } from '@/utils/external-url';
 import { ExpenseForm } from './ExpenseForm';
+import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 
 interface ViewEditExpenseDialogProps {
   expense: Expense;
@@ -134,9 +135,11 @@ export function ViewEditExpenseDialog({
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">
                   Amount
                 </h4>
-                <p className="text-xl font-bold">
-                  ${expense.amount.toFixed(2)}
-                </p>
+
+                <CurrencyDisplay
+                  amount={expense.amount}
+                  className="text-xl font-bold"
+                />
               </div>
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">
@@ -224,18 +227,24 @@ export function ViewEditExpenseDialog({
                         className="max-h-75 w-full object-contain rounded shadow-sm bg-white"
                       />
                     ) : getAttachmentType(expense.attachmentUrl) === 'pdf' ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                        <FileText className="h-16 w-16 mb-2 opacity-20" />
-                        <p className="text-sm mb-4">PDF Document</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openExternalUrl(expense.attachmentUrl!)
-                          }
-                        >
-                          View PDF
-                        </Button>
+                      <div className="w-full space-y-2">
+                        <iframe
+                          src={`${expense.attachmentUrl}#toolbar=0`}
+                          className="w-full h-125 rounded-md border bg-white"
+                          title="PDF Preview"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openExternalUrl(expense.attachmentUrl!)
+                            }
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open in New Tab
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">

@@ -244,8 +244,9 @@ export function ExpenseForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="credit_card">Credit Card</SelectItem>
+              <SelectItem value="mobile_money">Mobile Money</SelectItem>
               <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+              <SelectItem value="credit_card">Credit Card</SelectItem>
               <SelectItem value="cheque">Cheque</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>

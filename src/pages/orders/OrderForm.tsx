@@ -90,11 +90,13 @@ export function OrderForm() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditing ? 'Edit Order' : 'New Order'}
+          <h1 className="text-xl font-bold tracking-tight">
+            {isEditing ? 'Edit Sale or Order' : 'New Sale or Order'}
           </h1>
-          <p className="text-muted-foreground">
-            {isEditing ? 'Manage order details' : 'Create a new customer order'}
+          <p className="text-xs text-muted-foreground">
+            {isEditing
+              ? 'Update sale or order details'
+              : 'Record a new sale or order'}
           </p>
         </div>
       </div>

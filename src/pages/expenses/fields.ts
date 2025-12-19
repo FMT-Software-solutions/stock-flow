@@ -43,6 +43,7 @@ export const getExpenseFilterFields = (
     type: 'select',
     options: paymentMethods || [
       { label: 'Cash', value: 'cash' },
+      { label: 'Mobile Money', value: 'mobile_money' },
       { label: 'Credit Card', value: 'credit_card' },
       { label: 'Bank Transfer', value: 'bank_transfer' },
       { label: 'Cheque', value: 'cheque' },

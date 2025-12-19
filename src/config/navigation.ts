@@ -45,7 +45,7 @@ export const navItems: NavItem[] = [
   {
     to: '/orders',
     icon: ShoppingCart,
-    label: 'Orders',
+    label: 'Sales & Orders',
     permission: { scope: 'orders' },
     iconClassName: 'text-pink-500',
   },
@@ -63,13 +63,7 @@ export const navItems: NavItem[] = [
     permission: { scope: 'suppliers' },
     iconClassName: 'text-amber-500',
   },
-  {
-    to: '/reports',
-    icon: BarChart3,
-    label: 'Reports',
-    permission: { scope: 'reports' },
-    iconClassName: 'text-rose-500',
-  },
+  
   {
     to: '/expenses',
     icon: Receipt,
@@ -78,11 +72,14 @@ export const navItems: NavItem[] = [
     iconClassName: 'text-emerald-500',
   },
   {
+    to: '/reports',
+    icon: BarChart3,
+    label: 'Reports',
+    permission: { scope: 'reports' },
+    iconClassName: 'text-rose-500',
+  },
+  {
     to: '/branches',
-
-
-
-
     icon: MapPin,
     label: 'Branches',
     permission: { scope: 'branch_management' },

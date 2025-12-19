@@ -93,16 +93,16 @@ export function DataTableFilterSheet<TData>({
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-100 sm:w-135 p-4">
+      <SheetContent className="w-100 sm:w-135 px-4">
         <SheetHeader>
           <SheetTitle>Filters</SheetTitle>
           <SheetDescription>
             Apply filters to narrow down the data.
           </SheetDescription>
         </SheetHeader>
-        <Separator className="my-2" />
-        <ScrollArea className="h-[calc(100vh-200px)] pr-4">
-          <div className="space-y-6">
+        <Separator className="mb-2" />
+        <ScrollArea className="h-[calc(100vh-220px)] pr-4">
+          <div className="space-y-4">
             {filterFields.map((field) => {
               const column = table.getColumn(field.id)
               if (!column) return null
@@ -178,11 +178,13 @@ export function DataTableFilterSheet<TData>({
             })}
           </div>
         </ScrollArea>
-        <SheetFooter className="mt-4">
+        <SheetFooter className="mt-2 border-t">
+          <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={handleClear}>
             Clear filters
           </Button>
           <Button onClick={handleApply}>Apply filters</Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>

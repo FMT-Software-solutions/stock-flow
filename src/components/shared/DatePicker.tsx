@@ -39,7 +39,7 @@ export function DatePicker({
   // Update input value when date prop changes
   React.useEffect(() => {
     if (date) {
-      setInputValue(format(date, 'MMMM dd, yyyy'));
+      setInputValue(format(date, 'MMM dd, yyyy'));
       setMonth(date);
     } else {
       setInputValue('');

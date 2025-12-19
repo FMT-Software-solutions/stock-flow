@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { type Table, type Row } from '@tanstack/react-table';
+import { useDebounceValue } from '@/hooks/useDebounce';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,21 @@ export function DataTableToolbar<TData>({
   exportFields: customExportFields,
   searchKey,
 }: DataTableToolbarProps<TData>) {
+  const searchColumn = searchKey ? table.getColumn(searchKey) : undefined;
+  const filterValue = (searchColumn?.getFilterValue() as string) ?? '';
+  const [searchValue, setSearchValue] = useState(filterValue);
+  const debouncedSearchValue = useDebounceValue(searchValue, 1000);
+
+  useEffect(() => {
+    setSearchValue(filterValue);
+  }, [filterValue]);
+
+  useEffect(() => {
+    if (searchKey && debouncedSearchValue !== filterValue) {
+      table.getColumn(searchKey)?.setFilterValue(debouncedSearchValue);
+    }
+  }, [debouncedSearchValue, table, searchKey, filterValue]);
+
   const isFiltered = table.getState().columnFilters.length > 0;
 
   const exportFields = customExportFields || table.getAllColumns()
@@ -50,12 +67,8 @@ export function DataTableToolbar<TData>({
           {searchKey && (
             <Input
               placeholder="Search..."
-              value={
-                (table.getColumn(searchKey)?.getFilterValue() as string) ?? ''
-              }
-              onChange={(event) =>
-                table.getColumn(searchKey)?.setFilterValue(event.target.value)
-              }
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
               className="h-8 w-37.5 lg:w-62.5"
             />
           )}

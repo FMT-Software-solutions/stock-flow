@@ -9,6 +9,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { getExpenseFilterFields, expenseExportFields } from './fields';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 export function ExpensesList() {
   const { currentOrganization } = useOrganization();
@@ -124,21 +125,15 @@ export function ExpensesList() {
     statusOptions
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        Loading expenses...
-      </div>
-    );
-  }
-
   return (
-    <DataTable
-      columns={columns}
-      data={expenses}
-      searchKey="description"
-      filterFields={filterFields}
-      exportFields={expenseExportFields}
-    />
+    <div className={cn(isLoading ? 'opacity-50' : '')}>
+      <DataTable
+        columns={columns}
+        data={expenses}
+        searchKey="description"
+        filterFields={filterFields}
+        exportFields={expenseExportFields}
+      />
+    </div>
   );
 }

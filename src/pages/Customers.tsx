@@ -7,6 +7,7 @@ import { useCustomers } from '@/hooks/useCustomerQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { getCustomerFilterFields } from './customers/fields';
+import { cn } from '@/lib/utils';
 
 export function Customers() {
   const navigate = useNavigate();
@@ -23,26 +24,28 @@ export function Customers() {
     }))
   );
 
-  if (isLoading) return <div>Loading...</div>;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-          <p className="text-muted-foreground">Manage your customer base</p>
+          <h1 className="text-xl font-bold tracking-tight">Customers</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage your customer base
+          </p>
         </div>
-        <Button onClick={() => navigate('/customers/new')}>
+        <Button onClick={() => navigate('/customers/new')} disabled={isLoading}>
           <Plus className="mr-2 h-4 w-4" /> Add Customer
         </Button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={customers}
-        searchKey="firstName"
-        filterFields={filterFields}
-      />
+      <div className={cn(isLoading ? 'opacity-50' : '')}>
+        <DataTable
+          columns={columns}
+          data={customers}
+          searchKey="firstName"
+          filterFields={filterFields}
+        />
+      </div>
     </div>
   );
 }

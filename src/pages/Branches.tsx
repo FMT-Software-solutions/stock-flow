@@ -112,7 +112,7 @@ export function Branches() {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-xl font-bold tracking-tight">
             Branch Management
           </h1>
         </div>
@@ -142,11 +142,11 @@ export function Branches() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0 flex-wrap space-y-4">
         <div className="mb-4 md:mb-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1 className="text-xl md:text-3xl font-bold tracking-tight">
             Branch Management
           </h1>
-          <p className="text-muted-foreground">
-            Manage your branches and locations
+          <p className="text-sm text-muted-foreground">
+            Manage your organization branches and locations
           </p>
         </div>
 
@@ -183,7 +183,7 @@ export function Branches() {
                     Add
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-106.25">
                   <DialogHeader>
                     <DialogTitle>
                       {selectedBranch ? 'Edit Branch' : 'Create New Branch'}

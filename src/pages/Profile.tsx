@@ -128,7 +128,7 @@ export function Profile() {
 
   if (!user?.profile) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="flex items-center space-x-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading profile...</span>
@@ -263,7 +263,7 @@ export function Profile() {
           <Button
             onClick={handleSaveProfile}
             disabled={isSaving}
-            className="min-w-[120px]"
+            className="min-w-30"
           >
             {isSaving ? (
               <>

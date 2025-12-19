@@ -139,10 +139,6 @@ export function Inventory() {
 
   const categoryExportFields = getCategoryExportFields(products);
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -159,14 +155,25 @@ export function Inventory() {
             className="space-y-0"
           >
             <TabsList>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
-              <TabsTrigger value="products">Products</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-              <TabsTrigger value="variations">Variations</TabsTrigger>
+              <TabsTrigger value="inventory" disabled={isLoading}>
+                Inventory
+              </TabsTrigger>
+              <TabsTrigger value="products" disabled={isLoading}>
+                Products
+              </TabsTrigger>
+              <TabsTrigger value="categories" disabled={isLoading}>
+                Categories
+              </TabsTrigger>
+              <TabsTrigger value="variations" disabled={isLoading}>
+                Variations
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           {activeTab === 'products' && (
-            <Button onClick={() => navigate('/inventory/new')}>
+            <Button
+              onClick={() => navigate('/inventory/new')}
+              disabled={isLoading}
+            >
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
           )}
@@ -176,7 +183,11 @@ export function Inventory() {
               onOpenChange={setOpenProductSearch}
             >
               <PopoverTrigger asChild>
-                <Button role="combobox" aria-expanded={openProductSearch}>
+                <Button
+                  role="combobox"
+                  aria-expanded={openProductSearch}
+                  disabled={isLoading}
+                >
                   <Plus className="mr-2 h-4 w-4" /> Add Inventory
                 </Button>
               </PopoverTrigger>
@@ -212,13 +223,16 @@ export function Inventory() {
                 fields={categoryExportFields}
                 defaultFilename="categories-export"
               />
-              <Button onClick={handleCreateCategory}>
+              <Button onClick={handleCreateCategory} disabled={isLoading}>
                 <Plus className="mr-2 h-4 w-4" /> Add Category
               </Button>
             </div>
           )}
           {activeTab === 'variations' && (
-            <Button onClick={() => setVariationDialogOpen(true)}>
+            <Button
+              onClick={() => setVariationDialogOpen(true)}
+              disabled={isLoading}
+            >
               <Plus className="mr-2 h-4 w-4" /> Add Variation Type
             </Button>
           )}
@@ -228,7 +242,9 @@ export function Inventory() {
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="space-y-4"
+        className={cn('space-y-4', {
+          'opacity-50 cursor-not-allowed': isLoading,
+        })}
       >
         <TabsContent value="inventory" className="space-y-4">
           <StatsContainer

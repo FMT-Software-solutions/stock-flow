@@ -12,8 +12,8 @@ export function Orders() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sales & Orders</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight">Sales & Orders</h1>
+          <p className="text-sm text-muted-foreground">
             Manage inventory sales and orders
           </p>
         </div>

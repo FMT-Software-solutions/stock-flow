@@ -141,6 +141,65 @@ export function useProductInventory(productId?: string) {
   });
 }
 
+export function useInventoryEntry(id?: string) {
+  return useQuery({
+    queryKey: ['inventory_entry', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from('inventory')
+        .select(`
+          id,
+          inventory_number,
+          product_id,
+          variant_id,
+          branch_id,
+          quantity,
+          min_stock_level,
+          location,
+          organization_id,
+          last_updated,
+          custom_label,
+          price_override,
+          type,
+          image_url,
+          product:products (
+            id,
+            name,
+            sku,
+            unit,
+            selling_price,
+            image_url,
+            status,
+            category:product_categories (
+              name
+            )
+          ),
+          variant:product_variants (
+            id,
+            sku,
+            price,
+            attributes
+          ),
+          branch:branches (
+            id,
+            name
+          ),
+          creator:profiles!inventory_created_by_fkey2 (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return mapInventoryEntryFromDB(data);
+    },
+    enabled: !!id,
+  });
+}
+
 export function useCreateInventoryEntry() {
   const queryClient = useQueryClient();
   return useMutation({

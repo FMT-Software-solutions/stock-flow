@@ -34,11 +34,15 @@ export interface ExportOptions {
   filename?: string;
   title?: string;
   description?: string;
+  organizationName?: string;
   orientation?: 'portrait' | 'landscape';
 }
 
 export function useExport() {
-  const exportToCsv = useCallback((data: any[], fields: ExportField[], filename: string = 'export') => {
+  const exportToCsv = useCallback((data: any[], fields: ExportField[], options: ExportOptions | string = 'export') => {
+    const { filename = 'export', title, description, organizationName } = 
+      typeof options === 'string' ? { filename: options } : options;
+
     const headers = fields.map(f => f.label);
     const rows = data.map(row => 
       fields.map(field => {
@@ -52,7 +56,14 @@ export function useExport() {
       })
     );
 
+    const metadata: string[] = [];
+    if (organizationName) metadata.push(`Organization: ${organizationName}`);
+    if (title) metadata.push(`Title: ${title}`);
+    if (description) metadata.push(`Description: ${description}`);
+    if (metadata.length > 0) metadata.push('');
+
     const csvContent = [
+      ...metadata,
       headers.join(','),
       ...rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
     ].join('\n');
@@ -70,7 +81,10 @@ export function useExport() {
     }
   }, []);
 
-  const exportToExcel = useCallback((data: any[], fields: ExportField[], filename: string = 'export') => {
+  const exportToExcel = useCallback((data: any[], fields: ExportField[], options: ExportOptions | string = 'export') => {
+    const { filename = 'export', title, description, organizationName } = 
+      typeof options === 'string' ? { filename: options } : options;
+
     const exportData = data.map(row => {
       const newRow: Record<string, any> = {};
       fields.forEach(field => {
@@ -80,20 +94,50 @@ export function useExport() {
       return newRow;
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([]); // Create empty sheet
+
+    const metadata: string[][] = [];
+    if (organizationName) metadata.push([`Organization: ${organizationName}`]);
+    if (title) metadata.push([`Title: ${title}`]);
+    if (description) metadata.push([`Description: ${description}`]);
+    if (metadata.length > 0) metadata.push([]);
+
+    XLSX.utils.sheet_add_aoa(ws, metadata, { origin: 'A1' });
+    XLSX.utils.sheet_add_json(ws, exportData, { origin: `A${metadata.length + 1}`, skipHeader: false });
+
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     XLSX.writeFile(wb, `${filename}.xlsx`);
   }, []);
 
   const exportToPdf = useCallback(async (data: any[], fields: ExportField[], options: ExportOptions = {}) => {
-    const { filename = 'export', title, orientation = 'portrait' } = options;
+    const { filename = 'export', title, description, organizationName, orientation = 'portrait' } = options;
     const doc = new jsPDF({ orientation });
+
+    let currentY = 15;
+
+    if (organizationName) {
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(organizationName, 14, currentY);
+      currentY += 10;
+    }
 
     if (title) {
       doc.setFontSize(18);
-      doc.text(title, 14, 22);
+      doc.setTextColor(0);
+      doc.text(title, 14, currentY);
+      currentY += 10;
     }
+
+    if (description) {
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text(description, 14, currentY);
+      currentY += 10;
+    }
+
+    const startY = currentY + 5;
 
     const headers = fields.map(f => f.label);
     
@@ -116,7 +160,7 @@ export function useExport() {
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: title ? 30 : 20,
+      startY: startY,
       theme: 'grid',
       styles: { fontSize: 8, minCellHeight: 10 },
       headStyles: { fillColor: [41, 128, 185] },

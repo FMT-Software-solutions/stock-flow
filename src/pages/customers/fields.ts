@@ -33,11 +33,6 @@ export const getCustomerFilterFields = (
     type: 'number',
   },
   {
-    id: 'lastOrderDate',
-    label: 'Last Order',
-    type: 'date-range',
-  },
-  {
     id: 'createdAt',
     label: 'Joined Date',
     type: 'date-range',
@@ -79,11 +74,6 @@ export const customerExportFields: ExportField[] = [
     id: 'totalSpent',
     label: 'Total Spent',
     accessorFn: (row: any) => row.original.totalSpent,
-  },
-  {
-    id: 'lastOrderDate',
-    label: 'Last Order Date',
-    accessorFn: (row: any) => row.original.lastOrderDate,
   },
   {
     id: 'createdAt',

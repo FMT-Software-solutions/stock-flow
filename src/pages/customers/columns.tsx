@@ -140,9 +140,12 @@ export const columns: ColumnDef<Customer>[] = [
     cell: ({ row }) => {
       return (
         <div className="flex flex-col">
-          <span className="font-medium">
+          <Link
+            to={`/customers/details/${row.original.id}`}
+            className="font-medium hover:underline"
+          >
             {row.original.firstName} {row.original.lastName}
-          </span>
+          </Link>
           <span className="text-xs text-muted-foreground">
             {row.original.email}
           </span>
@@ -200,20 +203,9 @@ export const columns: ColumnDef<Customer>[] = [
     },
   },
   {
-    accessorKey: 'lastOrderDate',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Last Order" />
-    ),
-    cell: ({ row }) => {
-      const date = row.getValue('lastOrderDate') as string;
-      if (!date) return <span className="text-muted-foreground">-</span>;
-      return <div>{format(new Date(date), 'MMM dd, yyyy')}</div>;
-    },
-  },
-  {
     accessorKey: 'createdAt',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Joined Date" />
+      <DataTableColumnHeader column={column} title="Created Date" />
     ),
     cell: ({ row }) => {
       const date = row.getValue('createdAt') as string;

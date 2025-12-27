@@ -22,10 +22,12 @@ import { Dashboard } from '../pages/Dashboard';
 import { Inventory } from '../pages/Inventory';
 import { ProductForm } from '../pages/inventory/ProductForm';
 import { ProductDetails } from '../pages/inventory/ProductDetails';
+import { InventoryItemDetails } from '../pages/inventory/InventoryItemDetails';
 import { Orders } from '../pages/Orders';
 import { OrderForm } from '../pages/orders/OrderForm';
 import { Customers } from '../pages/Customers';
 import { CustomerForm } from '../pages/customers/CustomerForm';
+import CustomerDetails from '../pages/customers/CustomerDetails';
 import { Suppliers } from '../pages/Suppliers';
 import { SupplierForm } from '../pages/suppliers/SupplierForm';
 import { Reports } from '../pages/Reports';
@@ -108,6 +110,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="inventory/entry/:id"
+          element={
+            <PermissionGuard scope="inventory">
+              <InventoryItemDetails />
+            </PermissionGuard>
+          }
+        />
+        <Route
           path="inventory/:id"
           element={
             <PermissionGuard scope="inventory">
@@ -148,6 +158,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="orders/:id/edit"
+          element={
+            <PermissionGuard scope="orders" action="edit">
+              <OrderForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
           path="customers"
           element={
             <PermissionGuard scope="customers">
@@ -168,6 +186,14 @@ function AppRoutes() {
           element={
             <PermissionGuard scope="customers" action="edit">
               <CustomerForm />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="customers/details/:id"
+          element={
+            <PermissionGuard scope="customers">
+              <CustomerDetails />
             </PermissionGuard>
           }
         />

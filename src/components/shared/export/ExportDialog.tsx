@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -22,6 +23,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Download, Printer, FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react';
 import { useExport, type ExportFormat, type ExportField } from '@/hooks/useExport';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 
@@ -44,8 +46,11 @@ export function ExportDialog({
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState<ExportFormat>('excel');
   const [filename, setFilename] = useState(defaultFilename);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   
+  const { currentOrganization } = useOrganization();
   const { exportToCsv, exportToExcel, exportToPdf, exportToImage } = useExport();
 
   // Initialize selected fields with default selected fields
@@ -69,17 +74,23 @@ export function ExportDialog({
 
     setIsExporting(true);
     const fieldsToExport = fields.filter(f => selectedFields.includes(f.id));
+    const options = {
+      filename,
+      title,
+      description,
+      organizationName: currentOrganization?.name,
+    };
 
     try {
       switch (format) {
         case 'csv':
-          exportToCsv(data, fieldsToExport, filename);
+          exportToCsv(data, fieldsToExport, options);
           break;
         case 'excel':
-          exportToExcel(data, fieldsToExport, filename);
+          exportToExcel(data, fieldsToExport, options);
           break;
         case 'pdf':
-          await exportToPdf(data, fieldsToExport, { filename, title: filename });
+          await exportToPdf(data, fieldsToExport, options);
           break;
         case 'image':
           // For image, we usually need a DOM element.
@@ -203,6 +214,32 @@ export function ExportDialog({
                 )}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="title" className="text-right">
+              Title
+            </Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="col-span-3"
+              placeholder="Optional title"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="description" className="text-right">
+              Description
+            </Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="col-span-3"
+              placeholder="Optional description"
+            />
           </div>
 
           <div className="space-y-2">

@@ -257,7 +257,7 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
             />
           )}
           <div className="flex flex-col">
-            <Link to={`/inventory/${row.original.productId}`} className="font-medium hover:underline">
+            <Link to={`/inventory/entry/${row.original.id}`} className="font-medium hover:underline">
                 {row.original.productName}
             </Link>
             <span className="text-xs text-muted-foreground">

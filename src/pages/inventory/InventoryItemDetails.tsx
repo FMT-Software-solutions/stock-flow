@@ -1,0 +1,273 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { useInventoryEntry } from '@/hooks/useInventoryQueries';
+import { useInventoryOrders } from '@/hooks/useOrders';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowLeft, Edit, Copy } from 'lucide-react';
+import { DataTable } from '@/components/shared/data-table/data-table';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { Order } from '@/types/orders';
+import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
+import { format } from 'date-fns';
+import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
+import { useMemo } from 'react';
+import { ImagePreview } from '@/components/shared/ImagePreview';
+import { toast } from 'sonner';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { Badge } from '@/components/ui/badge';
+import { getOrderStatusVariant } from '@/lib/utils';
+
+export function InventoryItemDetails() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { data: inventory, isLoading: isLoadingInventory } = useInventoryEntry(
+    id
+  );
+  const { data: orders = [] } = useInventoryOrders(id);
+  const { availableBranches } = useBranchContext();
+
+  const columns = useMemo<ColumnDef<Order>[]>(
+    () => [
+      {
+        accessorKey: 'date',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Order Date" />
+        ),
+        cell: ({ row }) =>
+          format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mma'),
+      },
+      {
+        id: 'unitPrice',
+        header: 'Unit Price',
+        accessorFn: (row) => {
+          const item = (row.items || []).find(
+            (i: any) => i.inventory_id === id
+          );
+          return item ? item.unit_price : 0;
+        },
+        cell: ({ row }) => {
+          const item = (row.original.items || []).find(
+            (i: any) => i.inventory_id === id
+          );
+          return item ? <CurrencyDisplay amount={item.unit_price} /> : '-';
+        },
+      },
+      {
+        id: 'quantity',
+        header: 'Quantity',
+        accessorFn: (row) => {
+          const item = (row.items || []).find(
+            (i: any) => i.inventory_id === id
+          );
+          return item ? item.quantity : 0;
+        },
+        cell: ({ row }) => {
+          const item = (row.original.items || []).find(
+            (i: any) => i.inventory_id === id
+          );
+          return item ? item.quantity : '-';
+        },
+      },
+      {
+        accessorKey: 'total_amount',
+        header: 'Order Total',
+        cell: ({ row }) => {
+          const val = row.getValue('total_amount') as number | string;
+          const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
+          return <CurrencyDisplay amount={isNaN(amount) ? 0 : amount} />;
+        },
+      },
+      {
+        accessorKey: 'payment_method',
+        header: 'Payment Method',
+        cell: ({ row }) => {
+          const method = row.getValue('payment_method') as string;
+          return method ? method.replace('_', ' ').toUpperCase() : '-';
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <Badge
+            variant={getOrderStatusVariant(row.getValue('status'))}
+            className="px-4 justify-center capitalize"
+          >
+            {row.getValue('status')}
+          </Badge>
+        ),
+      },
+    ],
+    [id]
+  );
+
+  if (isLoadingInventory) {
+    return (
+      <div className="p-8 space-y-4">
+        <div className="h-8 w-64 bg-muted animate-pulse rounded" />
+        <div className="h-64 w-full bg-muted animate-pulse rounded" />
+      </div>
+    );
+  }
+
+  if (!inventory) {
+    return <div className="p-8">Inventory item not found</div>;
+  }
+
+  const branch = availableBranches.find((b) => b.id === inventory.branchId);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex items-start gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="mt-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {inventory.productName}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+              {inventory.inventoryNumber && (
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold text-foreground">Inv #:</span>
+                  <span className="font-mono">{inventory.inventoryNumber}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 ml-1"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        inventory.inventoryNumber || ''
+                      );
+                      toast.success('Copied to clipboard');
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">SKU:</span>
+                <span className="font-mono">{inventory.sku}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => navigate(`/inventory/${inventory.productId}/edit`)}
+          >
+            <Edit className="mr-2 h-4 w-4" /> Edit Product
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Card */}
+      <Card>
+        <CardContent className="px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 flex justify-center md:justify-start">
+              {inventory.imageUrl || inventory.productImage ? (
+                <ImagePreview
+                  src={inventory.imageUrl || inventory.productImage}
+                  alt={inventory.productName}
+                  className="w-48 h-48 rounded-lg object-cover border"
+                />
+              ) : (
+                <div className="w-48 h-48 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                  No Image
+                </div>
+              )}
+            </div>
+
+            <div className="col-span-1 md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-8 py-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Unit Price
+                </p>
+                <div className="text-xl font-bold">
+                  <CurrencyDisplay
+                    amount={
+                      inventory.priceOverride ?? inventory.productPrice ?? 0
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  In Stock
+                </p>
+                <div className="text-xl font-bold">
+                  {inventory.quantity} {inventory.unit}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Category
+                </p>
+                <div className="text-lg font-medium">
+                  {inventory.categoryName || '-'}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Branch
+                </p>
+                <div className="text-lg font-medium">{branch?.name || '-'}</div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Sold
+                </p>
+                <div className="text-xl font-bold">
+                  {orders.reduce((sum, order) => {
+                    const item = (order.items || []).find(
+                      (i: any) => i.inventory_id === id
+                    );
+                    return sum + (item ? item.quantity : 0);
+                  }, 0)}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Revenue
+                </p>
+                <div className="text-xl font-bold">
+                  <CurrencyDisplay
+                    amount={orders.reduce((sum, order) => {
+                      const item = (order.items || []).find(
+                        (i: any) => i.inventory_id === id
+                      );
+                      return sum + (item ? item.quantity * item.unit_price : 0);
+                    }, 0)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Purchase History */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold tracking-tight">
+          Purchase History
+        </h2>
+        <DataTable
+          columns={columns}
+          data={orders}
+          searchKey="date"
+          storageKey={`inventory-history-${id}`}
+        />
+      </div>
+    </div>
+  );
+}

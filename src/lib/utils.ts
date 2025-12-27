@@ -152,3 +152,19 @@ export function oklchToHex(oklch: string): string {
   
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
+
+
+export const getOrderStatusVariant = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'default';
+      case 'cancelled':
+        return 'destructive';
+      case 'pending':
+        return 'outline';
+      case 'refunded':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };

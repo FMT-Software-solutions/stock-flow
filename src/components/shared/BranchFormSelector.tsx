@@ -45,6 +45,17 @@ export function BranchFormSelector({
       onChange(defaultBranchId);
     }
   }, [value, defaultBranchId, onChange]);
+  
+  useEffect(() => {
+    const optionIds = options.map((b) => b.id);
+    if (value && !optionIds.includes(value)) {
+      if (defaultBranchId) {
+        onChange(defaultBranchId);
+      } else {
+        onChange('');
+      }
+    }
+  }, [value, options, defaultBranchId, onChange]);
 
   if (isLoading) {
     return (

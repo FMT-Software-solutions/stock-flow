@@ -39,7 +39,7 @@ export default function CustomerDetails() {
         <DataTableColumnHeader column={column} title="Order Date" />
       ),
       cell: ({ row }) =>
-        format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mma'),
+        format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mm a'),
     },
     {
       id: 'items',
@@ -94,7 +94,9 @@ export default function CustomerDetails() {
   }
 
   const totalOrdersCount = orders.length;
-  const totalRevenue = orders.reduce((sum, order) => {
+  const completedRevenue = orders.reduce((sum, order) => {
+    const status = String(order.status || '').toLowerCase();
+    if (status !== 'completed') return sum;
     const val = (order.total_amount as unknown) as number | string | undefined;
     const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
     return sum + (isNaN(amount) ? 0 : amount);
@@ -125,12 +127,13 @@ export default function CustomerDetails() {
   const statusCounts = orders.reduce(
     (acc, o) => {
       const s = String(o.status || '').toLowerCase();
-      if (s === 'pending') acc.pending += 1;
+      if (s === 'pending' || s === 'processing') acc.pendingProcessing += 1;
       else if (s === 'completed') acc.completed += 1;
-      else if (s === 'cancelled' || s === 'canceled') acc.cancelled += 1;
+      else if (s === 'cancelled' || s === 'canceled' || s === 'refunded')
+        acc.cancelledRefunded += 1;
       return acc;
     },
-    { pending: 0, completed: 0, cancelled: 0 }
+    { pendingProcessing: 0, completed: 0, cancelledRefunded: 0 }
   );
 
   return (
@@ -174,7 +177,7 @@ export default function CustomerDetails() {
               <span className="font-medium">{customer.totalOrders || 0}</span>
               <span className="text-muted-foreground">Total Spent</span>
               <span className="font-medium">
-                <CurrencyDisplay amount={totalRevenue || 0} />
+                <CurrencyDisplay amount={completedRevenue || 0} />
               </span>
             </div>
           </CardContent>
@@ -197,8 +200,11 @@ export default function CustomerDetails() {
                   Total Revenue
                 </p>
                 <div className="text-xl font-bold">
-                  <CurrencyDisplay amount={totalRevenue} />
+                  <CurrencyDisplay amount={completedRevenue} />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Completed orders only
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
@@ -213,9 +219,11 @@ export default function CustomerDetails() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Pending
+                  Pending / Processing
                 </p>
-                <div className="text-xl font-bold">{statusCounts.pending}</div>
+                <div className="text-xl font-bold">
+                  {statusCounts.pendingProcessing}
+                </div>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
@@ -227,10 +235,10 @@ export default function CustomerDetails() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Cancelled
+                  Cancelled / Refunded
                 </p>
                 <div className="text-xl font-bold">
-                  {statusCounts.cancelled}
+                  {statusCounts.cancelledRefunded}
                 </div>
               </div>
             </div>

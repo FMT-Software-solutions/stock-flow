@@ -1,19 +1,26 @@
 import { DataTable } from '@/components/shared/data-table/data-table';
-import { columns } from './orders/columns';
-import { useOrders } from '@/hooks/useOrders';
+import { StatsContainer } from '@/components/shared/stats/StatsContainer';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
-import { getOrderFilterFields, orderExportFields } from './orders/fields';
-import { useMemo } from 'react';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useCurrency } from '@/hooks/useCurrency';
+import { useOrders } from '@/hooks/useOrders';
 import { cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { columns } from './orders/columns';
+import {
+  getOrderFilterFields,
+  getOrderStatsGroups,
+  orderExportFields,
+} from './orders/fields';
 
 export function Orders() {
   const navigate = useNavigate();
   const { currentOrganization } = useOrganization();
-  const { selectedBranchIds, availableBranches } = useBranchContext();
+  const { selectedBranchIds } = useBranchContext();
+  const { formatCurrency } = useCurrency();
 
   const { data: orders = [], isLoading } = useOrders(
     currentOrganization?.id,
@@ -21,9 +28,15 @@ export function Orders() {
   );
 
   const filterFields = useMemo(() => {
-    const branches = availableBranches.map((b) => ({
-      label: b.name,
-      value: b.name,
+    const branches = Array.from(
+      new Set(
+        orders
+          .map((o) => o.branch?.name)
+          .filter((name): name is string => !!name)
+      )
+    ).map((name) => ({
+      label: name,
+      value: name,
     }));
 
     const customers = Array.from(
@@ -47,13 +60,21 @@ export function Orders() {
 
     const paymentMethods = Array.from(
       new Set(orders.map((o) => o.payment_method).filter(Boolean))
-    ).map((pm) => ({
-      label: (pm as string).charAt(0).toUpperCase() + (pm as string).slice(1),
-      value: pm as string,
-    }));
+    ).map((pm) => {
+      const v = pm as string;
+      const label = v
+        .split('_')
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ');
+      return { label, value: v };
+    });
 
     return getOrderFilterFields(branches, customers, paymentMethods);
-  }, [availableBranches, orders]);
+  }, [orders]);
+
+  const orderStatsGroups = useMemo(() => getOrderStatsGroups(formatCurrency), [
+    formatCurrency,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -72,6 +93,13 @@ export function Orders() {
         </Button>
       </div>
 
+      <StatsContainer
+        groups={orderStatsGroups}
+        data={orders}
+        storageKey="stockflow-orders-stats-container-is-open"
+        summaryLabel="Order Summary"
+      />
+
       <div className={cn(isLoading && 'opacity-50')}>
         <DataTable
           columns={columns}
@@ -79,7 +107,7 @@ export function Orders() {
           searchKey="orderNumber"
           filterFields={filterFields}
           exportFields={orderExportFields}
-          storageKey="orders-table"
+          storageKey="stockflow-orders-table"
         />
       </div>
     </div>

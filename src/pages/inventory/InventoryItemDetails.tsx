@@ -10,21 +10,36 @@ import type { Order } from '@/types/orders';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { format } from 'date-fns';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ImagePreview } from '@/components/shared/ImagePreview';
 import { toast } from 'sonner';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { Badge } from '@/components/ui/badge';
 import { getOrderStatusVariant } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Check, X, Pencil } from 'lucide-react';
+import { useUpdateInventoryEntry } from '@/hooks/useInventoryQueries';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function InventoryItemDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: inventory, isLoading: isLoadingInventory } = useInventoryEntry(
-    id
-  );
+  const {
+    data: inventory,
+    isLoading: isLoadingInventory,
+    refetch,
+  } = useInventoryEntry(id);
   const { data: orders = [] } = useInventoryOrders(id);
   const { availableBranches } = useBranchContext();
+  const updateInventory = useUpdateInventoryEntry();
+  const { checkPermission } = useRoleCheck();
+
+  const canEditInventory = checkPermission('inventory', 'edit');
+
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [isEditingStock, setIsEditingStock] = useState(false);
+  const [priceInput, setPriceInput] = useState<number | ''>('');
+  const [stockInput, setStockInput] = useState<number | ''>('');
 
   const columns = useMemo<ColumnDef<Order>[]>(
     () => [
@@ -192,20 +207,168 @@ export function InventoryItemDetails() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Unit Price
                 </p>
-                <div className="text-xl font-bold">
-                  <CurrencyDisplay
-                    amount={
-                      inventory.priceOverride ?? inventory.productPrice ?? 0
-                    }
-                  />
+                <div className="flex items-center gap-2">
+                  {!isEditingPrice ? (
+                    <>
+                      <div className="text-xl font-bold">
+                        <CurrencyDisplay
+                          amount={
+                            inventory.priceOverride ??
+                            inventory.productPrice ??
+                            0
+                          }
+                        />
+                      </div>
+                      {canEditInventory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setIsEditingPrice(true);
+                            setPriceInput(
+                              typeof inventory.priceOverride === 'number'
+                                ? inventory.priceOverride
+                                : inventory.productPrice ?? 0
+                            );
+                          }}
+                          aria-label="Edit unit price"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        type="number"
+                        value={priceInput}
+                        onChange={(e) =>
+                          setPriceInput(
+                            e.target.value === '' ? '' : Number(e.target.value)
+                          )
+                        }
+                        className="w-28 h-8"
+                        aria-label="Unit price input"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={async () => {
+                          try {
+                            const price =
+                              priceInput === ''
+                                ? undefined
+                                : Number(priceInput);
+                            await updateInventory.mutateAsync({
+                              id: inventory.id,
+                              priceOverride: price,
+                            });
+                            toast.success('Unit price updated');
+                            setIsEditingPrice(false);
+                            await refetch();
+                          } catch (err) {
+                            toast.error('Failed to update unit price');
+                            console.error(err);
+                          }
+                        }}
+                        aria-label="Save unit price"
+                      >
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setIsEditingPrice(false);
+                          setPriceInput('');
+                        }}
+                        aria-label="Cancel unit price edit"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
                   In Stock
                 </p>
-                <div className="text-xl font-bold">
-                  {inventory.quantity} {inventory.unit}
+                <div className="flex items-center gap-2">
+                  {!isEditingStock ? (
+                    <>
+                      <div className="text-xl font-bold">
+                        {inventory.quantity} {inventory.unit}
+                      </div>
+                      {canEditInventory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setIsEditingStock(true);
+                            setStockInput(inventory.quantity ?? 0);
+                          }}
+                          aria-label="Edit stock level"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        type="number"
+                        value={stockInput}
+                        onChange={(e) =>
+                          setStockInput(
+                            e.target.value === '' ? '' : Number(e.target.value)
+                          )
+                        }
+                        className="w-24 h-8"
+                        aria-label="Stock level input"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={async () => {
+                          try {
+                            const qty =
+                              stockInput === '' ? 0 : Number(stockInput);
+                            await updateInventory.mutateAsync({
+                              id: inventory.id,
+                              quantity: qty,
+                            });
+                            toast.success('Stock level updated');
+                            setIsEditingStock(false);
+                            await refetch();
+                          } catch (err) {
+                            toast.error('Failed to update stock level');
+                            console.error(err);
+                          }
+                        }}
+                        aria-label="Save stock level"
+                      >
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setIsEditingStock(false);
+                          setStockInput('');
+                        }}
+                        aria-label="Cancel stock edit"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="space-y-1">

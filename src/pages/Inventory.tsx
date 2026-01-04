@@ -250,6 +250,8 @@ export function Inventory() {
           <StatsContainer
             groups={inventoryStatsGroups}
             data={inventoryEntries}
+            summaryLabel="Inventory Summary"
+            storageKey="stockflow-inventory-stats-container-is-open"
           />
           <DataTable
             columns={inventoryColumns}
@@ -261,8 +263,13 @@ export function Inventory() {
             defaultColumnVisibility={{ searchable: false }}
           />
         </TabsContent>
-        <TabsContent value="products" className="space-y-4">
-          <StatsContainer groups={productStatsGroups} data={products} />
+        <TabsContent value="products" className="space-y-6">
+          <StatsContainer
+            groups={productStatsGroups}
+            data={products}
+            summaryLabel="Product Summary"
+            storageKey="stockflow-products-stats-container-is-open"
+          />
           <DataTable
             columns={columns}
             data={products}

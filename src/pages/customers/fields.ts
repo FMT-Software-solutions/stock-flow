@@ -1,43 +1,40 @@
 import type { DataTableFilterField } from '@/types/data-table';
 import type { ExportField } from '@/hooks/useExport';
+import { orderStatuses } from '@/constants/order-statuses';
+import { paymentStatuses } from '@/constants/payment-statuses';
 
 export const getCustomerFilterFields = (
   branches: { label: string; value: string }[]
 ): DataTableFilterField[] => [
-  {
-    id: 'email',
-    label: 'Email',
-    type: 'text',
-    placeholder: 'Filter by email...',
-  },
-  {
-    id: 'phone',
-    label: 'Phone',
-    type: 'text',
-    placeholder: 'Filter by phone...',
-  },
-  {
-    id: 'branchName',
-    label: 'Branch',
-    type: 'select',
-    options: branches,
-  },
-  {
-    id: 'totalOrders',
-    label: 'Total Orders',
-    type: 'number',
-  },
-  {
-    id: 'totalSpent',
-    label: 'Total Spent',
-    type: 'number',
-  },
-  {
-    id: 'createdAt',
-    label: 'Joined Date',
-    type: 'date-range',
-  },
-];
+    {
+      id: 'email',
+      label: 'Email',
+      type: 'text',
+      placeholder: 'Filter by email...',
+    },
+    {
+      id: 'phone',
+      label: 'Phone',
+      type: 'text',
+      placeholder: 'Filter by phone...',
+    },
+    {
+      id: 'branchName',
+      label: 'Branch',
+      type: 'select',
+      options: branches,
+    },
+    {
+      id: 'totalOrders',
+      label: 'Total Orders',
+      type: 'number',
+    },
+    {
+      id: 'createdAt',
+      label: 'Created Date',
+      type: 'date-range',
+    },
+  ];
 
 export const customerExportFields: ExportField[] = [
   {
@@ -71,13 +68,56 @@ export const customerExportFields: ExportField[] = [
     accessorFn: (row: any) => row.original.totalOrders,
   },
   {
-    id: 'totalSpent',
-    label: 'Total Spent',
-    accessorFn: (row: any) => row.original.totalSpent,
-  },
-  {
     id: 'createdAt',
-    label: 'Joined Date',
+    label: 'Created Date',
     accessorFn: (row: any) => row.original.createdAt,
   },
 ];
+
+
+export const getCustomerOrderFilterFields = (
+  branches: { label: string; value: string }[],
+  paymentMethods: { label: string; value: string }[]
+): DataTableFilterField[] => [
+    {
+      id: 'orderNumber',
+      label: 'Order Number',
+      type: 'text',
+      placeholder: 'Filter by order number...',
+    },
+    {
+      id: 'date',
+      label: 'Order Date',
+      type: 'date-range',
+    },
+    {
+      id: 'totalAmount',
+      label: 'Total Amount',
+      type: 'number',
+    },
+
+    {
+      id: 'branchName',
+      label: 'Branch',
+      type: 'select',
+      options: branches,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      type: 'select',
+      options: orderStatuses,
+    },
+    {
+      id: 'paymentStatus',
+      label: 'Payment Status',
+      type: 'select',
+      options: paymentStatuses,
+    },
+    {
+      id: 'paymentMethod',
+      label: 'Payment Method',
+      type: 'select',
+      options: paymentMethods,
+    },
+  ];

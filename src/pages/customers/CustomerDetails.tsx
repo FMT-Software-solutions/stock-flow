@@ -13,12 +13,49 @@ import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { OrderItemsCell } from '@/components/orders/OrderItemsCell';
 import { Badge } from '@/components/ui/badge';
 import { getOrderStatusVariant } from '@/lib/utils';
+import { customerOrderExportFields } from '../orders/fields';
+import { getCustomerOrderFilterFields } from './fields';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useMemo } from 'react';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 export default function CustomerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { selectedBranchIds } = useBranchContext();
+  const { currentOrganization } = useOrganization();
   const { data: customer, isLoading: isLoadingCustomer } = useCustomer(id);
-  const { data: orders = [] } = useCustomerOrders(id);
+  const { data: orders = [] } = useCustomerOrders(
+    id,
+    currentOrganization?.id,
+    selectedBranchIds
+  );
+
+  const filterFields = useMemo(() => {
+    const branches = Array.from(
+      new Set(
+        orders
+          .map((o) => o.branch?.name)
+          .filter((name): name is string => !!name)
+      )
+    ).map((name) => ({
+      label: name,
+      value: name,
+    }));
+
+    const paymentMethods = Array.from(
+      new Set(orders.map((o) => o.payment_method).filter(Boolean))
+    ).map((pm) => {
+      const v = pm as string;
+      const label = v
+        .split('_')
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ');
+      return { label, value: v };
+    });
+
+    return getCustomerOrderFilterFields(branches, paymentMethods);
+  }, [orders]);
 
   const columns: ColumnDef<Order>[] = [
     {
@@ -59,20 +96,41 @@ export default function CustomerDetails() {
       },
     },
     {
+      id: 'branchName',
+      accessorFn: (row) => row.branch?.name,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Branch" />
+      ),
+      cell: ({ row }) => {
+        const branch = row.original.branch;
+        return branch ? branch.name : '-';
+      },
+      filterFn: (row, id, value) => {
+        // Simple filter for now, usually handled by server or strict equality
+        return value.includes(row.getValue(id));
+      },
+    },
+    {
       accessorKey: 'payment_method',
       id: 'paymentMethod',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Payment Method" />
       ),
       cell: ({ row }) => {
-        const method = row.getValue('paymentMethod') as string;
-        return method ? method.replace('_', ' ').toUpperCase() : '-';
+        const method = row.getValue('paymentMethod') as string | undefined;
+        const label = method
+          ? method
+              .split('_')
+              .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+              .join(' ')
+          : '-';
+        return label;
       },
     },
     {
       accessorKey: 'status',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Status" />
+        <DataTableColumnHeader column={column} title="Order Status" />
       ),
       cell: ({ row }) => (
         <Badge
@@ -83,6 +141,17 @@ export default function CustomerDetails() {
         </Badge>
       ),
     },
+    {
+      accessorKey: 'payment_status',
+      id: 'paymentStatus',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Payment Status" />
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue('paymentStatus') as string;
+        return status ? status.replace('_', ' ').toUpperCase() : '-';
+      },
+    },
   ];
 
   if (isLoadingCustomer) {
@@ -90,7 +159,7 @@ export default function CustomerDetails() {
   }
 
   if (!customer) {
-    return <div className="p-8">Customer not found</div>;
+    return <div className="p-8 text-center text-muted">Customer not found</div>;
   }
 
   const totalOrdersCount = orders.length;
@@ -255,6 +324,8 @@ export default function CustomerDetails() {
               data={orders}
               searchKey="orderNumber"
               storageKey={`customer-orders-${customer.id}`}
+              exportFields={customerOrderExportFields}
+              filterFields={filterFields}
             />
           </CardContent>
         </Card>

@@ -5,9 +5,27 @@ import { Plus } from 'lucide-react';
 import { ExpensesList } from './expenses/ExpensesList';
 import { ExpenseConfiguration } from './expenses/ExpenseConfiguration';
 import { AddExpenseDialog } from './expenses/AddExpenseDialog';
+import { StatsContainer } from '@/components/shared/stats/StatsContainer';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useExpenses } from '@/hooks/useExpenseQueries';
+import { useCurrency } from '@/hooks/useCurrency';
+import { getExpenseStatsGroups } from './expenses/fields';
+import { useMemo } from 'react';
 
 export function Expenses() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const { currentOrganization } = useOrganization();
+  const { selectedBranchIds } = useBranchContext();
+  const { formatCurrency } = useCurrency();
+  const { data: expenses = [] } = useExpenses(
+    currentOrganization?.id,
+    selectedBranchIds.length > 0 ? selectedBranchIds : undefined
+  );
+  const expenseStatsGroups = useMemo(
+    () => getExpenseStatsGroups(formatCurrency),
+    [formatCurrency]
+  );
 
   return (
     <div className="space-y-6">
@@ -29,6 +47,13 @@ export function Expenses() {
           </AddExpenseDialog>
         </div>
       </div>
+
+      <StatsContainer
+        groups={expenseStatsGroups}
+        data={expenses}
+        storageKey="expenses-stats-is-open"
+        summaryLabel="Expenses Summary"
+      />
 
       <Tabs defaultValue="list" className="space-y-4">
         <TabsList>

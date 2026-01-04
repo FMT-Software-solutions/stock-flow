@@ -2,8 +2,6 @@ import { useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Customer } from '@/types/customer';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
-
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, Edit, Trash } from 'lucide-react';
 import {
@@ -14,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useDeleteCustomer } from '@/hooks/useCustomerQueries';
@@ -111,29 +108,21 @@ const CustomerActions = ({ customer }: { customer: Customer }) => {
 
 export const columns: ColumnDef<Customer>[] = [
   {
-    id: 'select',
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
+    id: 'search',
+    accessorFn: (row) =>
+      [
+        row.firstName || '',
+        row.lastName || '',
+        row.email || '',
+        row.phone || '',
+      ]
+        .join(' ')
+        .trim(),
     enableHiding: false,
   },
   {
-    accessorKey: 'firstName',
+    id: 'name',
+    accessorFn: (row) => `${row.firstName || ''} ${row.lastName || ''}`.trim(),
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Name" />
     ),
@@ -146,9 +135,6 @@ export const columns: ColumnDef<Customer>[] = [
           >
             {row.original.firstName} {row.original.lastName}
           </Link>
-          <span className="text-xs text-muted-foreground">
-            {row.original.email}
-          </span>
         </div>
       );
     },
@@ -187,20 +173,6 @@ export const columns: ColumnDef<Customer>[] = [
     cell: ({ row }) => (
       <div className="text-center">{row.getValue('totalOrders') || 0}</div>
     ),
-  },
-  {
-    accessorKey: 'totalSpent',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Total Spent" />
-    ),
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('totalSpent') || '0');
-      return (
-        <div className="font-medium">
-          <CurrencyDisplay amount={amount} />
-        </div>
-      );
-    },
   },
   {
     accessorKey: 'createdAt',

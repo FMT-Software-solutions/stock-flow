@@ -59,7 +59,7 @@ export function StatsGroupCard<TData>({
             <div
               key={field.id}
               className={cn(
-                'flex gap-1 justify-between items-center',
+                'flex gap-2 justify-between items-start py-1.5',
                 index !== group.fields.length - 1 && 'border-b'
               )}
             >
@@ -67,33 +67,30 @@ export function StatsGroupCard<TData>({
                 {FieldIcon && <FieldIcon className="h-4 w-4" />}
                 <span>{field.label}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={cn('font-bold', field.className)}>
+              <div className="flex flex-col items-end text-right max-w-[60%]">
+                <span className={cn('font-bold wrap-break-word', field.className)}>
                   {result.value}
                 </span>
                 {result.subValue && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground wrap-break-word">
                     {result.subValue}
                   </span>
                 )}
+                {(result.trend || result.trendValue) && (
+                  <span
+                    className={cn(
+                      'text-xs',
+                      result.trend === 'up'
+                        ? 'text-green-500'
+                        : result.trend === 'down'
+                        ? 'text-red-500'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    {result.trendValue}
+                  </span>
+                )}
               </div>
-              {(result.trend || result.trendValue) && (
-                <div className="flex items-center gap-1 text-xs">
-                  {result.trendValue && (
-                    <span
-                      className={cn(
-                        result.trend === 'up'
-                          ? 'text-green-500'
-                          : result.trend === 'down'
-                          ? 'text-red-500'
-                          : 'text-muted-foreground'
-                      )}
-                    >
-                      {result.trendValue}
-                    </span>
-                  )}
-                </div>
-              )}
               {result.footer && (
                 <div className="text-xs text-muted-foreground">
                   {result.footer}

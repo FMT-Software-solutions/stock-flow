@@ -265,9 +265,7 @@ export function ExpenseForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
         </div>

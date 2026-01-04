@@ -138,7 +138,16 @@ export const columns: ColumnDef<Order>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Payment Method" />
     ),
-    cell: ({ row }) => <span className="capitalize">{row.getValue('paymentMethod') || '-'}</span>,
+    cell: ({ row }) => {
+      const raw = row.getValue('paymentMethod') as string | undefined;
+      const label = raw
+        ? raw
+            .split('_')
+            .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+            .join(' ')
+        : '-';
+      return <span>{label}</span>;
+    },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id));
     },

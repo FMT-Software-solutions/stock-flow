@@ -6,7 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCustomers } from '@/hooks/useCustomerQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
-import { getCustomerFilterFields } from './customers/fields';
+import {
+  customerExportFields,
+  getCustomerFilterFields,
+} from './customers/fields';
 import { cn } from '@/lib/utils';
 
 export function Customers() {
@@ -42,8 +45,10 @@ export function Customers() {
         <DataTable
           columns={columns}
           data={customers}
-          searchKey="firstName"
+          searchKey="search"
           filterFields={filterFields}
+          exportFields={customerExportFields}
+          defaultColumnVisibility={{ search: false }}
         />
       </div>
     </div>

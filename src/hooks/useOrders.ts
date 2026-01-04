@@ -7,7 +7,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
     queryKey: ['orders', organizationId, branchIds],
     queryFn: async () => {
       if (!organizationId) return [];
-      
+
       let query = supabase
         .from('orders')
         .select(`
@@ -25,7 +25,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
 
       const { data, error } = await query;
       if (error) throw error;
-      
+
       return data as Order[];
     },
     enabled: !!organizationId,
@@ -56,12 +56,17 @@ export function useInventoryOrders(inventoryId?: string) {
   });
 }
 
-export function useCustomerOrders(customerId?: string) {
+export function useCustomerOrders(
+  customerId?: string,
+  organizationId?: string,
+  branchIds?: string[]
+) {
   return useQuery({
-    queryKey: ['orders', 'customer', customerId],
+    queryKey: ['orders', 'customer', customerId, organizationId, branchIds],
     queryFn: async () => {
       if (!customerId) return [];
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -71,6 +76,16 @@ export function useCustomerOrders(customerId?: string) {
         `)
         .eq('customer_id', customerId)
         .order('date', { ascending: false });
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      if (branchIds && branchIds.length > 0) {
+        query = query.in('branch_id', branchIds);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Order[];
     },
@@ -108,14 +123,14 @@ export function useCreateOrder() {
   return useMutation({
     mutationFn: async (input: CreateOrderInput) => {
       const { items, ...orderData } = input;
-      
+
       // 1. Create Order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderData)
         .select()
         .single();
-        
+
       if (orderError) throw orderError;
       if (!order) throw new Error('Failed to create order');
 
@@ -126,11 +141,11 @@ export function useCreateOrder() {
           order_id: order.id,
           organization_id: order.organization_id,
         }));
-        
+
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsWithIds);
-          
+
         if (itemsError) {
           // In a real app we might want to rollback the order here
           console.error('Failed to create items', itemsError);
@@ -155,13 +170,13 @@ export function useUpdateOrder() {
   return useMutation({
     mutationFn: async (input: UpdateOrderInput) => {
       const { items, id, ...orderData } = input;
-      
+
       // 1. Update Order Details
       const { error: orderError } = await supabase
         .from('orders')
         .update(orderData)
         .eq('id', id);
-        
+
       if (orderError) throw orderError;
 
       // 2. Update Items (Replace strategy for simplicity)
@@ -171,31 +186,31 @@ export function useUpdateOrder() {
           .from('order_items')
           .delete()
           .eq('order_id', id);
-          
+
         if (deleteError) throw deleteError;
 
         // Insert new - Trigger should deduct stock
         if (items.length > 0) {
-           // Query order to get org_id
-           const { data: existingOrder } = await supabase
-             .from('orders')
-             .select('organization_id')
-             .eq('id', id)
-             .single();
-             
-           if (!existingOrder) throw new Error('Order not found');
+          // Query order to get org_id
+          const { data: existingOrder } = await supabase
+            .from('orders')
+            .select('organization_id')
+            .eq('id', id)
+            .single();
 
-           const itemsWithIds = items.map(item => ({
-             ...item,
-             order_id: id,
-             organization_id: existingOrder.organization_id,
-           }));
-           
-           const { error: itemsError } = await supabase
-             .from('order_items')
-             .insert(itemsWithIds);
-             
-           if (itemsError) throw itemsError;
+          if (!existingOrder) throw new Error('Order not found');
+
+          const itemsWithIds = items.map(item => ({
+            ...item,
+            order_id: id,
+            organization_id: existingOrder.organization_id,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(itemsWithIds);
+
+          if (itemsError) throw itemsError;
         }
       }
     },
@@ -217,7 +232,7 @@ export function useDeleteOrder() {
         .from('orders')
         .update({ is_deleted: true })
         .eq('id', orderId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {

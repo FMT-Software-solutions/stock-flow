@@ -768,9 +768,9 @@ export function useDeleteSupplier() {
   });
 }
 
-export function useInventoryEntries(organizationId?: string, branchIds?: string[]) {
+export function useInventoryEntries(organizationId?: string, branchIds?: string[], includeAllProductStatuses?: boolean) {
   return useQuery({
-    queryKey: ['inventory_entries', organizationId, branchIds],
+    queryKey: ['inventory_entries', organizationId, branchIds, includeAllProductStatuses],
     queryFn: async () => {
       if (!organizationId) return [];
       let query = supabase
@@ -819,7 +819,10 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
         `)
         .eq('organization_id', organizationId)
         .eq('is_deleted', false)
-        .eq('product.status', 'published');
+        
+      if (!includeAllProductStatuses) {
+        query = query.eq('product.status', 'published');
+      }
 
       if (branchIds && branchIds.length > 0) {
         query = query.in('branch_id', branchIds);

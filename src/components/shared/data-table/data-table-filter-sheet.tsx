@@ -93,7 +93,7 @@ export function DataTableFilterSheet<TData>({
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-100 sm:w-135 px-4">
+      <SheetContent className="w-100 sm:w-135 px-4 ">
         <SheetHeader>
           <SheetTitle>Filters</SheetTitle>
           <SheetDescription>
@@ -102,7 +102,10 @@ export function DataTableFilterSheet<TData>({
         </SheetHeader>
         <Separator className="mb-2" />
         <ScrollArea className="h-[calc(100vh-220px)] pr-4">
-          <div className="space-y-4">
+          <div className="space-y-4 relative">
+            {/* this input should not be removed even though it is not used visually */}
+            <input type="text" className="opacity-0 h-0 bg-red-200 absolute top-0" placeholder="Search..."/>
+
             {filterFields.map((field) => {
               const column = table.getColumn(field.id)
               if (!column) return null

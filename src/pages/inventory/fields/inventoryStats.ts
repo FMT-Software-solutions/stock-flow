@@ -2,7 +2,7 @@ import type { StatsGroup } from "@/types/stats";
 import type { InventoryEntry } from "@/types/inventory";
 import { Package, AlertTriangle, DollarSign } from "lucide-react";
 
-export const getInventoryStatsGroups = (formatCurrency: (amount: number) => string): StatsGroup<InventoryEntry>[] => [
+export const getInventoryStatsGroups = (formatCurrency: (amount: number) => string, isOwner: boolean): StatsGroup<InventoryEntry>[] => [
     {
         id: "inventory_overview",
         title: "Inventory Overview",
@@ -28,16 +28,16 @@ export const getInventoryStatsGroups = (formatCurrency: (amount: number) => stri
             {
                 id: "low_stock",
                 label: "Low Stock",
-                calculate: (data) => ({ 
-                    value: data.filter(i => i.quantity <= i.minStockLevel && i.quantity > 0).length 
+                calculate: (data) => ({
+                    value: data.filter(i => i.quantity <= i.minStockLevel && i.quantity > 0).length
                 }),
                 className: "text-yellow-600"
             },
             {
                 id: "out_of_stock",
                 label: "Out of Stock",
-                calculate: (data) => ({ 
-                    value: data.filter(i => i.quantity <= 0).length 
+                calculate: (data) => ({
+                    value: data.filter(i => i.quantity <= 0).length
                 }),
                 className: "text-red-600"
             }
@@ -56,9 +56,10 @@ export const getInventoryStatsGroups = (formatCurrency: (amount: number) => stri
                         const price = curr.priceOverride ?? curr.variantPrice ?? curr.productPrice ?? 0;
                         return acc + (curr.quantity * price);
                     }, 0);
-                     return { value: formatCurrency(total) };
+                    return { value: formatCurrency(total) };
                 }
             }
-        ]
+        ],
+        isHidden: !isOwner,
     }
 ];

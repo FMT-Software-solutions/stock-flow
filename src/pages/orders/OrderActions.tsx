@@ -75,10 +75,13 @@ export function OrderActions({ order }: OrderActionsProps) {
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowReceiptDialog(true)}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print Receipt
-          </DropdownMenuItem>
+          {order.payment_status !== 'refunded' &&
+            order.payment_status !== 'unpaid' && (
+              <DropdownMenuItem onClick={() => setShowReceiptDialog(true)}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print Receipt
+              </DropdownMenuItem>
+            )}
           <DropdownMenuItem
             onClick={() => navigate(`/orders/${order.id}/edit`)}
           >

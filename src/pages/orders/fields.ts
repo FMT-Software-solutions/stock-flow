@@ -177,25 +177,56 @@ export const getOrderStatsGroups = (
       icon: DollarSign,
       fields: [
         {
-          id: 'completed_revenue',
-          label: 'Completed Revenue',
+          id: 'paid_revenue',
+          label: 'Paid Revenue',
           calculate: (data) => {
             const total = data.reduce((sum, o) => {
-              const s = String(o.status || '').toLowerCase();
-              if (s !== 'completed') return sum;
-              const val = o.total_amount as unknown as number | string | undefined;
-              const amount =
-                typeof val === 'string' ? parseFloat(val) : val ?? 0;
+              const val = o.paid_amount as unknown as number | string | undefined;
+              const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
               return sum + (isNaN(Number(amount)) ? 0 : Number(amount));
             }, 0);
-            const completedCount = data.filter(
-              (o) => String(o.status || '').toLowerCase() === 'completed'
+            const paidCount = data.filter(
+              (o) => Number(o.paid_amount ?? 0) > 0
             ).length;
             return {
               value: formatCurrency(total),
-              subValue: `${completedCount} orders`,
+              subValue: `${paidCount} orders`,
             };
           },
+        },
+        {
+          id: 'owings',
+          label: 'Owings',
+          calculate: (data) => {
+            const totalOwings = data.reduce((sum, o) => {
+              const paymentStatus = String(o.payment_status || '').toLowerCase();
+              const status = String(o.status || '').toLowerCase();
+              if (paymentStatus === 'refunded' || status === 'cancelled') return sum;
+              const totalVal = o.total_amount as unknown as number | string | undefined;
+              const paidVal = o.paid_amount as unknown as number | string | undefined;
+              const totalAmt = typeof totalVal === 'string' ? parseFloat(totalVal) : totalVal ?? 0;
+              const paidAmt = typeof paidVal === 'string' ? parseFloat(paidVal) : paidVal ?? 0;
+              const diff = Number(totalAmt) - Number(paidAmt);
+              return sum + (diff > 0 ? diff : 0);
+            }, 0);
+            return { value: formatCurrency(totalOwings) };
+          },
+          className: 'text-amber-600',
+        },
+        {
+          id: 'refunds',
+          label: 'Refunds',
+          calculate: (data) => {
+            const totalRefunds = data.reduce((sum, o) => {
+              const paymentStatus = String(o.payment_status || '').toLowerCase();
+              if (paymentStatus !== 'refunded') return sum;
+              const val = o.total_amount as unknown as number | string | undefined;
+              const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
+              return sum + (isNaN(Number(amount)) ? 0 : Number(amount));
+            }, 0);
+            return { value: formatCurrency(totalRefunds) };
+          },
+          className: 'text-red-600',
         },
         {
           id: 'avg_order_value',
@@ -223,7 +254,7 @@ export const getOrderStatsGroups = (
       fields: [
         {
           id: 'last_order',
-          label: 'Last Order',
+          label: 'Last Order Entry',
           calculate: (data) => {
             if (data.length === 0) return { value: '-' };
             const timestamps = data
@@ -242,15 +273,6 @@ export const getOrderStatsGroups = (
             }
             return { value: formatted, subValue: rel };
           },
-        },
-        {
-          id: 'paid_orders',
-          label: 'Paid Orders',
-          calculate: (data) => ({
-            value: data.filter(
-              (o) => String(o.payment_status || '').toLowerCase() === 'paid'
-            ).length,
-          }),
         },
       ],
     },

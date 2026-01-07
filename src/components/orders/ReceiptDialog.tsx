@@ -25,6 +25,17 @@ export function ReceiptDialog({
   const { currentOrganization } = useOrganization();
   const { formatCurrency } = useCurrency();
   const contentRef = useRef<HTMLDivElement>(null);
+  const paidAmount = Number(order.paid_amount ?? 0);
+  const totalAmount = Number(order.total_amount ?? 0);
+  const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  const customerName = order.customer
+    ? `${order.customer.first_name || ''} ${
+        order.customer.last_name || ''
+      }`.trim() ||
+      order.customer.name ||
+      'Customer'
+    : 'Walk-in Customer';
+  const customerContact = order.customer?.phone || order.customer?.email || '';
 
   const handlePrint = useReactToPrint({
     contentRef: contentRef,
@@ -68,7 +79,7 @@ export function ReceiptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[95vh] overflow-auto">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold text-lg">Receipt Preview</h3>
         </div>
@@ -96,12 +107,22 @@ export function ReceiptDialog({
           </div>
           <div className="flex justify-between mb-1">
             <span>Date:</span>
-            <span>{format(new Date(order.date), 'MMM dd, yyyy')}</span>
+            <span>{format(new Date(order.date), 'MMMM dd, yyyy')}</span>
           </div>
           <div className="flex justify-between mb-4">
             <span>Time:</span>
-            <span>{format(new Date(order.date), 'HH:mm')}</span>
+            <span>{format(new Date(order.date), 'h:mm a')}</span>
           </div>
+          <div className="flex justify-between mb-1">
+            <span>Customer:</span>
+            <span>{customerName}</span>
+          </div>
+          {customerContact && (
+            <div className="flex justify-between mb-4">
+              <span>Contact:</span>
+              <span>{customerContact}</span>
+            </div>
+          )}
 
           <div className="border-t border-dashed border-gray-400 my-2" />
 
@@ -125,6 +146,20 @@ export function ReceiptDialog({
             <span>TOTAL:</span>
             <span>{formatCurrency(order.total_amount)}</span>
           </div>
+          <div className="flex justify-between mt-2">
+            <span>PAID:</span>
+            <span>{formatCurrency(paidAmount)}</span>
+          </div>
+          {remainingAmount > 0 && (
+            <div className="flex justify-between">
+              <span>REMAINING:</span>
+              <span
+                className={remainingAmount > 0 ? 'text-red-600 font-bold' : ''}
+              >
+                {formatCurrency(remainingAmount)}
+              </span>
+            </div>
+          )}
 
           <div className="border-t border-dashed border-gray-400 my-4" />
 

@@ -4,16 +4,14 @@ import { Sidebar } from './Sidebar';
 import { useSidebar } from '../../contexts/SidebarContext';
 
 export function ClassicLayout() {
-  const { isCollapsed, isMobile } = useSidebar();
+  const { isCollapsed } = useSidebar();
 
   const getContentMargin = () => {
-    if (isMobile) return 'ml-0';
     return isCollapsed ? 'ml-16' : 'ml-64';
   };
 
   const getHeaderPadding = () => {
-    if (isMobile) return 'pl-0';
-    return isCollapsed ? 'pl-16' : 'pl-64';
+    return isCollapsed ? 'pl-14' : 'pl-64';
   };
 
   return (

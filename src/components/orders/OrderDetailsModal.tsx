@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Order } from '@/types/orders';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -21,9 +21,11 @@ interface OrderDetailsModalProps {
 function UserInfo({
   userId,
   label,
+  date,
 }: {
   userId?: string | null;
   label: string;
+  date?: Date | null;
 }) {
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', userId],
@@ -38,6 +40,9 @@ function UserInfo({
     },
     enabled: !!userId,
   });
+
+  const activityDate = date || new Date();
+  const relativeTime = formatDistanceToNow(activityDate, { addSuffix: true });
 
   if (!userId) return null;
 
@@ -57,6 +62,20 @@ function UserInfo({
             ? `${profile.first_name} ${profile.last_name}`
             : 'Unknown User'}
         </span>
+
+        {date && (
+          <div className="flex flex-col">
+            <span className="text-xs">
+              {format(activityDate, 'MMMM dd, yyyy h:mm a')}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {relativeTime === 'in less than a minute' ||
+              relativeTime === 'less than a minute ago'
+                ? 'now'
+                : relativeTime}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -68,12 +87,23 @@ export function OrderDetailsModal({
   order,
 }: OrderDetailsModalProps) {
   const { formatCurrency } = useCurrency();
+  const paidAmount = Number(order.paid_amount ?? 0);
+  const totalAmount = Number(order.total_amount ?? 0);
+  const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  const customerName = order.customer
+    ? `${order.customer.first_name || ''} ${
+        order.customer.last_name || ''
+      }`.trim() ||
+      order.customer.name ||
+      'Customer'
+    : 'Walk-in Customer';
+  const customerContact = order.customer?.phone || order.customer?.email || '';
 
   if (!order) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[95vh]">
+      <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
             Order #{order.order_number}
@@ -126,11 +156,12 @@ export function OrderDetailsModal({
             </div>
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Customer</span>
-              <div className="font-medium text-sm">
-                {order.customer
-                  ? `${order.customer.first_name} ${order.customer.last_name}`
-                  : 'Walk-in Customer'}
-              </div>
+              <div className="font-medium text-sm">{customerName}</div>
+              {customerContact && (
+                <div className="text-xs text-muted-foreground">
+                  {customerContact}
+                </div>
+              )}
             </div>
           </div>
 
@@ -189,14 +220,37 @@ export function OrderDetailsModal({
                 <span>Total</span>
                 <span>{formatCurrency(order.total_amount)}</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span>Paid</span>
+                <span>{formatCurrency(paidAmount)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Remaining</span>
+                <span
+                  className={
+                    remainingAmount > 0 ? 'text-red-600 font-medium' : ''
+                  }
+                >
+                  {formatCurrency(remainingAmount)}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Meta Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UserInfo userId={order.created_by} label="Created By" />
-            {order.updated_by && order.updated_by !== order.created_by && (
-              <UserInfo userId={order.updated_by} label="Last Updated By" />
+            <UserInfo
+              userId={order.created_by}
+              label="Created By"
+              date={new Date(order.created_at)}
+            />
+
+            {order.updated_by && (
+              <UserInfo
+                userId={order.updated_by}
+                label="Last Updated By"
+                date={new Date(order.updated_at)}
+              />
             )}
           </div>
         </div>

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Plus } from 'lucide-react';
+import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
@@ -22,7 +22,7 @@ import { InventorySelector } from '@/components/orders/InventorySelector';
 import { CustomerSelector } from '@/components/orders/CustomerSelector';
 import { RecentOrders } from '@/components/orders/RecentOrders';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   orderSchema,
@@ -33,6 +33,10 @@ import { useOrderForm } from '@/hooks/useOrderForm';
 import type { Order } from '@/types/orders';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useBranchContext } from '@/contexts/BranchContext';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -81,6 +85,19 @@ function OrderFormInner({
   // Initialize selectedBranchId from defaultValues
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
     defaultValues.branchId
+  );
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  type OrderDraft = { id: string; createdAt: string; values: OrderFormValues };
+  const draftsKey = `order-drafts-${currentOrganization?.id || 'global'}`;
+  const [drafts, setDrafts] = useLocalStorage<OrderDraft[]>(draftsKey, []);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [minTotal, setMinTotal] = useState<string>('');
+  const [maxTotal, setMaxTotal] = useState<string>('');
+  const [dateSelectId, setDateSelectId] = useState<string>('');
+  const branchDrafts = useMemo(
+    () => drafts.filter((d) => (d.values.branchId || '') === (selectedBranchId || '')),
+    [drafts, selectedBranchId]
   );
 
   const { data: inventory = [] } = useInventoryEntries(
@@ -167,11 +184,31 @@ function OrderFormInner({
 
   // Calculate total
   const items = form.watch('items');
+  const paymentStatus = form.watch('paymentStatus');
+  const paidAmount = form.watch('paidAmount');
   const totalAmount = items.reduce((sum, item) => {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unitPrice) || 0;
     return sum + qty * price;
   }, 0);
+
+  // Auto-fill paid amount based on status logic
+  useEffect(() => {
+    if (isEditing) return; // Only auto-fill on new order creation or status change?
+    
+    // "If the payment status is selected as unpaid or partial but paid amount entered is same as total amount, we should save the status is paid automatically."
+    // "same for when paid status is selected but amount entered is not full total amount. we should automatically save status as partial."
+    // "If status changed to unpaid or refunded, it should set paid amount to zero automatically."
+    // "Change to 'paid' -> update paid_amount to total_amount."
+
+    // Let's handle status changes first
+    if (paymentStatus === 'paid') {
+        form.setValue('paidAmount', totalAmount);
+    } else if (paymentStatus === 'unpaid' || paymentStatus === 'refunded') {
+        form.setValue('paidAmount', 0);
+    } 
+    // partial -> do nothing, let user enter
+  }, [paymentStatus, totalAmount, form, isEditing]);
 
   async function onSubmit(values: OrderFormValues) {
     if (!currentOrganization?.id) return;
@@ -201,12 +238,28 @@ function OrderFormInner({
         payment_status: values.paymentStatus,
         payment_method: values.paymentMethod,
         total_amount: totalAmount,
+        paid_amount: values.paidAmount ?? (values.paymentStatus === 'paid' ? totalAmount : 0),
         subtotal: totalAmount, // For now assuming no tax/discount calculation separately
         tax: 0,
         discount: 0,
         notes: values.notes,
         items: enrichedItems,
       };
+
+      // Final check for status consistency before submitting
+      if (orderData.payment_status === 'unpaid' && orderData.paid_amount > 0) {
+         if (orderData.paid_amount >= totalAmount) orderData.payment_status = 'paid';
+         else orderData.payment_status = 'partial';
+      }
+      if (orderData.payment_status === 'paid' && orderData.paid_amount < totalAmount) {
+         orderData.payment_status = 'partial';
+      }
+      if (orderData.payment_status === 'partial' && orderData.paid_amount >= totalAmount) {
+         orderData.payment_status = 'paid';
+      }
+      if (orderData.payment_status === 'partial' && orderData.paid_amount <= 0) {
+         orderData.payment_status = 'unpaid';
+      }
 
       if (isEditing && id) {
         await updateOrder.mutateAsync({
@@ -218,6 +271,10 @@ function OrderFormInner({
       } else {
         await createOrder.mutateAsync(orderData);
         toast.success('Order created successfully');
+        if (currentDraftId) {
+          setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
+          setCurrentDraftId(null);
+        }
         
         // Reset form for next order but keep configuration values
         // This helps when processing multiple orders in a queue
@@ -227,6 +284,7 @@ function OrderFormInner({
           status: values.status,
           paymentStatus: values.paymentStatus,
           paymentMethod: values.paymentMethod,
+          paidAmount: 0,
           notes: '',
           items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
         });
@@ -235,6 +293,49 @@ function OrderFormInner({
       console.error(error);
       toast.error('Failed to save order');
     }
+  }
+  function handleSaveDraft() {
+    const values = form.getValues();
+    const draftId = currentDraftId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const updatedEntry: OrderDraft = {
+      id: draftId,
+      createdAt: new Date().toISOString(),
+      values,
+    };
+    setDrafts((prev) => {
+      if (currentDraftId) {
+        // Replace existing and move to top
+        const filtered = prev.filter((d) => d.id !== currentDraftId);
+        return [updatedEntry, ...filtered];
+      }
+      // New draft
+      return [updatedEntry, ...prev];
+    });
+    toast.success(currentDraftId ? 'Draft updated' : 'Draft saved');
+    // Reset to new entry for next customer flow
+    form.reset({
+      branchId: values.branchId,
+      customerId: '',
+      status: values.status,
+      paymentStatus: values.paymentStatus,
+      paymentMethod: values.paymentMethod,
+      paidAmount: 0,
+      notes: '',
+      items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
+    });
+    setCurrentDraftId(null);
+  }
+  function handleLoadDraft(draftId: string) {
+    const d = drafts.find((x) => x.id === draftId);
+    if (!d) return;
+    form.reset(d.values);
+    setSelectedBranchId(d.values.branchId || '');
+    setCurrentDraftId(draftId);
+    toast.success('Draft loaded');
+  }
+  function handleDeleteDraft(draftId: string) {
+    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+    if (currentDraftId === draftId) setCurrentDraftId(null);
   }
 
   return (
@@ -262,30 +363,45 @@ function OrderFormInner({
             </div>
           </div>
 
-          <div className="w-full md:w-75">
-            <Controller
-              control={form.control}
-              name="branchId"
-              render={({ field }) => (
-                <div className="flex gap-2">
-                  <FieldLabel>
-                    Branch
-                  </FieldLabel>
-                  <BranchFormSelector
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="Select Branch"
-                  />
-                  {form.formState.errors.branchId && (
-                    <FieldError>
-                      {form.formState.errors.branchId.message}
-                    </FieldError>
+        <div className="w-full md:w-75">
+          <Controller
+            control={form.control}
+            name="branchId"
+            render={({ field }) => (
+              <div className="flex gap-2 items-center">
+                <FieldLabel>
+                  Branch
+                </FieldLabel>
+                <BranchFormSelector
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select Branch"
+                />
+                {form.formState.errors.branchId && (
+                  <FieldError>
+                    {form.formState.errors.branchId.message}
+                  </FieldError>
+                )}
+                {!isEditing && (
+                  <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDraftsOpen(true)}
+                >
+                  Drafts
+                  {branchDrafts.length > 0 && (
+                    <span className="ml-2">
+                      <Badge variant="secondary">{branchDrafts.length}</Badge>
+                    </span>
                   )}
-                </div>
-              )}
-            />
-          </div>
+                </Button> 
+                )}
+              </div>
+            )}
+          />
         </div>
+      </div>
 
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
@@ -498,8 +614,8 @@ function OrderFormInner({
                             <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="processing">Processing</SelectItem>
                             <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                            <SelectItem value="refunded">Refunded</SelectItem>
+                            {isEditing &&<SelectItem value="cancelled">Cancelled</SelectItem>}
+                            {isEditing &&<SelectItem value="refunded">Refunded</SelectItem>}
                           </SelectContent>
                         </Select>
                         {fieldState.error && (
@@ -525,7 +641,7 @@ function OrderFormInner({
                             <SelectItem value="unpaid">Unpaid</SelectItem>
                             <SelectItem value="paid">Paid</SelectItem>
                             <SelectItem value="partial">Partial</SelectItem>
-                            <SelectItem value="refunded">Refunded</SelectItem>
+                            {isEditing && <SelectItem value="refunded">Refunded</SelectItem>}
                           </SelectContent>
                         </Select>
                         {fieldState.error && (
@@ -576,8 +692,198 @@ function OrderFormInner({
                   <span>Total</span>
                   <span>{formatCurrency(totalAmount)}</span>
                 </div>
+                
+                <div className="mt-4 pt-4 border-t">
+                  <Controller
+                    control={form.control}
+                    name="paidAmount"
+                    render={({ field, fieldState }) => (
+                      <Field data-invalid={!!fieldState.error}>
+                        <FieldLabel>Paid Amount</FieldLabel>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => {
+                             const val = parseFloat(e.target.value);
+                             field.onChange(val);
+                             // Auto-update status based on amount
+                             if (!isNaN(val)) {
+                                if (val >= totalAmount) {
+                                   form.setValue('paymentStatus', 'paid');
+                                } else if (val > 0) {
+                                   form.setValue('paymentStatus', 'partial');
+                                } else {
+                                   form.setValue('paymentStatus', 'unpaid');
+                                }
+                             }
+                          }}
+                          readOnly={paymentStatus === 'paid'}
+                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-white/80'}
+                        />
+                        {fieldState.error && (
+                          <FieldError>{fieldState.error.message}</FieldError>
+                        )}
+                      </Field>
+                    )}
+                  />
+                  {/* Show arrears/remaining */}
+                  {(paidAmount !== undefined && paidAmount < totalAmount) && (
+                     <div className="flex justify-between items-center text-sm text-red-600 mt-2">
+                       <span>Remaining (Arrears)</span>
+                       <span>{formatCurrency(totalAmount - (paidAmount || 0))}</span>
+                     </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
+
+            <Sheet open={draftsOpen} onOpenChange={setDraftsOpen}>
+              <SheetContent side="right" className="w-full sm:max-w-md p-0">
+                <SheetHeader className="flex items-center justify-between border-b p-4">
+                  <SheetTitle className="text-lg">Drafts</SheetTitle>
+                  <div className="flex gap-2">
+                    {branchDrafts.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setDrafts((prev) =>
+                            prev.filter((d) => (d.values.branchId || '') !== (selectedBranchId || ''))
+                          );
+                          toast.success('All branch drafts cleared');
+                          setCurrentDraftId(null);
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => setDraftsOpen(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </SheetHeader>
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search items"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Min total"
+                      type="number"
+                      step="0.01"
+                      value={minTotal}
+                      onChange={(e) => setMinTotal(e.target.value)}
+                      className="w-28"
+                    />
+                    <Input
+                      placeholder="Max total"
+                      type="number"
+                      step="0.01"
+                      value={maxTotal}
+                      onChange={(e) => setMaxTotal(e.target.value)}
+                      className="w-28"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Select by date</FieldLabel>
+                    <Select
+                      onValueChange={(val) => {
+                        setDateSelectId(val);
+                        handleLoadDraft(val);
+                        setDraftsOpen(false);
+                      }}
+                      value={dateSelectId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select draft date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branchDrafts
+                          .slice()
+                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                          .map((d) => {
+                            const createdDate = new Date(d.createdAt);
+                            const rel = formatDistanceToNow(createdDate, { addSuffix: true });
+                            const relText =
+                              rel === 'in less than a minute' || rel === 'less than a minute ago' ? 'now' : rel;
+                            return (
+                              <SelectItem key={d.id} value={d.id}>
+                                {format(createdDate, 'MMMM dd, yyyy')} • {format(createdDate, 'h:mm a')} • {relText}
+                              </SelectItem>
+                            );
+                          })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    {branchDrafts.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No drafts</div>
+                    ) : (
+                      branchDrafts
+                        .slice()
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .filter((d) => {
+                          const sum = d.values.items.reduce(
+                            (acc, it) => acc + Number(it.quantity || 0) * Number(it.unitPrice || 0),
+                            0
+                          );
+                          const minOk =
+                            minTotal.trim() === '' ? true : sum >= Number.parseFloat(minTotal || '0');
+                          const maxOk =
+                            maxTotal.trim() === '' ? true : sum <= Number.parseFloat(maxTotal || `${sum}`);
+                          const term = searchTerm.trim().toLowerCase();
+                          const termOk =
+                            term === ''
+                              ? true
+                              : d.values.items.some((it) =>
+                                  String(it.productName || '').toLowerCase().includes(term)
+                                );
+                          return minOk && maxOk && termOk;
+                        })
+                        .map((d) => {
+                          const itemsCount = d.values.items.length;
+                          const sum = d.values.items.reduce(
+                            (acc, it) => acc + Number(it.quantity || 0) * Number(it.unitPrice || 0),
+                            0
+                          );
+                          const createdDate = new Date(d.createdAt);
+                          const rel = formatDistanceToNow(createdDate, { addSuffix: true });
+                          const relText =
+                            rel === 'in less than a minute' || rel === 'less than a minute ago' ? 'now' : rel;
+                          return (
+                            <div key={d.id} className="flex items-center justify-between border rounded-md p-2">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium">Draft • {itemsCount} items</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {format(createdDate, 'MMMM dd, yyyy')} • {format(createdDate, 'h:mm a')} • {relText}
+                                </div>
+                                <div className="text-xs font-medium">{formatCurrency(sum)}</div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => handleLoadDraft(d.id)}>
+                                  <FolderOpen className="h-4 w-4 mr-1" /> Load
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteDraft(d.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
 
             <div className="flex gap-4">
               <Button
@@ -588,6 +894,21 @@ function OrderFormInner({
               >
                 Cancel
               </Button>
+              {!isEditing && (
+                <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={handleSaveDraft}
+                disabled={
+                  !Array.isArray(items) ||
+                  items.length === 0 ||
+                  !items.some((it) => (it.inventoryId || '').trim().length > 0)
+                }
+              >
+                <Save className="h-4 w-4 mr-2" /> Save Draft
+              </Button> 
+            )}
               <Button
                 type="submit"
                 className="flex-1"

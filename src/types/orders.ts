@@ -28,6 +28,7 @@ export interface Order {
   payment_status: PaymentStatus;
   payment_method?: PaymentMethod | null;
   total_amount: number;
+  paid_amount: number;
   subtotal: number;
   tax: number;
   discount: number;
@@ -36,7 +37,7 @@ export interface Order {
   updated_at: string;
   created_by?: string | null;
   updated_by?: string | null;
-  
+
   // Relations
   items?: OrderItem[];
   customer?: {
@@ -66,6 +67,7 @@ export interface CreateOrderInput {
   payment_status?: PaymentStatus;
   payment_method?: PaymentMethod;
   total_amount: number;
+  paid_amount: number;
   subtotal: number;
   tax: number;
   discount: number;

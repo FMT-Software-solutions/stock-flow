@@ -35,6 +35,8 @@ export function InventoryItemDetails() {
   const { checkPermission } = useRoleCheck();
 
   const canEditInventory = checkPermission('inventory', 'edit');
+  const canExportOrders = checkPermission('orders', 'export');
+  const canEditProduct = checkPermission('products', 'edit');
 
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [isEditingStock, setIsEditingStock] = useState(false);
@@ -53,7 +55,7 @@ export function InventoryItemDetails() {
       },
       {
         id: 'unitPrice',
-        header: 'Unit Price',
+        header: 'Item Price',
         accessorFn: (row) => {
           const item = (row.items || []).find(
             (i: any) => i.inventory_id === id
@@ -69,7 +71,7 @@ export function InventoryItemDetails() {
       },
       {
         id: 'quantity',
-        header: 'Quantity',
+        header: 'Order Qty.',
         accessorFn: (row) => {
           const item = (row.items || []).find(
             (i: any) => i.inventory_id === id
@@ -102,7 +104,7 @@ export function InventoryItemDetails() {
       },
       {
         accessorKey: 'status',
-        header: 'Status',
+        header: 'Order Status',
         cell: ({ row }) => (
           <Badge
             variant={getOrderStatusVariant(row.getValue('status'))}
@@ -175,13 +177,16 @@ export function InventoryItemDetails() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => navigate(`/inventory/${inventory.productId}/edit`)}
-          >
-            <Edit className="mr-2 h-4 w-4" /> Edit Product
-          </Button>
-        </div>
+        {canEditProduct && (
+          <div className="flex gap-2">
+            <Button
+              onClick={() => navigate(`/inventory/${inventory.productId}/edit`)}
+              disabled={!canEditProduct}
+            >
+              <Edit className="mr-2 h-4 w-4" /> Edit Product
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stats Card */}
@@ -429,6 +434,7 @@ export function InventoryItemDetails() {
           data={orders}
           searchKey="date"
           storageKey={`inventory-history-${id}`}
+          canExport={canExportOrders}
         />
       </div>
     </div>

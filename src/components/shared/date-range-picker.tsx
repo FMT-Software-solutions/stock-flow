@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, X } from 'lucide-react';
 import {
   endOfDay,
   endOfMonth,
@@ -27,19 +27,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 export interface DatePickerWithRangeProps {
   className?: string;
   date?: DateRange;
   setDate?: (date: DateRange | undefined) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function DatePickerWithRange({
@@ -47,6 +41,7 @@ export function DatePickerWithRange({
   date,
   setDate,
   placeholder = 'Pick a date range',
+  disabled,
 }: DatePickerWithRangeProps) {
   const [selectedPreset, setSelectedPreset] = React.useState<
     string | undefined
@@ -134,25 +129,29 @@ export function DatePickerWithRange({
   const handlePresetChange = (value: string) => {
     setSelectedPreset(value);
     const preset = presets.find((p) => p.value === value);
-    if (preset) {
-      setDate?.(preset.getRange());
+    if (preset && setDate) {
+      setDate(preset.getRange());
     }
   };
 
-  const handleCalendarSelect = (range: DateRange | undefined) => {
-    setSelectedPreset(undefined); // Clear preset if manually selecting
-    setDate?.(range);
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (setDate) {
+      setDate(undefined);
+    }
+    setSelectedPreset(undefined);
   };
 
   return (
-    <div className={cn('grid gap-2', className)}>
+    <div className={cn('grid gap-2', disabled && 'opacity-50', className)}>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             id="date"
             variant={'outline'}
+            disabled={!!disabled}
             className={cn(
-              'w-full justify-start text-left font-normal',
+              'w-75 justify-start text-left font-normal relative',
               !date && 'text-muted-foreground'
             )}
           >
@@ -169,32 +168,60 @@ export function DatePickerWithRange({
             ) : (
               <span>{placeholder}</span>
             )}
+            {date && (
+              <div
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full cursor-pointer"
+                onClick={handleClear}
+                title="Clear date range"
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </div>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <div className="p-3 border-b">
-            <Select value={selectedPreset} onValueChange={handlePresetChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a preset..." />
-              </SelectTrigger>
-              <SelectContent position="popper">
+          <div className="flex">
+            <div className="p-3 border-r w-37.5">
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm mb-2">Presets</h4>
                 {presets.map((preset) => (
-                  <SelectItem key={preset.value} value={preset.value}>
+                  <Button
+                    key={preset.value}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      selectedPreset === preset.value && 'bg-accent'
+                    )}
+                    onClick={() => handlePresetChange(preset.value)}
+                  >
                     {preset.label}
-                  </SelectItem>
+                  </Button>
                 ))}
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-left font-normal text-muted-foreground hover:text-foreground"
+                  onClick={handleClear}
+                >
+                  Clear Filter
+                </Button>
+              </div>
+            </div>
+            <div className="p-3">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={(newDate) => {
+                  if (setDate) setDate(newDate);
+                  setSelectedPreset(undefined);
+                }}
+                numberOfMonths={2}
+              />
+            </div>
           </div>
-          <Calendar
-            autoFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleCalendarSelect}
-            numberOfMonths={2}
-          />
         </PopoverContent>
       </Popover>
     </div>

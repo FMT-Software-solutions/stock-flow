@@ -196,7 +196,7 @@ export function UserProfileDropdown() {
                 className="cursor-pointer"
               >
                 <PanelLeft className="mr-2 h-4 w-4" />
-                <span>Sidebar</span>
+                <span>Modern Sidebar</span>
                 {layoutMode === 'sidebar' && (
                   <Check className="ml-auto h-4 w-4 text-primary" />
                 )}
@@ -216,7 +216,7 @@ export function UserProfileDropdown() {
                 className="cursor-pointer"
               >
                 <Layers className="mr-2 h-4 w-4" />
-                <span>Stacked</span>
+                <span>Classic Layout</span>
                 {layoutMode === 'stacked' && (
                   <Check className="ml-auto h-4 w-4 text-primary" />
                 )}
@@ -226,7 +226,7 @@ export function UserProfileDropdown() {
                 className="cursor-pointer"
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
-                <span>Grid</span>
+                <span>Grid Layout</span>
                 {layoutMode === 'grid' && (
                   <Check className="ml-auto h-4 w-4 text-primary" />
                 )}

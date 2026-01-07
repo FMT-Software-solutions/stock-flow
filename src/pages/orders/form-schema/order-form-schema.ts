@@ -11,6 +11,7 @@ export const orderSchema = z.object({
     'refunded',
   ]),
   paymentStatus: z.enum(['paid', 'unpaid', 'partial', 'refunded']),
+  paidAmount: z.coerce.number().min(0).optional(),
   paymentMethod: z
     .enum(['cash', 'card', 'mobile_money', 'bank_transfer', 'other'])
     .optional(),

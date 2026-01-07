@@ -36,6 +36,7 @@ import {
 import { BulkUpdateInventorySheet } from './components/BulkUpdateInventorySheet';
 import type { Product } from '@/types/inventory';
 import type { GeneratedVariant } from '../components/ProductVariations';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface InventoryListProps {
   product: Product;
@@ -54,6 +55,9 @@ export function InventoryList({
 }: InventoryListProps) {
   const updateInventory = useUpdateInventoryEntry();
   const deleteInventory = useDeleteInventoryEntry();
+  const { checkPermission } = useRoleCheck();
+  const canEditInventory = checkPermission('inventory', 'edit');
+  const canDeleteInventory = checkPermission('inventory', 'delete');
 
   const [editingInventory, setEditingInventory] = useState<
     Record<
@@ -83,6 +87,7 @@ export function InventoryList({
       | 'imageUrl',
     value: any
   ) => {
+    if (!canEditInventory) return;
     setEditingInventory((prev) => {
       const currentEdit = prev[inventoryId] || {};
       return {
@@ -96,6 +101,7 @@ export function InventoryList({
   };
 
   const ensureEditState = (inv: any) => {
+    if (!canEditInventory) return;
     if (!editingInventory[inv.id]) {
       setEditingInventory((prev) => ({
         ...prev,
@@ -111,6 +117,7 @@ export function InventoryList({
   };
 
   const handleImageUpload = async (identifier: string, file: File) => {
+    if (!canEditInventory) return;
     try {
       toast.info('Uploading image...');
       const url = await uploadImageToCloudinary(file);
@@ -139,12 +146,14 @@ export function InventoryList({
   };
 
   const triggerFileInput = (identifier: string) => {
+    if (!canEditInventory) return;
     if (fileInputRefs.current[identifier]) {
       fileInputRefs.current[identifier]?.click();
     }
   };
 
   const handleSaveEdits = async (inventoryId: string) => {
+    if (!canEditInventory) return;
     const edits = editingInventory[inventoryId];
     if (!edits) return;
 
@@ -175,6 +184,7 @@ export function InventoryList({
   };
 
   const handleDeleteInventory = async (inventoryId: string) => {
+    if (!canDeleteInventory) return;
     if (confirm('Are you sure you want to delete this inventory item?')) {
       try {
         await deleteInventory.mutateAsync(inventoryId);
@@ -434,7 +444,9 @@ export function InventoryList({
                         <div className="col-span-4 flex items-center space-x-2">
                           <div
                             className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
-                            onClick={() => triggerFileInput(inv.id)}
+                            onClick={() => {
+                              if (canEditInventory) triggerFileInput(inv.id);
+                            }}
                           >
                             {currentImage ? (
                               <img
@@ -447,9 +459,11 @@ export function InventoryList({
                                 <ImageIcon className="h-4 w-4 text-muted-foreground" />
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Plus className="h-3 w-3 text-white" />
-                            </div>
+                            {canEditInventory && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Plus className="h-3 w-3 text-white" />
+                              </div>
+                            )}
                           </div>
                           <input
                             type="file"
@@ -462,6 +476,7 @@ export function InventoryList({
                               const file = e.target.files?.[0];
                               if (file) handleImageUpload(inv.id, file);
                             }}
+                            disabled={!canEditInventory}
                           />
 
                           <div className="flex-1 min-w-0">
@@ -482,6 +497,7 @@ export function InventoryList({
                                     e.target.value
                                   );
                                 }}
+                                disabled={!canEditInventory}
                               />
                             ) : (
                               <div
@@ -518,6 +534,7 @@ export function InventoryList({
                                 Number(e.target.value)
                               );
                             }}
+                            disabled={!canEditInventory}
                           />
                         </div>
                         <div className="col-span-2">
@@ -537,6 +554,7 @@ export function InventoryList({
                                 Number(e.target.value)
                               );
                             }}
+                            disabled={!canEditInventory}
                           />
                         </div>
                         <div className="col-span-2">
@@ -559,6 +577,7 @@ export function InventoryList({
                                   : undefined
                               );
                             }}
+                            disabled={!canEditInventory}
                           />
                         </div>
                         <div className="col-span-1 flex justify-end gap-1">
@@ -569,6 +588,7 @@ export function InventoryList({
                                 variant="outline"
                                 className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 cursor-pointer"
                                 onClick={() => handleSaveEdits(inv.id)}
+                                disabled={!canEditInventory}
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -587,6 +607,7 @@ export function InventoryList({
                               variant="ghost"
                               className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 cursor-pointer"
                               onClick={() => handleDeleteInventory(inv.id)}
+                              disabled={!canDeleteInventory}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

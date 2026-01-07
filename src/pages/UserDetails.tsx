@@ -11,7 +11,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { type UserRole } from '@/lib/auth';
 import { UserPermissionsEditor } from '@/components/user-management/UserPermissionsEditor';
-import { buildUserPermissions, getAllPossiblePermissions, type UserPermissions } from '@/modules/permissions';
+import { APP_PERMISSIONS, buildUserPermissions, getAllPossiblePermissions, type UserPermissions, type PermissionScope } from '@/modules/permissions';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranches } from '@/hooks/useBranchQueries';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -174,7 +174,16 @@ export default function UserDetails() {
         visible[scope] = all[scope];
       }
     });
-    
+    Object.keys(visible).forEach((key) => {
+      const scope = key as keyof UserPermissions;
+      const def = APP_PERMISSIONS[scope as unknown as PermissionScope];
+      if (def?.parent) {
+        const parentEnabled = !!selectedRolePermissions[def.parent as keyof UserPermissions]?.enabled;
+        if (!parentEnabled) {
+          delete visible[scope];
+        }
+      }
+    });
     // If visible is empty (e.g. role has nothing enabled), we might want to return empty object
     // effectively showing nothing.
     return visible;
@@ -276,7 +285,7 @@ export default function UserDetails() {
                   <SelectContent>
                     {roles?.filter(role => {
                         // Owners see all roles
-                        if (isCurrentUserOwner()) return true;
+                        // if (isCurrentUserOwner()) return true;
                         // Admins see all except owner
                         if (role.type === 'owner') return false;
                         return true;

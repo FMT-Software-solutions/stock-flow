@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { MoreHorizontal, Edit, Eye, Copy, Trash } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDeleteProduct } from '@/hooks/useInventoryQueries';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface ProductActionsProps {
   product: Product;
@@ -18,8 +19,13 @@ interface ProductActionsProps {
 
 export function ProductActions({ product }: ProductActionsProps) {
   const deleteProduct = useDeleteProduct();
+  const { checkPermission } = useRoleCheck();
+  const canViewProducts = checkPermission('products');
+  const canEditProducts = checkPermission('products', 'edit');
+  const canDeleteProducts = checkPermission('products', 'delete');
 
   const handleDelete = () => {
+    if (!canDeleteProducts) return;
     if (
       confirm(
         'Are you sure you want to delete this product? This will also delete related inventory items.'
@@ -45,20 +51,32 @@ export function ProductActions({ product }: ProductActionsProps) {
           <Copy className="mr-2 h-4 w-4" /> Copy Product ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to={`/inventory/${product.id}`} className="flex items-center">
+        {canViewProducts ? (
+          <DropdownMenuItem asChild>
+            <Link to={`/inventory/${product.id}`} className="flex items-center">
+              <Eye className="mr-2 h-4 w-4" /> View Details
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem disabled>
             <Eye className="mr-2 h-4 w-4" /> View Details
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link
-            to={`/inventory/${product.id}/edit`}
-            className="flex items-center"
-          >
+          </DropdownMenuItem>
+        )}
+        {canEditProducts ? (
+          <DropdownMenuItem asChild>
+            <Link
+              to={`/inventory/${product.id}/edit`}
+              className="flex items-center"
+            >
+              <Edit className="mr-2 h-4 w-4" /> Edit
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem disabled>
             <Edit className="mr-2 h-4 w-4" /> Edit
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={handleDelete} className="text-red-600" disabled={!canDeleteProducts}>
           <Trash className="mr-2 h-4 w-4" /> Delete
         </DropdownMenuItem>
       </DropdownMenuContent>

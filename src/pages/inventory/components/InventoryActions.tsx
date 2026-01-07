@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { MoreHorizontal, Edit, Eye, Copy, Trash } from 'lucide-react';
 import { InventoryDetailsDialog } from './InventoryDetailsDialog';
 import { useDeleteInventoryEntry } from '@/hooks/useInventoryQueries';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface InventoryActionsProps {
   inventory: InventoryEntry;
@@ -20,8 +21,13 @@ interface InventoryActionsProps {
 export function InventoryActions({ inventory }: InventoryActionsProps) {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const deleteInventory = useDeleteInventoryEntry();
+  const { checkPermission } = useRoleCheck();
+  const canViewInventory = checkPermission('inventory');
+  const canEditInventory = checkPermission('inventory', 'edit');
+  const canDeleteInventory = checkPermission('inventory', 'delete');
 
   const handleDelete = () => {
+    if (!canDeleteInventory) return;
     if (confirm('Are you sure you want to delete this inventory item?')) {
       deleteInventory.mutate(inventory.id);
     }
@@ -47,16 +53,32 @@ export function InventoryActions({ inventory }: InventoryActionsProps) {
             Copy Inventory Number
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowDetailsDialog(true)}>
+          <DropdownMenuItem
+            onClick={() => {
+              if (!canViewInventory) return;
+              setShowDetailsDialog(true);
+            }}
+            disabled={!canViewInventory}
+          >
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowDetailsDialog(true)}>
+          <DropdownMenuItem
+            onClick={() => {
+              if (!canEditInventory) return;
+              setShowDetailsDialog(true);
+            }}
+            disabled={!canEditInventory}
+          >
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+          <DropdownMenuItem
+            onClick={handleDelete}
+            className="text-red-600"
+            disabled={!canDeleteInventory}
+          >
             <Trash className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>

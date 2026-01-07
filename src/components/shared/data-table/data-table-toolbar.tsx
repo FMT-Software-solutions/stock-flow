@@ -20,6 +20,7 @@ interface DataTableToolbarProps<TData> {
   filterFields?: DataTableFilterField[];
   exportFields?: ExportField[];
   searchKey?: string;
+  canExport?: boolean;
 }
 
 export function DataTableToolbar<TData>({
@@ -27,6 +28,7 @@ export function DataTableToolbar<TData>({
   filterFields = [],
   exportFields: customExportFields,
   searchKey,
+  canExport = true,
 }: DataTableToolbarProps<TData>) {
   const searchColumn = searchKey ? table.getColumn(searchKey) : undefined;
   const filterValue = (searchColumn?.getFilterValue() as string) ?? '';
@@ -88,10 +90,12 @@ export function DataTableToolbar<TData>({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ExportDialog 
-            data={table.getFilteredRowModel().rows} 
-            fields={exportFields}
-          />
+          {canExport && (
+            <ExportDialog 
+              data={table.getFilteredRowModel().rows} 
+              fields={exportFields}
+            />
+          )}
           <DataTableViewOptions table={table} />
         </div>
       </div>

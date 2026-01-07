@@ -44,6 +44,9 @@ export function UserPermissionsEditor({
 
   const availablePermissions = providedAvailablePermissions || (role ? getAvailablePermissionsForRole(role) : {});
   const scopes = Object.keys(availablePermissions) as PermissionScope[];
+  const parentScopes = scopes.filter((s) => !APP_PERMISSIONS[s]?.parent);
+  const childrenFor = (parent: PermissionScope) =>
+    scopes.filter((s) => APP_PERMISSIONS[s]?.parent === parent);
 
   const handleScopeToggle = (scope: PermissionScope, enabled: boolean) => {
     if (readOnly) return;
@@ -122,8 +125,8 @@ export function UserPermissionsEditor({
       </div>
 
       <div className="grid gap-4">
-        {scopes.map((scope) => {
-          const config = APP_PERMISSIONS[scope];
+        {parentScopes.map((scope) => {
+          const config = APP_PERMISSIONS[scope]!;
           
           const userScope = permissions[scope];
           
@@ -189,6 +192,75 @@ export function UserPermissionsEditor({
                             {actionLabel}
                           </Label>
                         </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              )}
+              {childrenFor(scope).length > 0 && (
+                <CardContent className="p-4 pt-2 pl-14">
+                  <div className="grid gap-3">
+                    {childrenFor(scope).map((child) => {
+                      const childConfig = APP_PERMISSIONS[child]!;
+                      const childUserScope = permissions[child];
+                      const childEffectiveActions = childUserScope 
+                        ? (childUserScope.actions || []) 
+                        : (rolePermissions?.[child]?.actions || []);
+                      const childAvailableActions = availablePermissions[child]?.actions || [];
+                      const childEnabled = rolePermissions 
+                        ? (rolePermissions[child]?.enabled || false)
+                        : (childUserScope?.enabled || false);
+                      const childSwitchDisabled = readOnly || !isEnabled || (!!rolePermissions && rolePermissions[child]?.enabled !== undefined);
+
+                      return (
+                        <Card key={child} className={childEnabled && isEnabled ? 'border-primary/20' : 'opacity-75'}>
+                          <CardHeader className="px-4 py-2 ">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`scope-${child}`}
+                                  checked={childEnabled && isEnabled}
+                                  onCheckedChange={(checked) => handleScopeToggle(child, checked)}
+                                  disabled={childSwitchDisabled}
+                                />
+                                <div className="flex flex-col">
+                                  <Label htmlFor={`scope-${child}`} className="text-sm font-semibold cursor-pointer">
+                                    {childConfig.label}
+                                  </Label>
+                                  <span className="text-xs text-muted-foreground">{childConfig.description}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          {childEnabled && isEnabled && childAvailableActions.length > 0 && (
+                            <CardContent className="p-4 pt-2 pl-14">
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {childAvailableActions.map((action) => {
+                                  const actionLabel = childConfig.actions[action] || action;
+                                  const hasAction = childEffectiveActions.includes(action);
+                                  return (
+                                    <div key={`${child}-${action}`} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`${child}-${action}`}
+                                        checked={hasAction}
+                                        onCheckedChange={(checked) => 
+                                          handleActionToggle(child, action, checked === true)
+                                        }
+                                        disabled={readOnly || !isEnabled}
+                                      />
+                                      <Label 
+                                        htmlFor={`${child}-${action}`}
+                                        className="text-sm font-normal cursor-pointer"
+                                      >
+                                        {actionLabel}
+                                      </Label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </CardContent>
+                          )}
+                        </Card>
                       );
                     })}
                   </div>

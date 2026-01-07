@@ -10,6 +10,7 @@ import { uploadImageToCloudinary } from '@/utils/cloudinary';
 import { useCreateInventoryEntry } from '@/hooks/useInventoryQueries';
 import type { Product } from '@/types/inventory';
 import type { GeneratedVariant } from '../components/ProductVariations';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface InventoryGeneratorProps {
   product: Product;
@@ -29,6 +30,8 @@ export function InventoryGenerator({
   onSuccess,
 }: InventoryGeneratorProps) {
   const createInventory = useCreateInventoryEntry();
+  const { checkPermission } = useRoleCheck();
+  const canCreateInventory = checkPermission('inventory', 'create');
   const [newEntries, setNewEntries] = useState<
     {
       variantId?: string;
@@ -43,6 +46,7 @@ export function InventoryGenerator({
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleToggleVariant = (variantId: string, checked: boolean) => {
+    if (!canCreateInventory) return;
     if (checked) {
       setNewEntries((prev) => [
         ...prev,
@@ -69,6 +73,7 @@ export function InventoryGenerator({
       | 'imageUrl',
     value: any
   ) => {
+    if (!canCreateInventory) return;
     setNewEntries((prev) =>
       prev.map((e) => {
         if (e.variantId === identifier) return { ...e, [field]: value };
@@ -78,6 +83,7 @@ export function InventoryGenerator({
   };
 
   const handleImageUpload = async (identifier: string, file: File) => {
+    if (!canCreateInventory) return;
     try {
       toast.info('Uploading image...');
       const url = await uploadImageToCloudinary(file);
@@ -90,12 +96,14 @@ export function InventoryGenerator({
   };
 
   const triggerFileInput = (identifier: string) => {
+    if (!canCreateInventory) return;
     if (fileInputRefs.current[identifier]) {
       fileInputRefs.current[identifier]?.click();
     }
   };
 
   const addCustomEntry = () => {
+    if (!canCreateInventory) return;
     const tempId = `custom-${Date.now()}`;
     setNewEntries((prev) => [
       ...prev,
@@ -115,6 +123,10 @@ export function InventoryGenerator({
   };
 
   const handleSave = async () => {
+    if (!canCreateInventory) {
+      toast.error('You do not have permission to create inventory');
+      return;
+    }
     if (selectedBranchIds.length === 0 || newEntries.length === 0) return;
 
     // Validation: Quantity >= 1
@@ -187,6 +199,7 @@ export function InventoryGenerator({
             size="sm"
             variant="outline"
             onClick={() => {
+              if (!canCreateInventory) return;
               if (newEntries.length === availableVariants.length) {
                 setNewEntries([]);
               } else {
@@ -199,6 +212,7 @@ export function InventoryGenerator({
                 );
               }
             }}
+            disabled={!canCreateInventory}
           >
             {newEntries.length === availableVariants.length
               ? 'Deselect All'
@@ -245,13 +259,14 @@ export function InventoryGenerator({
                       onCheckedChange={(checked) =>
                         handleToggleVariant(variant.id!, !!checked)
                       }
+                      disabled={!canCreateInventory}
                     />
                   </div>
                   <div className="col-span-4 flex items-center space-x-2">
                     <div
                       className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
                       onClick={() =>
-                        isSelected && triggerFileInput(variant.id!)
+                        isSelected && canCreateInventory && triggerFileInput(variant.id!)
                       }
                     >
                       {entry?.imageUrl ? (
@@ -265,7 +280,7 @@ export function InventoryGenerator({
                           <ImageIcon className="h-4 w-4 text-muted-foreground" />
                         </div>
                       )}
-                      {isSelected && (
+                      {isSelected && canCreateInventory && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <Plus className="h-3 w-3 text-white" />
                         </div>
@@ -284,7 +299,7 @@ export function InventoryGenerator({
                         if (file && variant.id)
                           handleImageUpload(variant.id, file);
                       }}
-                      disabled={!isSelected}
+                      disabled={!isSelected || !canCreateInventory}
                     />
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(variant.attributes).map(
@@ -305,7 +320,7 @@ export function InventoryGenerator({
                       type="number"
                       className="text-right h-8"
                       value={entry?.quantity || 0}
-                      disabled={!isSelected}
+                      disabled={!isSelected || !canCreateInventory}
                       onChange={(e) =>
                         handleEntryChange(
                           variant.id!,
@@ -320,7 +335,7 @@ export function InventoryGenerator({
                       type="number"
                       className="text-right h-8"
                       value={entry?.minStockLevel || 0}
-                      disabled={!isSelected}
+                      disabled={!isSelected || !canCreateInventory}
                       onChange={(e) =>
                         handleEntryChange(
                           variant.id!,
@@ -336,7 +351,7 @@ export function InventoryGenerator({
                       className="text-right h-8"
                       placeholder={`Default: ${fallbackPrice}`}
                       value={entry?.priceOverride ?? ''}
-                      disabled={!isSelected}
+                      disabled={!isSelected || !canCreateInventory}
                       onChange={(e) =>
                         handleEntryChange(
                           variant.id!,
@@ -358,119 +373,127 @@ export function InventoryGenerator({
                   key={entry.variantId}
                   className="grid grid-cols-12 gap-4 p-3 text-sm items-center border-b last:border-0 bg-blue-50/50"
                 >
-                  <div className="col-span-1 flex justify-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
-                      onClick={() => removeCustomEntry(entry.variantId!)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="col-span-4 flex items-center space-x-2">
-                    <div
-                      className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
-                      onClick={() => triggerFileInput(entry.variantId!)}
-                    >
-                      {entry.imageUrl ? (
-                        <img
-                          src={entry.imageUrl}
-                          alt="Cust"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+                <div className="col-span-1 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
+                    onClick={() => removeCustomEntry(entry.variantId!)}
+                    disabled={!canCreateInventory}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="col-span-4 flex items-center space-x-2">
+                  <div
+                    className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
+                    onClick={() => canCreateInventory && triggerFileInput(entry.variantId!)}
+                  >
+                    {entry.imageUrl ? (
+                      <img
+                        src={entry.imageUrl}
+                        alt="Cust"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    {canCreateInventory && (
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Plus className="h-3 w-3 text-white" />
                       </div>
-                    </div>
-                    <input
-                      type="file"
-                      ref={(el) => {
-                        if (el && entry.variantId)
-                          fileInputRefs.current[entry.variantId] = el;
-                      }}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && entry.variantId)
-                          handleImageUpload(entry.variantId, file);
-                      }}
-                    />
-                    <Input
-                      placeholder="Custom Label (e.g. Used, Damaged)"
-                      className="h-8 text-xs flex-1"
-                      value={entry.customLabel}
-                      onChange={(e) =>
-                        handleEntryChange(
-                          entry.variantId!,
-                          'customLabel',
-                          e.target.value
-                        )
-                      }
-                    />
+                    )}
                   </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      className="text-right h-8"
-                      value={entry.quantity}
-                      onChange={(e) =>
-                        handleEntryChange(
-                          entry.variantId!,
-                          'quantity',
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      className="text-right h-8"
-                      value={entry.minStockLevel}
-                      onChange={(e) =>
-                        handleEntryChange(
-                          entry.variantId!,
-                          'minStockLevel',
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      className="text-right h-8"
-                      placeholder={`Default: ${product.sellingPrice}`}
-                      value={entry.priceOverride ?? ''}
-                      onChange={(e) =>
-                        handleEntryChange(
-                          entry.variantId!,
-                          'priceOverride',
-                          e.target.value ? Number(e.target.value) : undefined
-                        )
-                      }
-                    />
-                  </div>
+                  <input
+                    type="file"
+                    ref={(el) => {
+                      if (el && entry.variantId)
+                        fileInputRefs.current[entry.variantId] = el;
+                    }}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && entry.variantId)
+                        handleImageUpload(entry.variantId, file);
+                    }}
+                    disabled={!canCreateInventory}
+                  />
+                  <Input
+                    placeholder="Custom Label (e.g. Used, Damaged)"
+                    className="h-8 text-xs flex-1"
+                    value={entry.customLabel}
+                    onChange={(e) =>
+                      handleEntryChange(
+                        entry.variantId!,
+                        'customLabel',
+                        e.target.value
+                      )
+                    }
+                    disabled={!canCreateInventory}
+                  />
                 </div>
-              ))}
+                <div className="col-span-2">
+                  <Input
+                    type="number"
+                    className="text-right h-8"
+                    value={entry.quantity}
+                    onChange={(e) =>
+                      handleEntryChange(
+                        entry.variantId!,
+                        'quantity',
+                        Number(e.target.value)
+                      )
+                    }
+                    disabled={!canCreateInventory}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Input
+                    type="number"
+                    className="text-right h-8"
+                    value={entry.minStockLevel}
+                    onChange={(e) =>
+                      handleEntryChange(
+                        entry.variantId!,
+                        'minStockLevel',
+                        Number(e.target.value)
+                      )
+                    }
+                    disabled={!canCreateInventory}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    type="number"
+                    className="text-right h-8"
+                    placeholder={`Default: ${product.sellingPrice}`}
+                    value={entry.priceOverride ?? ''}
+                    onChange={(e) =>
+                      handleEntryChange(
+                        entry.variantId!,
+                        'priceOverride',
+                        e.target.value ? Number(e.target.value) : undefined
+                      )
+                    }
+                    disabled={!canCreateInventory}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       <div className="flex justify-between items-center pt-2">
-        <Button variant="outline" size="sm" onClick={addCustomEntry}>
+        <Button variant="outline" size="sm" onClick={addCustomEntry} disabled={!canCreateInventory}>
           <Plus className="mr-2 h-3 w-3" /> Add Custom Inventory
         </Button>
 
         {newEntries.length > 0 && (
-          <Button onClick={handleSave} disabled={createInventory.isPending}>
+          <Button onClick={handleSave} disabled={createInventory.isPending || !canCreateInventory}>
             {createInventory.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}

@@ -1,11 +1,11 @@
 import type { UserRole } from '@/lib/auth';
-import type { 
-  UserPermissions, 
-  PermissionScope, 
-  PermissionAction, 
+import type {
+  UserPermissions,
+  PermissionScope,
+  PermissionAction,
 } from './types';
-import { 
-  ROLE_ALLOWED_PERMISSIONS, 
+import {
+  ROLE_ALLOWED_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
   APP_PERMISSIONS,
 } from './config';
@@ -16,15 +16,15 @@ import {
  */
 export function getAllPossiblePermissions(): UserPermissions {
   const result: UserPermissions = {};
-  
+
   (Object.keys(APP_PERMISSIONS) as PermissionScope[]).forEach(scope => {
-    const config = APP_PERMISSIONS[scope];
+    const config = APP_PERMISSIONS[scope]!;
     result[scope] = {
       enabled: true,
       actions: Object.keys(config.actions) as PermissionAction[]
     };
   });
-  
+
   return result;
 }
 
@@ -41,19 +41,20 @@ export function hasPermission(
   scope: PermissionScope,
   action?: PermissionAction
 ): boolean {
+  const config = APP_PERMISSIONS[scope];
+  if (config?.parent) {
+    const parentPerm = permissions[config.parent];
+    if (!parentPerm?.enabled) {
+      return false;
+    }
+  }
   const scopePermission = permissions[scope];
-  
-  // 1. Check if scope is enabled
   if (!scopePermission?.enabled) {
     return false;
   }
-
-  // 2. If no specific action required, view access (enabled=true) is sufficient
   if (!action || action === 'view') {
     return true;
   }
-
-  // 3. Check if the specific action is in the allowed list
   return scopePermission.actions.includes(action);
 }
 
@@ -90,13 +91,13 @@ export function buildUserPermissions(
         // Validate against allowed permissions for this role
         // This prevents "privilege escalation" if a user's role changes but old permissions remain
         const allowedActions = ROLE_ALLOWED_PERMISSIONS[role]?.[scope];
-        
+
         // If the role isn't allowed this scope at all, skip it
         if (!allowedActions) return;
 
         // Filter actions to only include those allowed for this role
         const validActions = custom.actions.filter(a => allowedActions.includes(a));
-        
+
         result[scope] = {
           enabled: custom.enabled,
           actions: validActions
@@ -148,7 +149,7 @@ export function validatePermissionsForRole(
 
   (Object.keys(permissions) as PermissionScope[]).forEach(scope => {
     const perm = permissions[scope];
-    
+
     // Only check if enabled is true
     if (perm && perm.enabled) {
       const allowedActions = allowed[scope];

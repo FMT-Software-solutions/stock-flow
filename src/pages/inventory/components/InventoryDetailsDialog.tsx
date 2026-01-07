@@ -26,6 +26,7 @@ import { useUpdateInventoryEntry } from '@/hooks/useInventoryQueries';
 import { uploadImageToCloudinary } from '@/utils/cloudinary';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface InventoryDetailsDialogProps {
   inventory: InventoryEntry;
@@ -40,6 +41,8 @@ export function InventoryDetailsDialog({
 }: InventoryDetailsDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { checkPermission } = useRoleCheck();
+  const canEditInventory = checkPermission('inventory', 'edit');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -55,6 +58,7 @@ export function InventoryDetailsDialog({
   const updateInventory = useUpdateInventoryEntry();
 
   const handleEditToggle = () => {
+    if (!canEditInventory && !isEditing) return;
     if (isEditing) {
       // Reset form data on cancel
       setFormData({
@@ -211,6 +215,7 @@ export function InventoryDetailsDialog({
                     size="sm"
                     variant="outline"
                     onClick={handleEditToggle}
+                    disabled={!canEditInventory}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit

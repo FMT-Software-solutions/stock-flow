@@ -104,7 +104,7 @@ function AppRoutes() {
         <Route
           path="inventory/new"
           element={
-            <PermissionGuard scope="inventory" action="create">
+            <PermissionGuard scope="products" action="create">
               <ProductForm />
             </PermissionGuard>
           }
@@ -120,7 +120,7 @@ function AppRoutes() {
         <Route
           path="inventory/:id"
           element={
-            <PermissionGuard scope="inventory">
+            <PermissionGuard scope="products">
               <ProductDetails />
             </PermissionGuard>
           }
@@ -128,7 +128,7 @@ function AppRoutes() {
         <Route
           path="inventory/:id/edit"
           element={
-            <PermissionGuard scope="inventory" action="edit">
+            <PermissionGuard scope="products" action="edit">
               <ProductForm />
             </PermissionGuard>
           }

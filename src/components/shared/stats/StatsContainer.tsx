@@ -15,6 +15,7 @@ interface StatsContainerProps<TData> {
   className?: string;
   storageKey?: string;
   summaryLabel?: string;
+  collapsible?: boolean;
 }
 
 export function StatsContainer<TData>({
@@ -23,8 +24,30 @@ export function StatsContainer<TData>({
   className,
   storageKey = 'stockflow-stats-container-is-open',
   summaryLabel = 'Summary',
+  collapsible = true,
 }: StatsContainerProps<TData>) {
   const [isOpen, setIsOpen] = useLocalStorage(storageKey, true);
+
+  const content = (
+    <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
+      {groups
+        .filter((group) => !group.isHidden)
+        .map((group) => (
+          <StatsGroupCard key={group.id} group={group} data={data} />
+        ))}
+    </div>
+  );
+
+  if (!collapsible) {
+    return (
+      <div className="mb-6">
+        {summaryLabel && (
+          <div className="text-sm font-medium mb-2 px-1">{summaryLabel}</div>
+        )}
+        {content}
+      </div>
+    );
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -38,15 +61,7 @@ export function StatsContainer<TData>({
           <span className="sr-only">Toggle</span>
         </div>
       </CollapsibleTrigger>
-      <CollapsibleContent className="mb-6">
-        <div
-          className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}
-        >
-          {groups.map((group) => (
-            <StatsGroupCard key={group.id} group={group} data={data} />
-          ))}
-        </div>
-      </CollapsibleContent>
+      <CollapsibleContent className="mb-6">{content}</CollapsibleContent>
     </Collapsible>
   );
 }

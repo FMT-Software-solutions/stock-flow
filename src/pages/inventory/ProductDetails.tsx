@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { ProductInventoryManager } from './product-details/ProductInventoryManager';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function ProductDetails() {
   const { id } = useParams();
@@ -22,6 +23,8 @@ export function ProductDetails() {
   const { currentOrganization } = useOrganization();
   const { data: product, isLoading } = useProduct(id);
   const updateProduct = useUpdateProduct();
+  const { checkPermission } = useRoleCheck();
+  const canEditProducts = checkPermission('products', 'edit');
 
   const [hasVariations, setHasVariations] = useState(false);
   const [variants, setVariants] = useState<GeneratedVariant[]>([]);
@@ -47,6 +50,7 @@ export function ProductDetails() {
   }, [product]);
 
   const handleSaveVariations = async () => {
+    if (!canEditProducts) return;
     if (!product || !currentOrganization) return;
     
     if (hasVariations && variants.length === 0) {
@@ -101,12 +105,14 @@ export function ProductDetails() {
             <p className="text-muted-foreground">{product.sku}</p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate(`/inventory/${product.id}/edit`)}
-        >
-          <Edit className="mr-2 h-4 w-4" /> Edit Product
-        </Button>
+        {canEditProducts && (
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/inventory/${product.id}/edit`)}
+          >
+            <Edit className="mr-2 h-4 w-4" /> Edit Product
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -212,6 +218,7 @@ export function ProductDetails() {
                         id="has-variations"
                         checked={hasVariations}
                         onCheckedChange={setHasVariations}
+                        disabled={!canEditProducts}
                       />
                       <Label htmlFor="has-variations">This product has variations</Label>
                     </div>
@@ -227,7 +234,7 @@ export function ProductDetails() {
                         <div className="flex justify-end">
                           <Button 
                             onClick={handleSaveVariations} 
-                            disabled={isSaving || updateProduct.isPending}
+                            disabled={!canEditProducts || isSaving || updateProduct.isPending}
                           >
                             {(isSaving || updateProduct.isPending) && (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

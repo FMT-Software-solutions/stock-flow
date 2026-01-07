@@ -35,6 +35,7 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: TData) => void
   storageKey?: string
   defaultColumnVisibility?: VisibilityState
+  canExport?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -46,6 +47,7 @@ export function DataTable<TData, TValue>({
   onRowClick,
   storageKey,
   defaultColumnVisibility = {},
+  canExport = true,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -125,6 +127,7 @@ export function DataTable<TData, TValue>({
         searchKey={searchKey}
         filterFields={filterFields}
         exportFields={exportFields}
+        canExport={canExport}
       />
       <div className="rounded-md border">
         <Table>

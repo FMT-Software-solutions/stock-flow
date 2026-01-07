@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DataTable } from '@/components/shared/data-table/data-table';
 import { columns, inventoryColumns } from './inventory/columns';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import { StatsContainer } from '@/components/shared/stats/StatsContainer';
 import { getProductStatsGroups } from './inventory/fields/productStats';
 import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 import {
   Command,
@@ -52,6 +53,7 @@ export function Inventory() {
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds } = useBranchContext();
   const { formatCurrency } = useCurrency();
+  const { checkPermission, isOwner } = useRoleCheck();
   const { data: products = [], isLoading } = useProducts(
     currentOrganization?.id
   );
@@ -61,13 +63,43 @@ export function Inventory() {
   );
   const { data: categoriesList = [] } = useCategories(currentOrganization?.id);
 
-  const [activeTab, setActiveTab] = useState('inventory');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [variationDialogOpen, setVariationDialogOpen] = useState(false);
   const [openProductSearch, setOpenProductSearch] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   );
+
+  const canViewInventory = checkPermission('inventory');
+  const canViewProducts = checkPermission('products');
+  const canViewCategories = checkPermission('product_categories');
+  const canViewVariations = checkPermission('variations');
+  const canCreateInventory = checkPermission('inventory', 'create');
+  const canCreateProduct = checkPermission('products', 'create');
+  const canCreateCategory = checkPermission('product_categories', 'create');
+  const canCreateVariation = checkPermission('variations', 'create');
+  const canExportInventory = checkPermission('inventory', 'export');
+  const canExportProducts = checkPermission('products', 'export');
+  const canEditCategory = checkPermission('product_categories', 'edit');
+  const canExportCategory = checkPermission('product_categories', 'export');
+
+  const availableTabs = [
+    canViewInventory ? 'inventory' : null,
+    canViewProducts ? 'products' : null,
+    canViewCategories ? 'categories' : null,
+    canViewVariations ? 'variations' : null,
+  ].filter(Boolean) as string[];
+
+  const [activeTab, setActiveTab] = useState<string>(
+    availableTabs[0] ?? 'inventory'
+  );
+
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0] ?? activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewInventory, canViewProducts, canViewCategories, canViewVariations]);
 
   const handleCreateCategory = () => {
     setSelectedCategory(null);
@@ -134,7 +166,10 @@ export function Inventory() {
     inventoryCreators
   );
 
-  const inventoryStatsGroups = getInventoryStatsGroups(formatCurrency);
+  const inventoryStatsGroups = getInventoryStatsGroups(
+    formatCurrency,
+    isOwner()
+  );
   const productStatsGroups = getProductStatsGroups(formatCurrency);
 
   const categoryExportFields = getCategoryExportFields(products);
@@ -143,8 +178,8 @@ export function Inventory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
+          <p className="text-sm text-muted-foreground">
             Manage your products and stock levels
           </p>
         </div>
@@ -155,21 +190,29 @@ export function Inventory() {
             className="space-y-0"
           >
             <TabsList>
-              <TabsTrigger value="inventory" disabled={isLoading}>
-                Inventory
-              </TabsTrigger>
-              <TabsTrigger value="products" disabled={isLoading}>
-                Products
-              </TabsTrigger>
-              <TabsTrigger value="categories" disabled={isLoading}>
-                Categories
-              </TabsTrigger>
-              <TabsTrigger value="variations" disabled={isLoading}>
-                Variations
-              </TabsTrigger>
+              {canViewInventory && (
+                <TabsTrigger value="inventory" disabled={isLoading}>
+                  Inventory
+                </TabsTrigger>
+              )}
+              {canViewProducts && (
+                <TabsTrigger value="products" disabled={isLoading}>
+                  Products
+                </TabsTrigger>
+              )}
+              {canViewCategories && (
+                <TabsTrigger value="categories" disabled={isLoading}>
+                  Categories
+                </TabsTrigger>
+              )}
+              {canViewVariations && (
+                <TabsTrigger value="variations" disabled={isLoading}>
+                  Variations
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
-          {activeTab === 'products' && (
+          {activeTab === 'products' && canCreateProduct && (
             <Button
               onClick={() => navigate('/inventory/new')}
               disabled={isLoading}
@@ -177,7 +220,7 @@ export function Inventory() {
               <Plus className="mr-2 h-4 w-4" /> Add Product
             </Button>
           )}
-          {activeTab === 'inventory' && (
+          {activeTab === 'inventory' && canCreateInventory && (
             <Popover
               open={openProductSearch}
               onOpenChange={setOpenProductSearch}
@@ -218,17 +261,21 @@ export function Inventory() {
           )}
           {activeTab === 'categories' && (
             <div className="flex items-center gap-2">
-              <ExportDialog
-                data={categoriesList}
-                fields={categoryExportFields}
-                defaultFilename="categories-export"
-              />
-              <Button onClick={handleCreateCategory} disabled={isLoading}>
-                <Plus className="mr-2 h-4 w-4" /> Add Category
-              </Button>
+              {canExportCategory && (
+                <ExportDialog
+                  data={categoriesList}
+                  fields={categoryExportFields}
+                  defaultFilename="categories-export"
+                />
+              )}
+              {canCreateCategory && (
+                <Button onClick={handleCreateCategory} disabled={isLoading}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Category
+                </Button>
+              )}
             </div>
           )}
-          {activeTab === 'variations' && (
+          {activeTab === 'variations' && canCreateVariation && (
             <Button
               onClick={() => setVariationDialogOpen(true)}
               disabled={isLoading}
@@ -247,43 +294,57 @@ export function Inventory() {
         })}
       >
         <TabsContent value="inventory" className="space-y-4">
-          <StatsContainer
-            groups={inventoryStatsGroups}
-            data={inventoryEntries}
-            summaryLabel="Inventory Summary"
-            storageKey="stockflow-inventory-stats-container-is-open"
-          />
-          <DataTable
-            columns={inventoryColumns}
-            data={inventoryEntries}
-            searchKey="searchable"
-            filterFields={inventoryFilterFields}
-            exportFields={inventoryExportFields}
-            storageKey="inventory-entries-table"
-            defaultColumnVisibility={{ searchable: false }}
-          />
+          {canViewInventory && (
+            <>
+              <StatsContainer
+                groups={inventoryStatsGroups}
+                data={inventoryEntries}
+                summaryLabel="Inventory Summary"
+                storageKey="stockflow-inventory-stats-container-is-open"
+              />
+              <DataTable
+                columns={inventoryColumns}
+                data={inventoryEntries}
+                searchKey="searchable"
+                filterFields={inventoryFilterFields}
+                exportFields={inventoryExportFields}
+                storageKey="inventory-entries-table"
+                defaultColumnVisibility={{ searchable: false }}
+                canExport={canExportInventory}
+              />
+            </>
+          )}
         </TabsContent>
         <TabsContent value="products" className="space-y-6">
-          <StatsContainer
-            groups={productStatsGroups}
-            data={products}
-            summaryLabel="Product Summary"
-            storageKey="stockflow-products-stats-container-is-open"
-          />
-          <DataTable
-            columns={columns}
-            data={products}
-            searchKey="name"
-            filterFields={filterFields}
-            exportFields={productExportFields}
-            storageKey="inventory-products-table"
-          />
+          {canViewProducts && (
+            <>
+              <StatsContainer
+                groups={productStatsGroups}
+                data={products}
+                summaryLabel="Product Summary"
+                storageKey="stockflow-products-stats-container-is-open"
+              />
+              <DataTable
+                columns={columns}
+                data={products}
+                searchKey="name"
+                filterFields={filterFields}
+                exportFields={productExportFields}
+                storageKey="inventory-products-table"
+                canExport={canExportProducts}
+              />
+            </>
+          )}
         </TabsContent>
         <TabsContent value="categories">
-          <Categories onEditCategory={handleEditCategory} />
+          {canViewCategories && (
+            <Categories
+              onEditCategory={canEditCategory ? handleEditCategory : undefined}
+            />
+          )}
         </TabsContent>
         <TabsContent value="variations">
-          <Variations />
+          {canViewVariations && <Variations />}
         </TabsContent>
       </Tabs>
 

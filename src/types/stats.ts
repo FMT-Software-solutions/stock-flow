@@ -27,4 +27,5 @@ export interface StatsGroup<TData> {
     icon?: LucideIcon;
     onClick: () => void;
   };
+  isHidden?: boolean;
 }

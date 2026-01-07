@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VariationType } from '@/types/inventory';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function Variations() {
   const { currentOrganization } = useOrganization();
@@ -21,6 +22,8 @@ export function Variations() {
     currentOrganization?.id
   );
   const deleteType = useDeleteVariationType();
+  const { checkPermission } = useRoleCheck();
+  const canDeleteType = checkPermission('variations', 'delete');
 
   const handleDeleteType = async (id: string) => {
     if (!confirm('Are you sure? This will delete all options for this type.'))
@@ -44,6 +47,7 @@ export function Variations() {
             type={type}
             organizationId={currentOrganization?.id}
             onDelete={() => handleDeleteType(type.id)}
+            canDeleteType={canDeleteType}
           />
         ))}
       </div>
@@ -55,10 +59,12 @@ function VariationCard({
   type,
   organizationId,
   onDelete,
+  canDeleteType,
 }: {
   type: VariationType;
   organizationId?: string;
   onDelete: () => void;
+  canDeleteType: boolean;
 }) {
   const { data: options, isLoading } = useVariationOptions(
     type.id,
@@ -67,6 +73,9 @@ function VariationCard({
   const createOption = useCreateVariationOption();
   const deleteOption = useDeleteVariationOption();
   const [newOptionValue, setNewOptionValue] = useState('');
+  const { checkPermission } = useRoleCheck();
+  const canDeleteOption = checkPermission('variations', 'delete');
+  const canCreateOption = checkPermission('variations', 'create');
 
   const handleAddOption = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +121,7 @@ function VariationCard({
             </Badge>
           )}
         </CardTitle>
-        {!isSystemDefault && (
+        {!isSystemDefault && canDeleteType && (
           <Button
             variant="ghost"
             size="icon"
@@ -141,7 +150,7 @@ function VariationCard({
                   className="flex items-center gap-1"
                 >
                   {option.value}
-                  {!isOptionSystem && (
+                  {!isOptionSystem && canDeleteOption && (
                     <button
                       onClick={() => handleDeleteOption(option.id)}
                       className="ml-1 rounded-full hover:bg-muted p-0.5"
@@ -154,7 +163,7 @@ function VariationCard({
             })
           )}
         </div>
-        {!isSystemDefault && (
+        {!isSystemDefault && canCreateOption && (
           <form onSubmit={handleAddOption} className="flex gap-2">
             <Input
               placeholder="Add option..."

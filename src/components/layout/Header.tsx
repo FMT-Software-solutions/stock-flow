@@ -24,7 +24,7 @@ export function Header({ className }: HeaderProps) {
           <BranchSelector />
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="hidden md:flex items-center space-x-4 ">
           <AiUsageIndicator />
           <RestartToUpdateButton />
         </div>

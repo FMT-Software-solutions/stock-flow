@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useBulkUpdateInventoryEntries } from '@/hooks/useInventoryQueries';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { Layers } from 'lucide-react';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface BulkUpdateInventorySheetProps {
   productId: string;
@@ -31,6 +32,8 @@ export function BulkUpdateInventorySheet({
     availableBranches,
     selectedBranchIds: globalSelectedBranchIds,
   } = useBranchContext();
+  const { checkPermission } = useRoleCheck();
+  const canEditInventory = checkPermission('inventory', 'edit');
 
   // Filter available branches based on global selection
   const validBranches = useMemo(() => {
@@ -70,6 +73,10 @@ export function BulkUpdateInventorySheet({
   };
 
   const handleSubmit = async () => {
+    if (!canEditInventory) {
+      toast.error('You do not have permission to edit inventory');
+      return;
+    }
     if (selectedBranches.length === 0) {
       toast.error('Please select at least one branch');
       return;
@@ -117,7 +124,7 @@ export function BulkUpdateInventorySheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8">
+        <Button variant="outline" size="sm" className="h-8" disabled={!canEditInventory}>
           <Layers className="mr-2 h-4 w-4" />
           Bulk Update
         </Button>
@@ -251,7 +258,7 @@ export function BulkUpdateInventorySheet({
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={bulkUpdate.isPending}>
+            <Button onClick={handleSubmit} disabled={bulkUpdate.isPending || !canEditInventory}>
               {bulkUpdate.isPending ? 'Updating...' : 'Apply Updates'}
             </Button>
           </div>

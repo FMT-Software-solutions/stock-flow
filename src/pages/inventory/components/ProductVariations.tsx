@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export type GeneratedVariant = {
   id?: string; // If editing existing
@@ -54,6 +55,8 @@ export function ProductVariations({
 }: ProductVariationsProps) {
   const { currentOrganization } = useOrganization();
   const { data: variationTypes } = useVariationTypes(currentOrganization?.id);
+  const { checkPermission } = useRoleCheck();
+  const canEditProducts = checkPermission('products', 'edit');
 
   // Local state for the configuration (which types and options are selected)
   const [configs, setConfigs] = useState<VariationConfig[]>([]);
@@ -129,6 +132,7 @@ export function ProductVariations({
   };
 
   const addVariationType = (typeId: string) => {
+    if (!canEditProducts) return;
     const type = variationTypes?.find((t) => t.id === typeId);
     if (!type) return;
 
@@ -146,6 +150,7 @@ export function ProductVariations({
   };
 
   const removeVariationType = (typeId: string) => {
+    if (!canEditProducts) return;
     const newConfigs = configs.filter((c) => c.variationTypeId !== typeId);
     updateConfigs(newConfigs);
   };
@@ -202,6 +207,7 @@ export function ProductVariations({
     field: keyof GeneratedVariant,
     value: any
   ) => {
+    if (!canEditProducts) return;
     const newVariants = [...variants];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setVariants(newVariants);
@@ -217,7 +223,7 @@ export function ProductVariations({
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
             <Select onValueChange={addVariationType}>
-              <SelectTrigger className="w-50">
+              <SelectTrigger className="w-50" disabled={!canEditProducts}>
                 <SelectValue placeholder="Add Variation Type" />
               </SelectTrigger>
               <SelectContent>
@@ -251,6 +257,7 @@ export function ProductVariations({
                   );
                   updateConfigs(newConfigs);
                 }}
+                canEdit={canEditProducts}
               />
             ))}
           </div>
@@ -292,6 +299,7 @@ export function ProductVariations({
                           handleVariantChange(index, 'sku', e.target.value)
                         }
                         className="h-8"
+                        disabled={!canEditProducts}
                       />
                     </TableCell>
                     <TableCell>
@@ -306,6 +314,7 @@ export function ProductVariations({
                           )
                         }
                         className="h-8 w-24"
+                        disabled={!canEditProducts}
                       />
                     </TableCell>
                   </TableRow>
@@ -324,11 +333,13 @@ function VariationTypeRow({
   organizationId,
   onRemove,
   onOptionsChange,
+  canEdit,
 }: {
   config: VariationConfig;
   organizationId?: string;
   onRemove: () => void;
   onOptionsChange: (options: { id: string; value: string }[]) => void;
+  canEdit: boolean;
 }) {
   const { data: fetchedOptions } = useVariationOptions(
     config.variationTypeId,
@@ -359,6 +370,7 @@ function VariationTypeRow({
   ]);
 
   const handleOptionToggle = (option: { id: string; value: string }) => {
+    if (!canEdit) return;
     const isSelected = config.selectedOptions.some(
       (o) => o.id === option.id || o.value === option.value
     );
@@ -386,7 +398,7 @@ function VariationTypeRow({
               <Badge
                 key={option.id || option.value}
                 variant={isSelected ? 'default' : 'outline'}
-                className="cursor-pointer hover:opacity-80"
+                className={canEdit ? 'cursor-pointer hover:opacity-80' : 'opacity-60 cursor-not-allowed'}
                 onClick={() => handleOptionToggle(option)}
               >
                 {option.value}
@@ -400,7 +412,7 @@ function VariationTypeRow({
           </div>
         )}
       </div>
-      <Button variant="ghost" size="icon" onClick={onRemove}>
+      <Button variant="ghost" size="icon" onClick={onRemove} disabled={!canEdit}>
         <Trash2 className="h-4 w-4 text-muted-foreground" />
       </Button>
     </div>

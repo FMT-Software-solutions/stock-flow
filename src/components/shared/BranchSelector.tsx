@@ -24,7 +24,7 @@ export function BranchSelector() {
 
   const selectedCount = selectedBranchIds.length;
   const allSelected =
-    availableBranches.length > 0 && selectedCount === availableBranches.length;
+    availableBranches.length > 1 && selectedCount === availableBranches.length;
 
   if (isLoading) {
     return (
@@ -52,6 +52,8 @@ export function BranchSelector() {
           <span className="hidden md:inline">
             {allSelected
               ? 'All Branches'
+              : availableBranches.length === 1
+              ? availableBranches[0].name
               : selectedCount === 0
               ? 'Select Branch'
               : `${selectedCount} Branch${selectedCount > 1 ? 'es' : ''}`}
@@ -79,7 +81,7 @@ export function BranchSelector() {
           </>
         )}
 
-        <div className="max-h-[300px] overflow-y-auto">
+        <div className="max-h-75 overflow-y-auto">
           {availableBranches.map((branch) => {
             const isSelected = selectedBranchIds.includes(branch.id);
             return (

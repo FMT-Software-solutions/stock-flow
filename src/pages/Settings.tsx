@@ -346,16 +346,18 @@ export function Settings() {
           {canManageOrgDetails && (
             <TabsTrigger
               value="organization"
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1"
             >
               <Building2 className="h-4 w-4" />
-              <span>Organization Details</span>
+              <span>
+                <span className="hidden md:inline">Organization</span> Details
+              </span>
             </TabsTrigger>
           )}
           {canViewAppearance && (
             <TabsTrigger
               value="appearance"
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1"
             >
               <Palette className="h-4 w-4" />
               <span>Appearance</span>
@@ -363,15 +365,18 @@ export function Settings() {
           )}
 
           {canManageRoles && (
-            <TabsTrigger value="roles" className="flex items-center space-x-2">
+            <TabsTrigger value="roles" className="flex items-center space-x-1">
               <Shield className="h-4 w-4" />
-              <span>Roles & Permissions</span>
+              <span>
+                Roles
+                <span className="hidden md:inline"> & Permissions</span>
+              </span>
             </TabsTrigger>
           )}
           {canManageNotifications && (
             <TabsTrigger
               value="notifications"
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1"
             >
               <Bell className="h-4 w-4" />
               <span>Notifications</span>
@@ -381,7 +386,7 @@ export function Settings() {
           {isElectron() && (
             <TabsTrigger
               value="updates"
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1"
             >
               <Download className="h-4 w-4" />
               <span>Updates</span>
@@ -451,12 +456,12 @@ export function Settings() {
                         setOrgData((prev) => ({ ...prev, currency: value }))
                       }
                     >
-                      <SelectTrigger className="min-w-[200px]">
+                      <SelectTrigger className="min-w-50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="GHS">GHS</SelectItem>
-                        {/* <SelectItem value="USD">USD</SelectItem> */}
+                        <SelectItem value="USD">USD</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -527,7 +532,7 @@ export function Settings() {
                         accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
                         disabled={isUploadingLogo}
                         maxSize={2}
-                        className="mt-2 max-w-[300px]"
+                        className="mt-2 max-w-75"
                         variant="compact"
                       >
                         {isUploadingLogo && (

@@ -1,11 +1,15 @@
 import type { UserRole } from '@/lib/auth';
 
 // 1. Top-level permissions (Pages)
-export type PermissionScope = 
+export type PermissionScope =
   | 'dashboard'
   | 'user_management'
   | 'branch_management'
   | 'inventory'
+  | 'inventory_entries'
+  | 'products'
+  | 'product_categories'
+  | 'variations'
   | 'orders'
   | 'customers'
   | 'suppliers'
@@ -18,7 +22,7 @@ export type PermissionScope =
 
 
 // 2. Child permissions (Actions)
-export type PermissionAction = 
+export type PermissionAction =
   | 'view'      // Implicitly true if enabled
   | 'create'
   | 'edit'
@@ -44,9 +48,11 @@ export type UserPermissions = Partial<Record<PermissionScope, ScopePermission>>;
 export interface PermissionDefinition {
   label: string;
   description: string;
-  actions: Partial<Record<PermissionAction, string>>; // Label for the action
+  actions: Partial<Record<PermissionAction, string>>;
+  parent?: PermissionScope;
+  children?: PermissionScope[];
 }
 
-export type AppPermissionsConfig = Record<PermissionScope, PermissionDefinition>;
+export type AppPermissionsConfig = Partial<Record<PermissionScope, PermissionDefinition>>;
 
 export type RolePermissionsConfig = Record<UserRole, Partial<Record<PermissionScope, PermissionAction[]>>>;

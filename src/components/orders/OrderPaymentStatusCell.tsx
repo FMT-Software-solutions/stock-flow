@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Order, PaymentStatus } from '@/types/orders';
 import { useUpdateOrder } from '@/hooks/useOrders';
 import {
@@ -6,6 +7,15 @@ import {
   SelectItem,
   SelectTrigger,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
@@ -15,6 +25,9 @@ interface OrderPaymentStatusCellProps {
 
 export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
   const updateOrder = useUpdateOrder();
+  const [showPartialDialog, setShowPartialDialog] = useState(false);
+  const [partialAmount, setPartialAmount] = useState<number>(order.paid_amount || 0);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   const getStyles = (status: string) => {
     let className = 'bg-gray-100 text-gray-800 border-gray-200';
@@ -32,10 +45,25 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
   const handleUpdate = async (newStatus: string) => {
     if (newStatus === order.payment_status) return;
 
+    if (newStatus === 'partial') {
+        setPendingStatus(newStatus);
+        setPartialAmount(order.paid_amount || 0);
+        setShowPartialDialog(true);
+        return;
+    }
+
+    let newPaidAmount = order.paid_amount;
+    if (newStatus === 'paid') {
+        newPaidAmount = order.total_amount;
+    } else if (newStatus === 'unpaid' || newStatus === 'refunded') {
+        newPaidAmount = 0;
+    }
+
     try {
       await updateOrder.mutateAsync({
         id: order.id,
         payment_status: newStatus as PaymentStatus,
+        paid_amount: newPaidAmount,
       });
       toast.success(`Payment status updated to ${newStatus}`);
     } catch (error) {
@@ -44,7 +72,52 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
     }
   };
 
+  const confirmPartialUpdate = async () => {
+    if (!pendingStatus) return;
+    
+    // Validation
+    if (partialAmount <= 0) {
+        toast.error('Partial amount must be greater than 0');
+        return;
+    }
+    if (partialAmount >= order.total_amount) {
+        // If they enter full amount, should we switch to 'paid'?
+        // User requested: "if status changed to unpaid or refunded, it should set paid amount to zero automatically."
+        // "If we update from other status to partial, we should let user enter paid amount in a popup."
+        // "Make sure all edge cases are handled."
+        // It's safer to just set it to 'paid' if they enter full amount, or warn them.
+        // Let's switch to 'paid' automatically for better UX
+        try {
+            await updateOrder.mutateAsync({
+                id: order.id,
+                payment_status: 'paid',
+                paid_amount: order.total_amount,
+            });
+            toast.success('Amount covers total, status set to Paid');
+            setShowPartialDialog(false);
+            return;
+        } catch (error) {
+             toast.error('Failed to update');
+             return;
+        }
+    }
+
+    try {
+        await updateOrder.mutateAsync({
+          id: order.id,
+          payment_status: 'partial',
+          paid_amount: partialAmount,
+        });
+        toast.success(`Payment status updated to Partial`);
+        setShowPartialDialog(false);
+      } catch (error) {
+        toast.error('Failed to update payment status');
+        console.error(error);
+      }
+  };
+
   return (
+    <>
     <div onClick={(e) => e.stopPropagation()} className="flex items-center">
       <Select
         defaultValue={order.payment_status}
@@ -72,5 +145,30 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
         </SelectContent>
       </Select>
     </div>
+
+    <Dialog open={showPartialDialog} onOpenChange={setShowPartialDialog}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Enter Partial Payment Amount</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium">Paid Amount</label>
+                    <Input 
+                        type="number" 
+                        value={partialAmount} 
+                        onChange={(e) => setPartialAmount(parseFloat(e.target.value))}
+                        max={order.total_amount}
+                    />
+                    <p className="text-xs text-muted-foreground">Total Order Amount: {order.total_amount}</p>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowPartialDialog(false)}>Cancel</Button>
+                <Button onClick={confirmPartialUpdate} disabled={updateOrder.isPending}>Save</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }

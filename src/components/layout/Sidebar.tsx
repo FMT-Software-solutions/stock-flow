@@ -34,6 +34,9 @@ export function Sidebar({ className, fullHeight = false }: SidebarProps) {
     return true;
   });
 
+  if (import.meta.env.DEV) {
+    console.debug('sidebar:visible-items', filteredNavItems.map(i => i.label));
+  }
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

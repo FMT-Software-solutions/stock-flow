@@ -63,33 +63,62 @@ export function hasPermission(
  * This ensures that even if defaults change, we can reconstruct the user's effective permissions.
  * 
  * @param role - The user's role
- * @param customPermissions - (Optional) Custom permissions stored in DB
+ * @param customPermissions - (Optional) Custom permissions stored in DB (user overrides)
+ * @param basePermissions - (Optional) The organization's base permissions for this role. If not provided, uses static defaults.
  * @returns UserPermissions
  */
 export function buildUserPermissions(
   role: UserRole,
-  customPermissions?: UserPermissions
+  customPermissions?: UserPermissions,
+  basePermissions?: UserPermissions
 ): UserPermissions {
-  // 1. Start with role defaults
-  const defaults = ROLE_DEFAULT_PERMISSIONS[role] || {};
+  if (import.meta.env.DEV) {
+    console.debug('buildUserPermissions:start', {
+      role,
+      baseScopes: Object.keys(basePermissions || {}),
+      customScopes: Object.keys(customPermissions || {}),
+    });
+  }
+  // 1. Start with base permissions (organization role or static defaults)
   const result: UserPermissions = {};
 
-  // Initialize with defaults
-  (Object.keys(defaults) as PermissionScope[]).forEach(scope => {
-    const defaultActions = defaults[scope] || [];
-    result[scope] = {
-      enabled: true,
-      actions: [...defaultActions]
-    };
-  });
+  if (basePermissions) {
+    // If basePermissions provided, it follows UserPermissions structure
+    (Object.keys(basePermissions) as PermissionScope[]).forEach(scope => {
+      const defaultScope = basePermissions[scope];
+      if (defaultScope) {
+        result[scope] = {
+          enabled: defaultScope.enabled,
+          actions: [...defaultScope.actions]
+        };
+      }
+    });
+  } else {
+    // Fallback to static defaults which are arrays of actions
+    const defaults = ROLE_DEFAULT_PERMISSIONS[role] || {};
+    (Object.keys(defaults) as PermissionScope[]).forEach(scope => {
+      const defaultActions = defaults[scope];
+      if (defaultActions) {
+        result[scope] = {
+          enabled: true,
+          actions: [...defaultActions]
+        };
+      }
+    });
+  }
 
+  if (import.meta.env.DEV) {
+    console.debug('buildUserPermissions:afterBase', {
+      role,
+      scopes: Object.keys(result),
+    });
+  }
   // 2. Apply custom overrides if they exist
   if (customPermissions) {
     (Object.keys(customPermissions) as PermissionScope[]).forEach(scope => {
       const custom = customPermissions[scope];
       if (custom) {
         // Validate against allowed permissions for this role
-        // This prevents "privilege escalation" if a user's role changes but old permissions remain
         const allowedActions = ROLE_ALLOWED_PERMISSIONS[role]?.[scope];
 
         // If the role isn't allowed this scope at all, skip it
@@ -97,6 +126,10 @@ export function buildUserPermissions(
 
         // Filter actions to only include those allowed for this role
         const validActions = custom.actions.filter(a => allowedActions.includes(a));
+
+        // If the override explicitly disables a scope, honor it.
+        // If it explicitly enables it, honor it (checked against allowedActions above indirectly by existence).
+        // If the scope wasn't in defaults but is in custom, add it (provided it's allowed).
 
         result[scope] = {
           enabled: custom.enabled,
@@ -106,6 +139,13 @@ export function buildUserPermissions(
     });
   }
 
+  if (import.meta.env.DEV) {
+    console.debug('buildUserPermissions:result', {
+      role,
+      scopes: Object.keys(result),
+      snapshot: result,
+    });
+  }
   return result;
 }
 

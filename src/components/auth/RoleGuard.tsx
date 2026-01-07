@@ -49,24 +49,51 @@ export function useRoleCheck() {
     if (!currentOrganization) return false;
 
     // If no permissions string, we use the role's default permissions
-    // This handles legacy data or cases where permissions haven't been explicitly stored
     if (!currentOrganization.permissions) {
       const defaultPermissions = buildUserPermissions(
         currentOrganization.user_role
       );
-      return hasPermission(defaultPermissions, scope, action);
+      const allowed = hasPermission(defaultPermissions, scope, action);
+      if (import.meta.env.DEV) {
+        console.debug('checkPermission:defaultRole', {
+          role: currentOrganization.user_role,
+          scope,
+          action,
+          allowed,
+        });
+      }
+      return allowed;
     }
 
     try {
       const permissions = JSON.parse(currentOrganization.permissions);
-      return hasPermission(permissions, scope, action);
+      const allowed = hasPermission(permissions, scope, action);
+      if (import.meta.env.DEV) {
+        console.debug('checkPermission:orgEffective', {
+          role: currentOrganization.user_role,
+          scope,
+          action,
+          allowed,
+          availableScopes: Object.keys(permissions || {}),
+        });
+      }
+      return allowed;
     } catch (e) {
       console.error('Failed to parse permissions', e);
       // Fallback to role defaults on parse error
       const defaultPermissions = buildUserPermissions(
         currentOrganization.user_role
       );
-      return hasPermission(defaultPermissions, scope, action);
+      const allowed = hasPermission(defaultPermissions, scope, action);
+      if (import.meta.env.DEV) {
+        console.debug('checkPermission:fallbackRole', {
+          role: currentOrganization.user_role,
+          scope,
+          action,
+          allowed,
+        });
+      }
+      return allowed;
     }
   };
 

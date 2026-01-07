@@ -12,6 +12,7 @@ import {
   DEFAULT_LOGO_SETTINGS,
   DEFAULT_NOTIFICATION_SETTINGS,
 } from '../types/organizations';
+import { buildUserPermissions } from '@/modules/permissions';
 
 // Query Keys
 export const organizationKeys = {
@@ -65,55 +66,72 @@ export function useUserOrganizations(userId: string | undefined) {
 
       if (error) throw error;
 
-      const organizations: OrganizationWithRole[] = data
-        ?.map(item => {
-          // Determine effective permissions:
-          // 1. If organization_role exists, use its permissions
-          // 2. Fallback to direct permissions column
-          // 3. Fallback to role defaults (handled in types or wherever used)
-          
-          const orgRole = Array.isArray(item.organization_role) 
-            ? item.organization_role[0] 
+      const organizations: OrganizationWithRole[] = await Promise.all(
+        (data || []).map(async item => {
+          const orgRole = Array.isArray(item.organization_role)
+            ? item.organization_role[0]
             : item.organization_role;
 
-          let effectivePermissions = item.permissions;
-          if (orgRole?.permissions) {
-            // Merge logic:
-            // 1. Parse role permissions (Base)
-            // 2. Parse user permissions (Override)
-            // 3. For each scope, use Role's enabled state
-            // 4. For each scope, use User's actions if defined, else Role's actions
-            
+          const roleType = (orgRole?.type || item.role) as OrganizationRole;
+
+          let basePermissionsObj: any = {};
+          let customPermissionsObj: any = {};
+
+          try {
+            basePermissionsObj = orgRole?.permissions ? JSON.parse(orgRole.permissions) : {};
+          } catch {
+            basePermissionsObj = {};
+          }
+
+          try {
+            customPermissionsObj = item.permissions ? JSON.parse(item.permissions) : {};
+          } catch {
+            customPermissionsObj = {};
+          }
+
+          if (!basePermissionsObj || Object.keys(basePermissionsObj).length === 0) {
+            const { data: roleByType } = await supabase
+              .from('organization_roles')
+              .select('id,type,permissions')
+              .eq('organization_id', (item.organization as any)?.id)
+              .eq('type', roleType)
+              .limit(1);
+            const fallbackRole = Array.isArray(roleByType) ? roleByType[0] : roleByType;
             try {
-              const rolePerms = JSON.parse(orgRole.permissions);
-              const userPerms = item.permissions ? JSON.parse(item.permissions) : {};
-              const mergedPerms: any = {};
-
-              Object.keys(rolePerms).forEach(scope => {
-                const roleScope = rolePerms[scope];
-                const userScope = userPerms[scope];
-
-                mergedPerms[scope] = {
-                  enabled: roleScope.enabled, // Page access locked to Role
-                  actions: userScope?.actions ?? roleScope.actions // Actions fallback to Role if not defined by User
-                };
-              });
-              
-              effectivePermissions = JSON.stringify(mergedPerms);
-            } catch (e) {
-              console.error('Error merging permissions', e);
-              effectivePermissions = orgRole.permissions;
+              basePermissionsObj = fallbackRole?.permissions ? JSON.parse(fallbackRole.permissions) : {};
+            } catch {
+              basePermissionsObj = {};
             }
           }
 
+          const hasBase = basePermissionsObj && Object.keys(basePermissionsObj).length > 0;
+          const effectivePermissionsObj = buildUserPermissions(
+            roleType as any,
+            customPermissionsObj,
+            hasBase ? basePermissionsObj : undefined
+          );
+          if (import.meta.env.DEV) {
+            console.debug('org:effective-permissions', {
+              organizationId: (item.organization as any)?.id,
+              organizationName: (item.organization as any)?.name,
+              roleType,
+              baseScopes: Object.keys(basePermissionsObj || {}),
+              overrideScopes: Object.keys(customPermissionsObj || {}),
+              effectiveScopes: Object.keys(effectivePermissionsObj || {}),
+              usedFallbackDefaults: !hasBase
+            });
+          }
+          const effectivePermissions = JSON.stringify(effectivePermissionsObj);
+
           return {
             ...(item.organization as any),
-            user_role: (orgRole?.type || item.role) as OrganizationRole, // Use role type (owner/custom/etc) or legacy role
+            user_role: roleType,
             role_id: item.role_id,
             role_name: orgRole?.name,
             permissions: effectivePermissions,
           };
-        }) || [];
+        })
+      );
 
       return organizations;
     },
@@ -182,7 +200,7 @@ export function useUpdateOrganization() {
   return useMutation({
     mutationFn: async (data: UpdateOrganizationData): Promise<Organization> => {
       const { id, ...updateData } = data;
-      
+
       // Filter out undefined values and convert them to null for proper database handling
       const cleanedUpdateData = Object.fromEntries(
         Object.entries(updateData).map(([key, value]) => [
@@ -211,7 +229,7 @@ export function useUpdateOrganization() {
         organizationKeys.organization(variables.id),
         updatedOrg
       );
-      
+
       // Invalidate user organizations to refresh the list
       queryClient.invalidateQueries({
         queryKey: organizationKeys.all,

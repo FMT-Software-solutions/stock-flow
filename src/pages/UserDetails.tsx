@@ -39,7 +39,8 @@ export default function UserDetails() {
     assignAllBranches: false
   });
 
-  const [hasChanges, setHasChanges] = useState(false);
+  const [hasDetailsChanges, setHasDetailsChanges] = useState(false);
+  const [hasPermissionsChanges, setHasPermissionsChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const [selectedRolePermissions, setSelectedRolePermissions] = useState<any>(null);
@@ -53,7 +54,6 @@ export default function UserDetails() {
       const userBranchIds = user.user_branches?.map(ub => ub.branch_id).filter(Boolean) as string[] || [];
       
       // Find the role definition to get base permissions
-      // If roleId exists but role is not found (deleted), fallback to empty or handle gracefully
       let roleDef = roles?.find(r => r.id === userRoleId);
       
       // If role not found by ID, try type (for system roles)
@@ -61,8 +61,6 @@ export default function UserDetails() {
         roleDef = roles?.find(r => r.type === userRole && r.type !== 'custom');
       }
 
-      // If still not found (e.g. deleted custom role), we might want to warn or show basic permissions
-      // But for now we build defaults based on type
       const basePermissions = roleDef ? JSON.parse(roleDef.permissions) : buildUserPermissions(userRole);
       
       setSelectedRolePermissions(basePermissions);
@@ -71,20 +69,24 @@ export default function UserDetails() {
         firstName: user.profile.first_name || '',
         lastName: user.profile.last_name || '',
         role: userRole,
-        // If roleDef is missing (deleted role), we should probably clear the roleId so the select shows placeholder
-        // OR keep it to show "Custom Role (Deleted)" if we had the name, but we don't here.
         roleId: roleDef ? roleDef.id : '', 
-        // If permissions are null, build default for role. Otherwise use stored permissions.
-        permissions: userPermissions || JSON.stringify(basePermissions),
+        // Use userPermissions directly (null/string). If null, editor shows inherited.
+        permissions: userPermissions || '',
         selectedBranchIds: userBranchIds,
-        assignAllBranches: false // Logic for this can be complex, simplifying for now
+        assignAllBranches: false
       });
+      setHasDetailsChanges(false);
+      setHasPermissionsChanges(false);
     }
-  }, [user, roles]); // Add roles dependency
+  }, [user, roles]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    setHasChanges(true);
+    if (field === 'permissions') {
+      setHasPermissionsChanges(true);
+    } else {
+      setHasDetailsChanges(true);
+    }
   };
 
   const handleRoleChange = (roleId: string) => {
@@ -99,14 +101,14 @@ export default function UserDetails() {
       ...prev, 
       role: selectedRole.type as UserRole, 
       roleId: selectedRole.id,
-      permissions: selectedRole.permissions,
-      // Reset branches if switching to owner (implied all branches) or handle accordingly
+      permissions: '', // Reset to inherited
       assignAllBranches: selectedRole.type === 'owner' ? true : prev.assignAllBranches
     }));
-    setHasChanges(true);
+    setHasDetailsChanges(true);
+    setHasPermissionsChanges(true); // Marking permissions as changed because we reset them
   };
 
-  const handleSave = async () => {
+  const handleSaveDetails = async () => {
     if (!userId || !user) return;
     
     setIsSaving(true);
@@ -119,18 +121,108 @@ export default function UserDetails() {
           role: formData.role,
           roleId: formData.roleId,
           branchIds: formData.selectedBranchIds,
-          permissions: formData.permissions
+          // Do NOT send permissions here
         }
       });
       
-      toast.success('User updated successfully');
-      setHasChanges(false);
+      toast.success('User details updated successfully');
+      setHasDetailsChanges(false);
     } catch (error) {
-      console.error('Failed to update user', error);
-      toast.error('Failed to update user');
+      console.error('Failed to update user details', error);
+      toast.error('Failed to update user details');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSavePermissions = async () => {
+    if (!userId || !user) return;
+    
+    setIsSaving(true);
+    try {
+      // Calculate sparse overrides
+      let finalPermissions: string | null = null;
+      
+      if (formData.permissions) {
+        const currentPerms = JSON.parse(formData.permissions);
+        const sparsePerms: UserPermissions = {};
+        let hasOverrides = false;
+
+        Object.keys(currentPerms).forEach(key => {
+          const scope = key as PermissionScope;
+          const userScope = currentPerms[scope];
+          const roleScope = selectedRolePermissions?.[scope];
+
+          // Compare userScope with roleScope
+          // We need to save if:
+          // 1. Enabled state differs
+          // 2. Actions differ
+          // 3. Scope exists in user but not in role (unlikely given how editor works, but possible)
+          
+          if (!roleScope) {
+             // If role doesn't have it, and user enabled it, save it.
+             if (userScope?.enabled) {
+               sparsePerms[scope] = userScope;
+               hasOverrides = true;
+             }
+             return;
+          }
+
+          const enabledChanged = userScope.enabled !== roleScope.enabled;
+          
+          // Sort actions to compare arrays
+          const userActions = [...(userScope.actions || [])].sort();
+          const roleActions = [...(roleScope.actions || [])].sort();
+          const actionsChanged = JSON.stringify(userActions) !== JSON.stringify(roleActions);
+
+          if (enabledChanged || actionsChanged) {
+            sparsePerms[scope] = userScope;
+            hasOverrides = true;
+          }
+        });
+
+        if (hasOverrides) {
+          finalPermissions = JSON.stringify(sparsePerms);
+        }
+      }
+
+      await updateUser.mutateAsync({
+        authUserId: userId,
+        userData: {
+          // Only update permissions
+          permissions: finalPermissions as string // Cast to match type, though null is valid for clearing
+        }
+      });
+      
+      toast.success('Permissions updated successfully');
+      setHasPermissionsChanges(false);
+      // Update local state to reflect that current permissions are now the saved overrides
+      // Actually, we should reload or keep as is? 
+      // If we saved sparse overrides, we should probably keep the full object in state 
+      // so the editor doesn't jump, BUT the editor expects "permissionsJson" to be the overrides?
+      // No, editor takes `permissionsJson` and `rolePermissions`.
+      // If we pass sparse overrides to editor, it will merge them with rolePermissions for display.
+      // So updating `formData.permissions` to `finalPermissions` is correct.
+      setFormData(prev => ({ ...prev, permissions: finalPermissions || '' }));
+
+    } catch (error) {
+      console.error('Failed to update permissions', error);
+      toast.error('Failed to update permissions');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetPermissions = async () => {
+    if (!confirm('Are you sure you want to reset all permissions to the role defaults?')) return;
+    
+    setFormData(prev => ({ ...prev, permissions: '' }));
+    setHasPermissionsChanges(true);
+    // We could auto-save here or let user click save. 
+    // "resetting of users overrides to organization role one" implies saving.
+    // Let's just update state and let user save to be safe/consistent with "Save Permissions" button.
+    // Or if the requirement implies an action: "add a reset roles button to allow resseting... this will clear the overrides"
+    // I'll make it just update state for now, user hits Save.
   };
 
   if (isUserLoading) {
@@ -223,8 +315,8 @@ export default function UserDetails() {
               Cancel
             </Button>
             <Button 
-              onClick={handleSave} 
-              disabled={!hasChanges || isSaving}
+              onClick={handleSaveDetails} 
+              disabled={!hasDetailsChanges || isSaving}
             >
               {isSaving ? (
                 <>
@@ -331,14 +423,50 @@ export default function UserDetails() {
 
         {/* Right Column - Permissions */}
         <div className="space-y-6 lg:col-span-2">
-          <UserPermissionsEditor 
-            role={formData.role}
-            permissionsJson={formData.permissions}
-            rolePermissions={selectedRolePermissions}
-            onChange={(newJson) => handleInputChange('permissions', newJson)}
-            readOnly={!canEdit}
-            availablePermissions={getVisiblePermissions()}
-          />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="space-y-1">
+                <CardTitle>Page Access & Permissions</CardTitle>
+                <CardDescription>
+                  Configure detailed access rights. Uncheck to inherit from role.
+                </CardDescription>
+              </div>
+              {canEdit && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetPermissions}
+                    disabled={isSaving || !formData.permissions}
+                  >
+                    Reset to Defaults
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSavePermissions}
+                    disabled={!hasPermissionsChanges || isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Save Permissions
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              <UserPermissionsEditor 
+                role={formData.role}
+                permissionsJson={formData.permissions}
+                rolePermissions={selectedRolePermissions}
+                onChange={(newJson) => handleInputChange('permissions', newJson)}
+                readOnly={!canEdit}
+                availablePermissions={getVisiblePermissions()}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

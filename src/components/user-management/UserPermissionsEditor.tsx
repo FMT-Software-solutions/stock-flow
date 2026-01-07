@@ -50,9 +50,7 @@ export function UserPermissionsEditor({
 
   const handleScopeToggle = (scope: PermissionScope, enabled: boolean) => {
     if (readOnly) return;
-    // If rolePermissions is provided, scope enablement is locked to the role
-    if (rolePermissions && rolePermissions[scope]?.enabled !== undefined) return;
-
+    
     const currentScope = permissions[scope] || { enabled: false, actions: [] };
     
     const newPermissions = {
@@ -138,14 +136,13 @@ export function UserPermissionsEditor({
 
           const availableActions = availablePermissions[scope]?.actions || [];
           
-          // If rolePermissions is provided, use it to determine if scope is enabled
-          const isEnabled = rolePermissions 
-            ? (rolePermissions[scope]?.enabled || false)
-            : (userScope?.enabled || false);
+          // If userScope is present (override), use it. Otherwise fall back to rolePermissions.
+          const isEnabled = userScope
+            ? (userScope.enabled || false)
+            : (rolePermissions?.[scope]?.enabled || false);
 
-          // If rolePermissions is provided, the switch is disabled (locked to role)
-          // Unless readOnly is already true
-          const isSwitchDisabled = readOnly || (!!rolePermissions && rolePermissions[scope]?.enabled !== undefined);
+          // Switch is only disabled if readOnly is true
+          const isSwitchDisabled = readOnly;
 
           return (
             <Card key={scope} className={isEnabled ? 'border-primary/20' : 'opacity-75'}>
@@ -207,10 +204,12 @@ export function UserPermissionsEditor({
                         ? (childUserScope.actions || []) 
                         : (rolePermissions?.[child]?.actions || []);
                       const childAvailableActions = availablePermissions[child]?.actions || [];
-                      const childEnabled = rolePermissions 
-                        ? (rolePermissions[child]?.enabled || false)
-                        : (childUserScope?.enabled || false);
-                      const childSwitchDisabled = readOnly || !isEnabled || (!!rolePermissions && rolePermissions[child]?.enabled !== undefined);
+                      
+                      const childEnabled = childUserScope
+                        ? (childUserScope.enabled || false)
+                        : (rolePermissions?.[child]?.enabled || false);
+
+                      const childSwitchDisabled = readOnly || !isEnabled;
 
                       return (
                         <Card key={child} className={childEnabled && isEnabled ? 'border-primary/20' : 'opacity-75'}>

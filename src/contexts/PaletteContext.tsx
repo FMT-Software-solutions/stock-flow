@@ -1,27 +1,26 @@
-import { createContext, useContext, useEffect, useMemo } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CompleteTheme } from '@/types/theme';
 import { useOrganization } from './OrganizationContext';
 import { PREDEFINED_PALETTES } from '@/data/predefined-palettes';
 import { themeMap } from '@/themes';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { applyTheme, batchUpdateThemeProperties } from '@/utils/theme-util';
+import { getOrgTheme, setOrgTheme } from '@/lib/dexie';
 
 export interface PaletteContextType {
   selectedTheme: CompleteTheme | null;
   selectedThemeKey: string;
   applySelectedTheme: (themeKey: string) => void;
-  updateThemeColor: (colorKey: string, value: string, mode: 'light' | 'dark') => void;
+  updateThemeColor: (
+    colorKey: string,
+    value: string,
+    mode: 'light' | 'dark'
+  ) => void;
   resetToOrganizationTheme: () => void;
   allThemes: Record<string, CompleteTheme>;
 }
 
 const PaletteContext = createContext<PaletteContextType | undefined>(undefined);
-
-const STORAGE_KEYS = {
-  ORG_SELECTED_THEME_PREFIX: 'fmt-org-theme-',
-  SELECTED_THEME_KEY: 'fmt-org-theme-key-',
-};
 
 interface PaletteProviderProps {
   children: ReactNode;
@@ -29,17 +28,10 @@ interface PaletteProviderProps {
 
 export function PaletteProvider({ children }: PaletteProviderProps) {
   const { selectedOrgId, currentOrganization } = useOrganization();
-  const orgTheme = `${STORAGE_KEYS.ORG_SELECTED_THEME_PREFIX}${selectedOrgId}`;
-  const orgThemeKey = `${STORAGE_KEYS.SELECTED_THEME_KEY}${selectedOrgId}`;
-
-  const [
-    selectedTheme,
-    setSelectedTheme,
-  ] = useLocalStorage<CompleteTheme | null>(orgTheme, null);
-  const [selectedThemeKey, setSelectedThemeKey] = useLocalStorage<string>(
-    orgThemeKey,
-    ''
+  const [selectedTheme, setSelectedTheme] = useState<CompleteTheme | null>(
+    null
   );
+  const [selectedThemeKey, setSelectedThemeKey] = useState<string>('');
 
   // Combine predefined palettes with themes from themes folder
   const allThemes = useMemo(() => {
@@ -53,35 +45,45 @@ export function PaletteProvider({ children }: PaletteProviderProps) {
     return combined;
   }, []);
 
-  // Load and apply theme from localStorage or organization on mount
   useEffect(() => {
     const loadTheme = () => {
       if (selectedOrgId || currentOrganization) {
-        const savedOrgTheme = localStorage.getItem(orgTheme);
-
-        if (savedOrgTheme) {
-          const parsedTheme: CompleteTheme = JSON.parse(savedOrgTheme);
-          try {
-            setSelectedTheme(parsedTheme);
-            setSelectedThemeKey(parsedTheme.id);
-            applyTheme(parsedTheme);
-          } catch (error) {
-            console.error('Error parsing saved organization palette:', error);
-            // Fallback to organization's brand colors
+        if (selectedOrgId) {
+          getOrgTheme(selectedOrgId).then((row) => {
+            if (row) {
+              setSelectedTheme(row.selectedTheme);
+              setSelectedThemeKey(row.selectedThemeKey);
+              applyTheme(row.selectedTheme);
+              return;
+            }
             if (currentOrganization?.brand_colors) {
               setSelectedTheme(currentOrganization.brand_colors);
               setSelectedThemeKey(currentOrganization.brand_colors.id);
               applyTheme(currentOrganization.brand_colors);
+              setOrgTheme(
+                selectedOrgId,
+                currentOrganization.brand_colors.id,
+                currentOrganization.brand_colors
+              );
+              return;
             }
-          }
+            const defaultTheme = PREDEFINED_PALETTES['default'];
+            setSelectedTheme(defaultTheme);
+            setSelectedThemeKey('default');
+            applyTheme(defaultTheme);
+          });
         } else if (currentOrganization?.brand_colors) {
-          // Use organization's brand colors
           setSelectedTheme(currentOrganization.brand_colors);
           setSelectedThemeKey(currentOrganization.brand_colors.id);
           applyTheme(currentOrganization.brand_colors);
+          const orgId = currentOrganization.id;
+          setOrgTheme(
+            orgId,
+            currentOrganization.brand_colors.id,
+            currentOrganization.brand_colors
+          );
         }
       } else {
-        // use default theme
         const defaultTheme = PREDEFINED_PALETTES['default'];
         setSelectedTheme(defaultTheme);
         setSelectedThemeKey('default');
@@ -90,41 +92,48 @@ export function PaletteProvider({ children }: PaletteProviderProps) {
     };
 
     loadTheme();
-  }, [selectedOrgId]);
+  }, [selectedOrgId, currentOrganization?.id]);
 
   const applySelectedTheme = (themeKey: string) => {
-    const selectedTheme = allThemes[themeKey];
-
-    if (selectedTheme) {
-      setSelectedTheme(selectedTheme);
+    const nextTheme = allThemes[themeKey];
+    if (nextTheme) {
+      setSelectedTheme(nextTheme);
       setSelectedThemeKey(themeKey);
-      applyTheme(selectedTheme);
+      applyTheme(nextTheme);
+      const orgId = selectedOrgId || currentOrganization?.id;
+      if (orgId) {
+        setOrgTheme(orgId, themeKey, nextTheme);
+      }
     }
   };
 
-  const updateThemeColor = (colorKey: string, value: string, mode: 'light' | 'dark') => {
+  const updateThemeColor = (
+    colorKey: string,
+    value: string,
+    mode: 'light' | 'dark'
+  ) => {
     if (!selectedTheme) return;
 
-    // Create updated theme with new color and change name to "custom"
     const updatedTheme = {
       ...selectedTheme,
       id: 'custom',
       name: 'Custom',
       [mode]: {
         ...selectedTheme[mode],
-        [colorKey]: value
-      }
+        [colorKey]: value,
+      },
     };
 
-    // Update local state
     setSelectedTheme(updatedTheme);
     setSelectedThemeKey('custom');
-
-    // Update DOM with the specific color change
     batchUpdateThemeProperties({
       colors: { [colorKey]: value },
-      isDark: mode === 'dark'
+      isDark: mode === 'dark',
     });
+    const orgId = selectedOrgId || currentOrganization?.id;
+    if (orgId) {
+      setOrgTheme(orgId, 'custom', updatedTheme);
+    }
   };
 
   const resetToOrganizationTheme = () => {
@@ -132,6 +141,14 @@ export function PaletteProvider({ children }: PaletteProviderProps) {
       setSelectedTheme(currentOrganization.brand_colors);
       setSelectedThemeKey(currentOrganization.brand_colors.id);
       applyTheme(currentOrganization.brand_colors);
+      const orgId = selectedOrgId || currentOrganization.id;
+      if (orgId) {
+        setOrgTheme(
+          orgId,
+          currentOrganization.brand_colors.id,
+          currentOrganization.brand_colors
+        );
+      }
     }
   };
 

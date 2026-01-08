@@ -19,6 +19,7 @@ import type {
 } from '../types/organizations';
 import { useAuth } from './AuthContext';
 import { buildUserPermissions } from '@/modules/permissions';
+import { setOrgTheme } from '@/lib/dexie';
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
   undefined
@@ -50,25 +51,25 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     refetch: refreshOrganizations,
   } = useUserOrganizationsV2(user?.id);
 
-  const userOrganizations: OrganizationWithRole[] = (userOrganizationsRaw as any[]).map((item) => {
-    const effective =
-      item.effective_permissions ||
-      buildUserPermissions(
-        item.user_role,
-        item.user_overrides || undefined,
-        item.base_role_permissions || {}
-      );
-    return {
-      ...item.organization,
-      user_role: item.user_role as OrganizationRole,
-      role_id: item.role_id ?? null,
-      role_name: item.role_name ?? null,
-      permissions: JSON.stringify(effective),
-      branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
-    } as OrganizationWithRole;
-  });
-
-
+  const userOrganizations: OrganizationWithRole[] = (userOrganizationsRaw as any[]).map(
+    (item) => {
+      const effective =
+        item.effective_permissions ||
+        buildUserPermissions(
+          item.user_role,
+          item.user_overrides || undefined,
+          item.base_role_permissions || {}
+        );
+      return {
+        ...item.organization,
+        user_role: item.user_role as OrganizationRole,
+        role_id: item.role_id ?? null,
+        role_name: item.role_name ?? null,
+        permissions: JSON.stringify(effective),
+        branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
+      } as OrganizationWithRole;
+    }
+  );
 
   const createOrganizationMutation = useCreateOrganization();
   const updateOrganizationMutation = useUpdateOrganization();
@@ -108,6 +109,13 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       }
       if (currentOrganization?.id !== organization.id) {
         setCurrentOrganization(organization);
+        if (organization.brand_colors) {
+          await setOrgTheme(
+            organization.id,
+            organization.brand_colors.id,
+            organization.brand_colors
+          );
+        }
       }
     }
   };

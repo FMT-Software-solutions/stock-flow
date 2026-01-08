@@ -19,7 +19,7 @@ import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Branch } from '@/types';
-import { useBranchesPreferences } from '@/hooks/useBranchesPreferences';
+import { useBranchesPreferences } from '@/hooks/preferences/useBranchesPreferences';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 

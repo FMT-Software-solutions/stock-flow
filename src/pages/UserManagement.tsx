@@ -15,7 +15,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUserBranches } from '@/hooks/useBranchQueries';
 import { useUserActions } from '@/hooks/useUserActions';
 import { useUserQueries } from '@/hooks/useUserQueries';
-import { useUsersPreferences } from '@/hooks/useUsersPreferences';
+import { useUsersPreferences } from '@/hooks/preferences/useUsersPreferences';
 import type { UserAction } from '@/types/user-management';
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';

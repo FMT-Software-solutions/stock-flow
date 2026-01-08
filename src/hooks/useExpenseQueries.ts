@@ -234,6 +234,7 @@ export function useExpenses(organizationId?: string, branchIds?: string[]) {
       return data.map(mapExpenseFromDB);
     },
     enabled: !!organizationId,
+    placeholderData: (prev) => prev ?? [],
   });
 }
 

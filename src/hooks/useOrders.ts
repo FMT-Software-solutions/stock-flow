@@ -29,6 +29,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
       return data as Order[];
     },
     enabled: !!organizationId,
+    placeholderData: (prev) => prev ?? [],
   });
 }
 

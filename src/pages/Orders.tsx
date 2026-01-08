@@ -18,7 +18,7 @@ import {
 } from './orders/fields';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 import type { Order } from '@/types/orders';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 
 export function Orders() {
   const navigate = useNavigate();
@@ -86,8 +86,9 @@ export function Orders() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [summaryMode, setSummaryMode] = useLocalStorage<'filtered' | 'all'>(
-    `stockflow-orders-summary-mode-${currentOrganization?.id || 'global'}`,
+  const [summaryMode, setSummaryMode] = useOrgPreference<'filtered' | 'all'>(
+    currentOrganization?.id,
+    'orders.summaryMode',
     'filtered'
   );
   const summaryData = summaryMode === 'filtered' ? filteredOrders : orders;
@@ -121,6 +122,7 @@ export function Orders() {
         data={summaryData}
         storageKey="stockflow-orders-stats-container-is-open"
         summaryLabel="Order Summary"
+        orgId={currentOrganization?.id}
         summaryMode={summaryMode}
         onSummaryModeChange={setSummaryMode}
       />
@@ -134,6 +136,7 @@ export function Orders() {
           exportFields={orderExportFields}
           storageKey="stockflow-orders-table"
           canExport={canExportOrders}
+          orgId={currentOrganization?.id}
           onRowClick={handleRowClick}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
         />

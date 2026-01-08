@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { getOrgKV, setOrgKV } from '@/lib/dexie';
 
 export type DisplayMode = 'grid' | 'table';
 
@@ -8,32 +9,29 @@ export function useBranchesPreferences() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('grid');
   const [pageSize, setPageSize] = useState(10);
 
-  // Load preferences when organization changes
   useEffect(() => {
     if (currentOrganization?.id) {
-      const savedDisplayMode = localStorage.getItem(`branches-display-mode-${currentOrganization.id}`);
-      const savedPageSize = localStorage.getItem(`branches-page-size-${currentOrganization.id}`);
-      
-      if (savedDisplayMode) {
-        setDisplayMode(savedDisplayMode as DisplayMode);
-      }
-      if (savedPageSize) {
-        setPageSize(parseInt(savedPageSize, 10));
-      }
+      const orgId = currentOrganization.id;
+      getOrgKV<DisplayMode>(orgId, 'branches.displayMode').then((dm) => {
+        if (dm) setDisplayMode(dm);
+        else setOrgKV<DisplayMode>(orgId, 'branches.displayMode', 'grid').catch(() => { });
+      });
+      getOrgKV<number>(orgId, 'branches.pageSize').then((ps) => {
+        if (typeof ps === 'number') setPageSize(ps);
+        else setOrgKV<number>(orgId, 'branches.pageSize', 10).catch(() => { });
+      });
     }
   }, [currentOrganization?.id]);
 
-  // Save display mode when it changes
   useEffect(() => {
     if (currentOrganization?.id) {
-      localStorage.setItem(`branches-display-mode-${currentOrganization.id}`, displayMode);
+      setOrgKV<DisplayMode>(currentOrganization.id, 'branches.displayMode', displayMode).catch(() => { });
     }
   }, [displayMode, currentOrganization?.id]);
 
-  // Save page size when it changes
   useEffect(() => {
     if (currentOrganization?.id) {
-      localStorage.setItem(`branches-page-size-${currentOrganization.id}`, pageSize.toString());
+      setOrgKV<number>(currentOrganization.id, 'branches.pageSize', pageSize).catch(() => { });
     }
   }, [pageSize, currentOrganization?.id]);
 

@@ -33,7 +33,7 @@ import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Product, InventoryEntry } from '@/types/inventory';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 
 import {
   Command,
@@ -176,18 +176,20 @@ export function Inventory() {
 
   const categoryExportFields = getCategoryExportFields(products);
 
-  const [inventoryFiltered, setInventoryFiltered] = useState<InventoryEntry[]>([]);
+  const [inventoryFiltered, setInventoryFiltered] = useState<InventoryEntry[]>(
+    []
+  );
   const [productsFiltered, setProductsFiltered] = useState<Product[]>([]);
-  const [inventorySummaryMode, setInventorySummaryMode] = useLocalStorage<'filtered' | 'all'>(
-    `stockflow-inventory-summary-mode-${currentOrganization?.id || 'global'}`,
-    'filtered'
-  );
-  const [productsSummaryMode, setProductsSummaryMode] = useLocalStorage<'filtered' | 'all'>(
-    `stockflow-products-summary-mode-${currentOrganization?.id || 'global'}`,
-    'filtered'
-  );
-  const inventorySummaryData = inventorySummaryMode === 'filtered' ? inventoryFiltered : inventoryEntries;
-  const productsSummaryData = productsSummaryMode === 'filtered' ? productsFiltered : products;
+  const [inventorySummaryMode, setInventorySummaryMode] = useOrgPreference<
+    'filtered' | 'all'
+  >(currentOrganization?.id, 'inventory.summaryMode', 'filtered');
+  const [productsSummaryMode, setProductsSummaryMode] = useOrgPreference<
+    'filtered' | 'all'
+  >(currentOrganization?.id, 'products.summaryMode', 'filtered');
+  const inventorySummaryData =
+    inventorySummaryMode === 'filtered' ? inventoryFiltered : inventoryEntries;
+  const productsSummaryData =
+    productsSummaryMode === 'filtered' ? productsFiltered : products;
 
   return (
     <div className="space-y-6">
@@ -316,6 +318,7 @@ export function Inventory() {
                 data={inventorySummaryData}
                 summaryLabel="Inventory Summary"
                 storageKey="stockflow-inventory-stats-container-is-open"
+                orgId={currentOrganization?.id}
                 summaryMode={inventorySummaryMode}
                 onSummaryModeChange={setInventorySummaryMode}
               />
@@ -328,7 +331,10 @@ export function Inventory() {
                 storageKey="inventory-entries-table"
                 defaultColumnVisibility={{ searchable: false }}
                 canExport={canExportInventory}
-                onFilteredDataChange={(rows) => setInventoryFiltered(rows as InventoryEntry[])}
+                orgId={currentOrganization?.id}
+                onFilteredDataChange={(rows) =>
+                  setInventoryFiltered(rows as InventoryEntry[])
+                }
               />
             </>
           )}
@@ -341,6 +347,7 @@ export function Inventory() {
                 data={productsSummaryData}
                 summaryLabel="Product Summary"
                 storageKey="stockflow-products-stats-container-is-open"
+                orgId={currentOrganization?.id}
                 summaryMode={productsSummaryMode}
                 onSummaryModeChange={setProductsSummaryMode}
               />
@@ -352,7 +359,10 @@ export function Inventory() {
                 exportFields={productExportFields}
                 storageKey="inventory-products-table"
                 canExport={canExportProducts}
-                onFilteredDataChange={(rows) => setProductsFiltered(rows as Product[])}
+                orgId={currentOrganization?.id}
+                onFilteredDataChange={(rows) =>
+                  setProductsFiltered(rows as Product[])
+                }
               />
             </>
           )}

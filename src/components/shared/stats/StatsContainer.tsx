@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronsUpDown } from 'lucide-react';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import {
   Select,
   SelectContent,
@@ -25,6 +25,7 @@ interface StatsContainerProps<TData> {
   collapsible?: boolean;
   summaryMode?: 'filtered' | 'all';
   onSummaryModeChange?: (mode: 'filtered' | 'all') => void;
+  orgId?: string;
 }
 
 export function StatsContainer<TData>({
@@ -36,8 +37,9 @@ export function StatsContainer<TData>({
   collapsible = true,
   summaryMode,
   onSummaryModeChange,
+  orgId,
 }: StatsContainerProps<TData>) {
-  const [isOpen, setIsOpen] = useLocalStorage(storageKey, true);
+  const [isOpen, setIsOpen] = useOrgPreference<boolean>(orgId, `stats.${storageKey}.isOpen`, true);
 
   const content = (
     <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>

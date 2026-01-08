@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -38,7 +38,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { setOrgKV } from '@/lib/dexie';
+import { useOrgArrayPreference } from '@/hooks/preferences/useOrgArrayPreference';
 import { useProducts, useInventoryEntries } from '@/hooks/useInventoryQueries';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -259,8 +260,9 @@ export function Dashboard() {
   const [customersDateRange, setCustomersDateRange] = useState<DateRange | undefined>(undefined);
   
   // Visibility State
-  const [visibleSections, setVisibleSections] = useLocalStorage<SectionId[]>(
-    'dashboard-visible-sections',
+  const [visibleSections, setVisibleSections] = useOrgArrayPreference<SectionId>(
+    currentOrganization?.id,
+    'dashboard.visibleSections',
     ALL_SECTIONS.map(s => s.id)
   );
 
@@ -509,11 +511,14 @@ export function Dashboard() {
   ];
 
   const toggleSection = (id: SectionId) => {
-    setVisibleSections(prev => 
-      prev.includes(id) 
-        ? prev.filter(x => x !== id)
-        : [...prev, id]
-    );
+    setVisibleSections(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      const orgId = currentOrganization?.id;
+      if (orgId) {
+        setOrgKV<SectionId[]>(orgId, 'dashboard.visibleSections', next).catch(() => {});
+      }
+      return next;
+    });
   };
 
   return (

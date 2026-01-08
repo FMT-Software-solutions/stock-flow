@@ -14,7 +14,7 @@ import { getExpenseStatsGroups } from './expenses/fields';
 import { useMemo } from 'react';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Expense } from '@/types/expenses';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 
 export function Expenses() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -35,8 +35,9 @@ export function Expenses() {
   const canManageTypes = checkPermission('expense_types');
 
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
-  const [summaryMode, setSummaryMode] = useLocalStorage<'filtered' | 'all'>(
-    `stockflow-expenses-summary-mode-${currentOrganization?.id || 'global'}`,
+  const [summaryMode, setSummaryMode] = useOrgPreference<'filtered' | 'all'>(
+    currentOrganization?.id,
+    'expenses.summaryMode',
     'filtered'
   );
   const summaryData = summaryMode === 'filtered' ? filteredExpenses : expenses;
@@ -69,6 +70,7 @@ export function Expenses() {
         data={summaryData}
         storageKey="expenses-stats-is-open"
         summaryLabel="Expenses Summary"
+        orgId={currentOrganization?.id}
         summaryMode={summaryMode}
         onSummaryModeChange={setSummaryMode}
       />

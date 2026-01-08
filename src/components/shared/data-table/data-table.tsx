@@ -26,6 +26,7 @@ import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar } from "./data-table-toolbar"
 import { type DataTableFilterField } from "@/types/data-table"
 import type { ExportField } from "@/hooks/useExport"
+import { useOrgTablePreferences } from "@/hooks/preferences/useOrgTablePreferences"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -38,6 +39,7 @@ interface DataTableProps<TData, TValue> {
   defaultColumnVisibility?: VisibilityState
   canExport?: boolean
   onFilteredDataChange?: (rows: TData[]) => void
+  orgId?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -51,56 +53,22 @@ export function DataTable<TData, TValue>({
   defaultColumnVisibility = {},
   canExport = true,
   onFilteredDataChange,
+  orgId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>(() => {
-      if (storageKey) {
-        try {
-          const item = window.localStorage.getItem(`${storageKey}-visibility`)
-          return item ? { ...defaultColumnVisibility, ...JSON.parse(item) } : defaultColumnVisibility
-        } catch (e) {
-          return defaultColumnVisibility
-        }
-      }
-      return defaultColumnVisibility
-    })
+  const { columnVisibility, setColumnVisibility, pageSize, setPageSize } =
+    useOrgTablePreferences(orgId, storageKey, defaultColumnVisibility, 10)
   const [rowSelection, setRowSelection] = React.useState({})
-  const [pagination, setPagination] = React.useState<PaginationState>(() => {
-    if (storageKey) {
-      try {
-        const item = window.localStorage.getItem(`${storageKey}-pagination`)
-        if (item) {
-          const parsed = JSON.parse(item)
-          return { pageIndex: 0, pageSize: parsed.pageSize || 10 }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    return { pageIndex: 0, pageSize: 10 }
-  })
-
+  const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize })
   React.useEffect(() => {
-    if (storageKey) {
-      window.localStorage.setItem(
-        `${storageKey}-visibility`,
-        JSON.stringify(columnVisibility)
-      )
-    }
-  }, [columnVisibility, storageKey])
-
+    setPagination((prev) => ({ ...prev, pageSize }))
+  }, [pageSize])
   React.useEffect(() => {
-    if (storageKey) {
-      window.localStorage.setItem(
-        `${storageKey}-pagination`,
-        JSON.stringify({ pageSize: pagination.pageSize })
-      )
-    }
-  }, [pagination.pageSize, storageKey])
+    setPageSize(pagination.pageSize)
+  }, [pagination.pageSize])
 
   const table = useReactTable({
     data,

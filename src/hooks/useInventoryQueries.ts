@@ -120,6 +120,7 @@ export function useProducts(organizationId?: string) {
       return data.map(mapProductFromDB);
     },
     enabled: !!organizationId,
+    placeholderData: (prev) => prev ?? [],
   });
 }
 
@@ -834,6 +835,7 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
       return data.map(mapInventoryEntryFromDB);
     },
     enabled: !!organizationId,
+    placeholderData: (prev) => prev ?? [],
   });
 }
 

@@ -116,6 +116,29 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
       delete: 'Delete Expenses',
       export: 'Export Expenses',
     },
+    children: ['expense_categories', 'expense_types'],
+  },
+  expense_categories: {
+    label: 'Expense Categories',
+    description: 'Manage expense categories',
+    actions: {
+      create: 'Create Expense Categories',
+      edit: 'Edit Expense Categories',
+      delete: 'Delete Expense Categories',
+      export: 'Export Expense Categories',
+    },
+    parent: 'expenses',
+  },
+  expense_types: {
+    label: 'Expense Types',
+    description: 'Manage expense types',
+    actions: {
+      create: 'Create Expense Types',
+      edit: 'Edit Expense Types',
+      delete: 'Delete Expense Types',
+      export: 'Export Expense Types',
+    },
+    parent: 'expenses',
   },
   settings: {
 
@@ -151,6 +174,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: ['create', 'edit', 'delete', 'export'],
     reports: ['view', 'export'],
     expenses: ['create', 'edit', 'delete', 'export'],
+    expense_categories: ['create', 'edit', 'delete', 'export'],
+    expense_types: ['create', 'edit', 'delete', 'export'],
     settings: ['manage_org_details', 'view_org_appearance_prefs', 'manage_org_appearance_prefs', 'manage_notifications'],
   },
   admin: {
@@ -166,6 +191,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: ['create', 'edit', 'delete', 'export'],
     reports: ['view', 'export'],
     expenses: ['create', 'edit', 'delete', 'export'],
+    expense_categories: ['create', 'edit', 'delete', 'export'],
+    expense_types: ['create', 'edit', 'delete', 'export'],
     settings: ['manage_org_details', 'view_org_appearance_prefs', 'manage_org_appearance_prefs', 'manage_notifications'],
   },
   branch_admin: {
@@ -181,6 +208,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: ['create', 'edit', 'delete', 'export'],
     reports: ['view', 'export'],
     expenses: ['create', 'edit', 'delete', 'export'],
+    expense_categories: ['create', 'edit', 'delete', 'export'],
+    expense_types: ['create', 'edit', 'delete', 'export'],
     settings: ['view_org_appearance_prefs'],
   },
   write: {
@@ -194,6 +223,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: ['create', 'edit'],
     reports: ['view'],
     expenses: ['create', 'edit'],
+    expense_categories: ['create', 'edit'],
+    expense_types: ['create', 'edit'],
     // Editors cannot access user management
 
     // Editors cannot access branch management (implied "viewers can only see dashboard", editor usually similar unless specified)
@@ -210,6 +241,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: [],
     reports: [],
     expenses: [],
+    expense_categories: [],
+    expense_types: [],
     // Viewers can only see dashboard
   },
   custom: {
@@ -226,6 +259,8 @@ export const ROLE_ALLOWED_PERMISSIONS: RolePermissionsConfig = {
     suppliers: ['create', 'edit', 'delete', 'export'],
     reports: ['view', 'export'],
     expenses: ['create', 'edit', 'delete', 'export'],
+    expense_categories: ['create', 'edit', 'delete', 'export'],
+    expense_types: ['create', 'edit', 'delete', 'export'],
     settings: ['manage_org_details', 'view_org_appearance_prefs', 'manage_org_appearance_prefs', 'manage_notifications'],
   },
 };

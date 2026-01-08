@@ -4,9 +4,22 @@ import { DataTableColumnHeader } from "@/components/shared/data-table/data-table
 import { Badge } from "@/components/ui/badge"
 import { CurrencyDisplay } from "@/components/shared/CurrencyDisplay"
 import { format } from "date-fns"
+import { isDateInRange } from "@/lib/utils"
 import { ExpenseActions } from "./ExpenseActions"
 
 export const columns: ColumnDef<Expense>[] = [
+  {
+    id: "search",
+    accessorFn: (row) =>
+      [
+        row.description || "",
+        row.categoryName || "Uncategorized",
+        row.typeName || "Unknown Type",
+      ]
+        .join(" ")
+        .trim(),
+    enableHiding: false,
+  },
   {
     accessorKey: "date",
     header: ({ column }) => (
@@ -17,12 +30,7 @@ export const columns: ColumnDef<Expense>[] = [
       return <div>{format(new Date(date), "MMM dd, yyyy")}</div>
     },
     filterFn: (row, id, value) => {
-        const rowDate = new Date(row.getValue(id))
-        const { from, to } = value
-        if (!from) return true
-        if (to && rowDate > to) return false
-        if (rowDate < from) return false
-        return true
+      return isDateInRange(row.getValue(id), value)
     },
   },
   {
@@ -36,8 +44,10 @@ export const columns: ColumnDef<Expense>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Category" />
     ),
+    cell: ({ row }) => row.getValue("categoryName") || "Uncategorized",
     filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
+      const v = (row.getValue(id) as string) || "Uncategorized"
+      return value.includes(v)
     },
   },
   {
@@ -45,9 +55,10 @@ export const columns: ColumnDef<Expense>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Type" />
     ),
-    cell: ({ row }) => row.getValue("typeName") || "-",
+    cell: ({ row }) => row.getValue("typeName") || "Unknown Type",
     filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
+      const v = (row.getValue(id) as string) || "Unknown Type"
+      return value.includes(v)
     },
   },
   {

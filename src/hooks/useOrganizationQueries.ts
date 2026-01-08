@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../utils/supabase';
 import type {
   Organization,
-  OrganizationWithRole,
   CreateOrganizationData,
   UpdateOrganizationData,
   OrganizationRole,
@@ -18,7 +17,6 @@ import { buildUserPermissions } from '@/modules/permissions';
 // Query Keys
 export const organizationKeys = {
   all: ['organizations'] as const,
-  userOrganizations: (userId: string) => [...organizationKeys.all, 'user', userId] as const,
   userOrganizationsV2: (userId: string) => [...organizationKeys.all, 'user-v2', userId] as const,
   organization: (id: string) => [...organizationKeys.all, 'detail', id] as const,
 };
@@ -30,11 +28,13 @@ export function useUserOrganizationsV2(userId: string | undefined) {
       if (!userId) throw new Error('User ID is required');
       const { data, error } = await supabase.rpc('get_user_org_context', { user_id: userId });
       if (error) throw error;
-      const rows = Array.isArray(data) ? data : [];
-      return rows.map((item: any) => {
+      const rows: OrganizationContextItem[] = Array.isArray(data) ? (data as OrganizationContextItem[]) : [];
+      return rows.map((item: OrganizationContextItem) => {
         const basePerms = item.base_role_permissions || {};
         const overrides = item.user_overrides || undefined;
-        const effective = item.effective_permissions || buildUserPermissions(item.user_role as any, overrides, basePerms);
+        const effective =
+          item.effective_permissions ||
+          buildUserPermissions(item.user_role, overrides || undefined, basePerms);
         return {
           organization: item.organization as Organization,
           user_role: item.user_role as OrganizationRole,
@@ -50,125 +50,6 @@ export function useUserOrganizationsV2(userId: string | undefined) {
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-// Hook to fetch user organizations
-export function useUserOrganizations(userId: string | undefined) {
-  return useQuery({
-    queryKey: organizationKeys.userOrganizations(userId || ''),
-    queryFn: async (): Promise<OrganizationWithRole[]> => {
-      if (!userId) throw new Error('User ID is required');
-
-      const { data, error } = await supabase
-        .from('user_organizations')
-        .select(`
-          id,
-          role,
-          permissions,
-          role_id,
-          organization_role:organization_roles(
-            id,
-            name,
-            type,
-            permissions
-          ),
-          created_at,
-          updated_at,
-          organization:organizations!inner(
-            id,
-            name,
-            email,
-            phone,
-            logo,
-            address,
-            created_at,
-            updated_at,
-            currency,
-            logo_settings,
-            brand_colors,
-            notification_settings,
-            is_active,
-            ai_daily_limit
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('organization.is_active', true)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const organizations: OrganizationWithRole[] = await Promise.all(
-        (data || []).map(async item => {
-          const orgRole = Array.isArray(item.organization_role)
-            ? item.organization_role[0]
-            : item.organization_role;
-
-          const roleType = (orgRole?.type || item.role) as OrganizationRole;
-
-          let basePermissionsObj: any = {};
-          let customPermissionsObj: any = {};
-
-          try {
-            basePermissionsObj = orgRole?.permissions ? JSON.parse(orgRole.permissions) : {};
-          } catch {
-            basePermissionsObj = {};
-          }
-
-          try {
-            customPermissionsObj = item.permissions ? JSON.parse(item.permissions) : {};
-          } catch {
-            customPermissionsObj = {};
-          }
-
-          if (!basePermissionsObj || Object.keys(basePermissionsObj).length === 0) {
-            const { data: roleByType } = await supabase
-              .from('organization_roles')
-              .select('id,type,permissions')
-              .eq('organization_id', (item.organization as any)?.id)
-              .eq('type', roleType)
-              .limit(1);
-            const fallbackRole = Array.isArray(roleByType) ? roleByType[0] : roleByType;
-            try {
-              basePermissionsObj = fallbackRole?.permissions ? JSON.parse(fallbackRole.permissions) : {};
-            } catch {
-              basePermissionsObj = {};
-            }
-          }
-
-          const hasBase = basePermissionsObj && Object.keys(basePermissionsObj).length > 0;
-          const effectivePermissionsObj = buildUserPermissions(
-            roleType as any,
-            customPermissionsObj,
-            hasBase ? basePermissionsObj : undefined
-          );
-          if (import.meta.env.DEV) {
-            console.debug('org:effective-permissions', {
-              organizationId: (item.organization as any)?.id,
-              organizationName: (item.organization as any)?.name,
-              roleType,
-              baseScopes: Object.keys(basePermissionsObj || {}),
-              overrideScopes: Object.keys(customPermissionsObj || {}),
-              effectiveScopes: Object.keys(effectivePermissionsObj || {}),
-              usedFallbackDefaults: !hasBase
-            });
-          }
-          const effectivePermissions = JSON.stringify(effectivePermissionsObj);
-
-          return {
-            ...(item.organization as any),
-            user_role: roleType,
-            role_id: item.role_id,
-            role_name: orgRole?.name,
-            permissions: effectivePermissions,
-          };
-        })
-      );
-
-      return organizations;
-    },
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
@@ -217,9 +98,8 @@ export function useCreateOrganization() {
       return newOrg;
     },
     onSuccess: (_, { userId }) => {
-      // Invalidate and refetch user organizations
       queryClient.invalidateQueries({
-        queryKey: organizationKeys.userOrganizations(userId),
+        queryKey: organizationKeys.userOrganizationsV2(userId),
       });
     },
   });

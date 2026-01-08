@@ -98,7 +98,7 @@ export function UserTable({
               <TableHead>Branches</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Login</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="w-25">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -148,7 +148,7 @@ export function UserTable({
               <TableHead>Branches</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Login</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="w-25">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -206,7 +206,7 @@ export function UserTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="max-w-[150px] truncate">
+                    <div className="max-w-37.5 truncate">
                       <span
                         className={`text-sm ${
                           isInactive ? 'text-gray-400' : 'text-muted-foreground'

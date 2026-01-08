@@ -6,29 +6,22 @@ import { UserActionDialogs } from '@/components/user-management/UserActionDialog
 import { UserAddDialog } from '@/components/user-management/UserAddDialog';
 import { UserDisplayControls } from '@/components/user-management/UserDisplayControls';
 import { UserFiltersControls } from '@/components/user-management/UserFiltersControls';
-import { UserEditDialog } from '@/components/user-management/UserEditDialog';
 import { UserGrid } from '@/components/user-management/UserGrid';
 import { UserPagination } from '@/components/user-management/UserPagination';
 import { UserTable } from '@/components/user-management/UserTable';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUserBranches } from '@/hooks/useBranchQueries';
 import { useUserActions } from '@/hooks/useUserActions';
 import { useUserQueries } from '@/hooks/useUserQueries';
 import { useUsersPreferences } from '@/hooks/useUsersPreferences';
-import type { UserAction, UserWithRelations } from '@/types/user-management';
-import {
-  detectUserChanges,
-  logUserChanges,
-  transformUserUpdateData,
-} from '@/utils/user-update-utils';
+import type { UserAction } from '@/types/user-management';
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { buildUserPermissions } from '@/modules/permissions/utils';
-import type { UserRole } from '@/lib/auth';
+import { toast } from 'sonner';
+
 import { useDebounceValue } from '@/hooks/useDebounce';
 
 export default function UserManagement() {
@@ -50,10 +43,6 @@ export default function UserManagement() {
 
   // State for dialogs and forms
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithRelations | null>(
-    null
-  );
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounceValue(searchTerm, 1000);
 
@@ -75,13 +64,7 @@ export default function UserManagement() {
   } = useUsersPreferences();
 
   // Data fetching
-  const {
-    users,
-    branches,
-    isLoading,
-    createUser,
-    updateUser,
-  } = useUserQueries();
+  const { users, branches, isLoading, createUser } = useUserQueries();
 
   // Fetch current user's branch assignments for branch admin restrictions
   const { data: userBranches } = useUserBranches(
@@ -135,8 +118,6 @@ export default function UserManagement() {
 
     switch (action) {
       case 'edit':
-        // setEditingUser(user);
-        // setIsEditDialogOpen(true);
         navigate(`/users/${user.id}`);
         break;
       case 'deactivate':
@@ -206,9 +187,7 @@ export default function UserManagement() {
       // Pass roleId if available
       roleId: userData.roleId,
       // Use provided permissions (from role selection) or build defaults
-      permissions:
-        userData.permissions ||
-        JSON.stringify(buildUserPermissions(userData.role as UserRole)),
+      permissions: userData.permissions || '',
     };
 
     createUser.mutate(transformedData, {
@@ -221,48 +200,6 @@ export default function UserManagement() {
         toast.error(error.message || 'Failed to create user');
       },
     });
-  };
-
-  const handleUpdateUser = (userData: any) => {
-    if (!editingUser) return;
-
-    // Get active branch IDs for change detection
-    const activeBranchIds =
-      branches?.filter((b) => b.is_active).map((b) => b.id) || [];
-
-    // Detect what has actually changed
-    const changes = detectUserChanges(editingUser, userData, activeBranchIds);
-
-    // Log changes for debugging
-    logUserChanges(changes, editingUser.id);
-
-    // If no changes detected, show message and return
-    if (!changes.hasAnyChanges) {
-      toast.info('No changes detected');
-      return;
-    }
-
-    // Transform the form data for the API
-    const transformedData = transformUserUpdateData(userData, activeBranchIds);
-
-    updateUser.mutate(
-      {
-        authUserId: editingUser.id,
-        // profileId removed - now using unified IDs where authUserId is the same as profileId
-        userData: transformedData,
-      },
-      {
-        onSuccess: () => {
-          setIsEditDialogOpen(false);
-          setEditingUser(null);
-          toast.success('User updated successfully');
-        },
-        onError: (error) => {
-          console.error('Error updating user:', error);
-          toast.error(error.message || 'Failed to update user');
-        },
-      }
-    );
   };
 
   // Use custom hook for filtering, sorting, and pagination
@@ -399,21 +336,6 @@ export default function UserManagement() {
           isDefaultOpen={filters.status === 'inactive'}
         />
       )}
-
-      {/* Edit User Dialog */}
-      <UserEditDialog
-        isOpen={isEditDialogOpen}
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) {
-            setEditingUser(null);
-          }
-        }}
-        user={editingUser}
-        onSubmit={handleUpdateUser}
-        branches={availableBranches || []}
-        isLoading={updateUser.isPending}
-      />
 
       {/* User Action Dialogs */}
       <UserActionDialogs

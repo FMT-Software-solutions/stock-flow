@@ -51,18 +51,14 @@ export function ProductActions({ product }: ProductActionsProps) {
           <Copy className="mr-2 h-4 w-4" /> Copy Product ID
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {canViewProducts ? (
+        {canViewProducts && (
           <DropdownMenuItem asChild>
             <Link to={`/inventory/${product.id}`} className="flex items-center">
               <Eye className="mr-2 h-4 w-4" /> View Details
             </Link>
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem disabled>
-            <Eye className="mr-2 h-4 w-4" /> View Details
-          </DropdownMenuItem>
         )}
-        {canEditProducts ? (
+        {canEditProducts && (
           <DropdownMenuItem asChild>
             <Link
               to={`/inventory/${product.id}/edit`}
@@ -71,14 +67,16 @@ export function ProductActions({ product }: ProductActionsProps) {
               <Edit className="mr-2 h-4 w-4" /> Edit
             </Link>
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem disabled>
-            <Edit className="mr-2 h-4 w-4" /> Edit
+        )}
+        {canDeleteProducts && (
+          <DropdownMenuItem
+            onClick={handleDelete}
+            className="text-red-600"
+            disabled={!canDeleteProducts}
+          >
+            <Trash className="mr-2 h-4 w-4" /> Delete
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={handleDelete} className="text-red-600" disabled={!canDeleteProducts}>
-          <Trash className="mr-2 h-4 w-4" /> Delete
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

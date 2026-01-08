@@ -32,6 +32,8 @@ import { getProductStatsGroups } from './inventory/fields/productStats';
 import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import type { Product, InventoryEntry } from '@/types/inventory';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 import {
   Command,
@@ -174,6 +176,19 @@ export function Inventory() {
 
   const categoryExportFields = getCategoryExportFields(products);
 
+  const [inventoryFiltered, setInventoryFiltered] = useState<InventoryEntry[]>([]);
+  const [productsFiltered, setProductsFiltered] = useState<Product[]>([]);
+  const [inventorySummaryMode, setInventorySummaryMode] = useLocalStorage<'filtered' | 'all'>(
+    `stockflow-inventory-summary-mode-${currentOrganization?.id || 'global'}`,
+    'filtered'
+  );
+  const [productsSummaryMode, setProductsSummaryMode] = useLocalStorage<'filtered' | 'all'>(
+    `stockflow-products-summary-mode-${currentOrganization?.id || 'global'}`,
+    'filtered'
+  );
+  const inventorySummaryData = inventorySummaryMode === 'filtered' ? inventoryFiltered : inventoryEntries;
+  const productsSummaryData = productsSummaryMode === 'filtered' ? productsFiltered : products;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -298,9 +313,11 @@ export function Inventory() {
             <>
               <StatsContainer
                 groups={inventoryStatsGroups}
-                data={inventoryEntries}
+                data={inventorySummaryData}
                 summaryLabel="Inventory Summary"
                 storageKey="stockflow-inventory-stats-container-is-open"
+                summaryMode={inventorySummaryMode}
+                onSummaryModeChange={setInventorySummaryMode}
               />
               <DataTable
                 columns={inventoryColumns}
@@ -311,6 +328,7 @@ export function Inventory() {
                 storageKey="inventory-entries-table"
                 defaultColumnVisibility={{ searchable: false }}
                 canExport={canExportInventory}
+                onFilteredDataChange={(rows) => setInventoryFiltered(rows as InventoryEntry[])}
               />
             </>
           )}
@@ -320,9 +338,11 @@ export function Inventory() {
             <>
               <StatsContainer
                 groups={productStatsGroups}
-                data={products}
+                data={productsSummaryData}
                 summaryLabel="Product Summary"
                 storageKey="stockflow-products-stats-container-is-open"
+                summaryMode={productsSummaryMode}
+                onSummaryModeChange={setProductsSummaryMode}
               />
               <DataTable
                 columns={columns}
@@ -332,6 +352,7 @@ export function Inventory() {
                 exportFields={productExportFields}
                 storageKey="inventory-products-table"
                 canExport={canExportProducts}
+                onFilteredDataChange={(rows) => setProductsFiltered(rows as Product[])}
               />
             </>
           )}

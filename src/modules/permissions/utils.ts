@@ -6,7 +6,6 @@ import type {
 } from './types';
 import {
   ROLE_ALLOWED_PERMISSIONS,
-  ROLE_DEFAULT_PERMISSIONS,
   APP_PERMISSIONS,
 } from './config';
 
@@ -64,7 +63,7 @@ export function hasPermission(
  * 
  * @param role - The user's role
  * @param customPermissions - (Optional) Custom permissions stored in DB (user overrides)
- * @param basePermissions - (Optional) The organization's base permissions for this role. If not provided, uses static defaults.
+ * @param basePermissions - (Optional) The organization's base permissions for this role.
  * @returns UserPermissions
  */
 export function buildUserPermissions(
@@ -79,7 +78,7 @@ export function buildUserPermissions(
       customScopes: Object.keys(customPermissions || {}),
     });
   }
-  // 1. Start with base permissions (organization role or static defaults)
+  // 1. Start with base permissions (organization role)
   const result: UserPermissions = {};
 
   if (basePermissions) {
@@ -90,18 +89,6 @@ export function buildUserPermissions(
         result[scope] = {
           enabled: defaultScope.enabled,
           actions: [...defaultScope.actions]
-        };
-      }
-    });
-  } else {
-    // Fallback to static defaults which are arrays of actions
-    const defaults = ROLE_DEFAULT_PERMISSIONS[role] || {};
-    (Object.keys(defaults) as PermissionScope[]).forEach(scope => {
-      const defaultActions = defaults[scope];
-      if (defaultActions) {
-        result[scope] = {
-          enabled: true,
-          actions: [...defaultActions]
         };
       }
     });

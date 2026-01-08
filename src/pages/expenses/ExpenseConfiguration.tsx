@@ -38,10 +38,17 @@ import {
 } from '@/hooks/useExpenseQueries';
 import type { ExpenseCategory } from '@/types/expenses';
 import { toast } from 'sonner';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function ExpenseConfiguration() {
   const { currentOrganization } = useOrganization();
   const organizationId = currentOrganization?.id;
+  const { checkPermission } = useRoleCheck();
+  const canCreateCategory = checkPermission('expense_categories', 'create');
+  const canEditCategory = checkPermission('expense_categories', 'edit');
+  const canDeleteCategory = checkPermission('expense_categories', 'delete');
+  const canCreateType = checkPermission('expense_types', 'create');
+  const canDeleteType = checkPermission('expense_types', 'delete');
 
   const {
     data: categories = [],
@@ -198,55 +205,57 @@ export function ExpenseConfiguration() {
       <Card className="md:col-span-4 h-full flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl">Categories</CardTitle>
-          <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Category</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={newCategory.name || ''}
-                    onChange={(e) =>
-                      setNewCategory({
-                        ...newCategory,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={newCategory.description || ''}
-                    onChange={(e) =>
-                      setNewCategory({
-                        ...newCategory,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={handleAddCategory}
-                  disabled={createCategory.isPending}
-                >
-                  {createCategory.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Add Category
+          {canCreateCategory && (
+            <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="h-4 w-4" />
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Category</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input
+                      value={newCategory.name || ''}
+                      onChange={(e) =>
+                        setNewCategory({
+                          ...newCategory,
+                          name: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={newCategory.description || ''}
+                      onChange={(e) =>
+                        setNewCategory({
+                          ...newCategory,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={handleAddCategory}
+                    disabled={createCategory.isPending}
+                  >
+                    {createCategory.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Add Category
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0">
           <div className="mb-4 relative shrink-0">
@@ -280,28 +289,32 @@ export function ExpenseConfiguration() {
                     </p>
                   </div>
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditCategory(cat);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteCategory(cat.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEditCategory && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditCategory(cat);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDeleteCategory && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCategory(cat.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -324,49 +337,51 @@ export function ExpenseConfiguration() {
                 : 'Select a category to manage types'}
             </CardDescription>
           </div>
-          <Dialog open={isAddTypeOpen} onOpenChange={setIsAddTypeOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                disabled={!selectedCategoryId}
-                onClick={() => setNewTypeName('')}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Type
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Expense Type</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Input
-                    value={
-                      categories.find((c) => c.id === selectedCategoryId)
-                        ?.name || ''
-                    }
-                    disabled
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={newTypeName}
-                    onChange={(e) => setNewTypeName(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddType} disabled={createType.isPending}>
-                  {createType.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Add Type
+          {canCreateType && selectedCategoryId && (
+            <Dialog open={isAddTypeOpen} onOpenChange={setIsAddTypeOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  disabled={!selectedCategoryId}
+                  onClick={() => setNewTypeName('')}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Add Type
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Expense Type</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Input
+                      value={
+                        categories.find((c) => c.id === selectedCategoryId)
+                          ?.name || ''
+                      }
+                      disabled
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input
+                      value={newTypeName}
+                      onChange={(e) => setNewTypeName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddType} disabled={createType.isPending}>
+                    {createType.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Add Type
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0">
           {selectedCategoryId ? (
@@ -399,13 +414,15 @@ export function ExpenseConfiguration() {
                             {type.name}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteType(type.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                            </Button>
+                            {canDeleteType && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteType(type.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

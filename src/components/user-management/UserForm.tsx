@@ -181,7 +181,7 @@ export function UserForm({
       <div className='space-y-1'>
         <Label htmlFor="role">Role</Label>
         <Select key={`role-${formData.roleId}-${mode}`} value={formData.roleId} onValueChange={handleRoleChange}>
-          <SelectTrigger className='w-[250px]'>
+          <SelectTrigger className='w-62.5'>
             <SelectValue placeholder="Select Role" />
           </SelectTrigger>
           <SelectContent>

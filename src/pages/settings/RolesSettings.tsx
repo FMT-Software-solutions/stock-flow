@@ -134,60 +134,65 @@ export function RolesSettings() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {roles?.map((role) => (
-          <Card key={role.id} className="relative overflow-hidden">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    {role.name}
-                    {role.type !== 'custom' && (
-                      <Badge
-                        variant="secondary"
-                        className="text-xs font-normal"
+        {roles
+          ?.sort(
+            (a, b) =>
+              (a.type === 'custom' ? 1 : 0) - (b.type === 'custom' ? 1 : 0)
+          )
+          .map((role) => (
+            <Card key={role.id} className="relative overflow-hidden">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      {role.name}
+                      {role.type !== 'custom' && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs font-normal"
+                        >
+                          System
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2 min-h-5">
+                      {role.description || ''}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                    Access Configured
+                  </div>
+                  <div className="flex gap-1">
+                    {role.type !== 'owner' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleOpenEdit(role)}
                       >
-                        System
-                      </Badge>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                     )}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2 min-h-[20px]">
-                    {role.description || ''}
-                  </CardDescription>
+                    {role.type === 'custom' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setRoleToDelete(role)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ShieldCheck className="mr-1 h-3 w-3" />
-                  Access Configured
-                </div>
-                <div className="flex gap-1">
-                  {role.type !== 'owner' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleOpenEdit(role)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  {role.type === 'custom' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setRoleToDelete(role)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -254,6 +259,7 @@ export function RolesSettings() {
                 }
                 availablePermissions={allPossiblePermissions}
                 readOnly={editingRole?.type === 'owner'}
+                showResetButtons={false}
               />
             </div>
           </div>

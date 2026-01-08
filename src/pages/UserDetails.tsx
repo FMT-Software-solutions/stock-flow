@@ -11,7 +11,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { type UserRole } from '@/lib/auth';
 import { UserPermissionsEditor } from '@/components/user-management/UserPermissionsEditor';
-import { APP_PERMISSIONS, buildUserPermissions, getAllPossiblePermissions, type UserPermissions, type PermissionScope } from '@/modules/permissions';
+import { APP_PERMISSIONS, getAllPossiblePermissions, getAvailablePermissionsForRole, type UserPermissions, type PermissionScope, type PermissionAction } from '@/modules/permissions';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranches } from '@/hooks/useBranchQueries';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -44,6 +44,7 @@ export default function UserDetails() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [selectedRolePermissions, setSelectedRolePermissions] = useState<any>(null);
+  const [baselineOverrides, setBaselineOverrides] = useState<UserPermissions>({});
 
   useEffect(() => {
     if (user) {
@@ -61,9 +62,10 @@ export default function UserDetails() {
         roleDef = roles?.find(r => r.type === userRole && r.type !== 'custom');
       }
 
-      const basePermissions = roleDef ? JSON.parse(roleDef.permissions) : buildUserPermissions(userRole);
+      const basePermissions = roleDef ? JSON.parse(roleDef.permissions) : getAvailablePermissionsForRole(userRole);
       
       setSelectedRolePermissions(basePermissions);
+      setBaselineOverrides(userPermissions ? JSON.parse(userPermissions) : {});
 
       setFormData({
         firstName: user.profile.first_name || '',
@@ -80,11 +82,63 @@ export default function UserDetails() {
     }
   }, [user, roles]);
 
+  const normalizeSparseOverrides = (currentPerms: UserPermissions, rolePerms: UserPermissions): UserPermissions => {
+    const sparse: UserPermissions = {};
+    (Object.keys(currentPerms) as PermissionScope[]).forEach((key) => {
+      const userScope = currentPerms[key];
+      const roleScope = rolePerms?.[key];
+      if (!userScope) return;
+      if (!roleScope) {
+        if (userScope.enabled) {
+          const userActions = [...(userScope.actions || [])].sort() as PermissionAction[];
+          sparse[key] = { enabled: userScope.enabled, actions: userActions };
+        }
+        return;
+      }
+      const enabledChanged = userScope.enabled !== roleScope.enabled;
+      const userActions = [...(userScope.actions || [])].sort();
+      const roleActions = [...(roleScope.actions || [])].sort();
+      const actionsChanged = JSON.stringify(userActions) !== JSON.stringify(roleActions);
+      if (enabledChanged || actionsChanged) {
+        sparse[key] = { enabled: userScope.enabled, actions: userActions as PermissionAction[] };
+      }
+    });
+    return sparse;
+  };
+
+  const equalOverrides = (a: UserPermissions, b: UserPermissions): boolean => {
+    const aKeys = Object.keys(a) as PermissionScope[];
+    const bKeys = Object.keys(b) as PermissionScope[];
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+      const aScope = a[key];
+      const bScope = b[key];
+      if (!bScope || !aScope) return false;
+      if (!!aScope.enabled !== !!bScope.enabled) return false;
+      const aActs = [...(aScope.actions || [])].sort();
+      const bActs = [...(bScope.actions || [])].sort();
+      if (JSON.stringify(aActs) !== JSON.stringify(bActs)) return false;
+    }
+    return true;
+  };
+
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
     if (field === 'permissions') {
-      setHasPermissionsChanges(true);
+      try {
+        const raw = value ? JSON.parse(value) : {};
+        const normalized = normalizeSparseOverrides(raw, selectedRolePermissions || {});
+        const hasChanges = !equalOverrides(normalized, baselineOverrides);
+        setFormData(prev => ({ 
+          ...prev, 
+          permissions: Object.keys(normalized).length ? JSON.stringify(normalized) : '' 
+        }));
+        setHasPermissionsChanges(hasChanges);
+      } catch {
+        setFormData(prev => ({ ...prev, permissions: value }));
+        setHasPermissionsChanges(true);
+      }
     } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
       setHasDetailsChanges(true);
     }
   };
@@ -105,7 +159,8 @@ export default function UserDetails() {
       assignAllBranches: selectedRole.type === 'owner' ? true : prev.assignAllBranches
     }));
     setHasDetailsChanges(true);
-    setHasPermissionsChanges(true); // Marking permissions as changed because we reset them
+    setBaselineOverrides({});
+    setHasPermissionsChanges(false);
   };
 
   const handleSaveDetails = async () => {
@@ -121,7 +176,6 @@ export default function UserDetails() {
           role: formData.role,
           roleId: formData.roleId,
           branchIds: formData.selectedBranchIds,
-          // Do NOT send permissions here
         }
       });
       
@@ -140,50 +194,11 @@ export default function UserDetails() {
     
     setIsSaving(true);
     try {
-      // Calculate sparse overrides
       let finalPermissions: string | null = null;
-      
-      if (formData.permissions) {
-        const currentPerms = JSON.parse(formData.permissions);
-        const sparsePerms: UserPermissions = {};
-        let hasOverrides = false;
-
-        Object.keys(currentPerms).forEach(key => {
-          const scope = key as PermissionScope;
-          const userScope = currentPerms[scope];
-          const roleScope = selectedRolePermissions?.[scope];
-
-          // Compare userScope with roleScope
-          // We need to save if:
-          // 1. Enabled state differs
-          // 2. Actions differ
-          // 3. Scope exists in user but not in role (unlikely given how editor works, but possible)
-          
-          if (!roleScope) {
-             // If role doesn't have it, and user enabled it, save it.
-             if (userScope?.enabled) {
-               sparsePerms[scope] = userScope;
-               hasOverrides = true;
-             }
-             return;
-          }
-
-          const enabledChanged = userScope.enabled !== roleScope.enabled;
-          
-          // Sort actions to compare arrays
-          const userActions = [...(userScope.actions || [])].sort();
-          const roleActions = [...(roleScope.actions || [])].sort();
-          const actionsChanged = JSON.stringify(userActions) !== JSON.stringify(roleActions);
-
-          if (enabledChanged || actionsChanged) {
-            sparsePerms[scope] = userScope;
-            hasOverrides = true;
-          }
-        });
-
-        if (hasOverrides) {
-          finalPermissions = JSON.stringify(sparsePerms);
-        }
+      const currentPerms = formData.permissions ? JSON.parse(formData.permissions) : {};
+      const sparse = normalizeSparseOverrides(currentPerms, selectedRolePermissions || {});
+      if (Object.keys(sparse).length > 0) {
+        finalPermissions = JSON.stringify(sparse);
       }
 
       await updateUser.mutateAsync({
@@ -195,14 +210,8 @@ export default function UserDetails() {
       });
       
       toast.success('Permissions updated successfully');
+      setBaselineOverrides(sparse);
       setHasPermissionsChanges(false);
-      // Update local state to reflect that current permissions are now the saved overrides
-      // Actually, we should reload or keep as is? 
-      // If we saved sparse overrides, we should probably keep the full object in state 
-      // so the editor doesn't jump, BUT the editor expects "permissionsJson" to be the overrides?
-      // No, editor takes `permissionsJson` and `rolePermissions`.
-      // If we pass sparse overrides to editor, it will merge them with rolePermissions for display.
-      // So updating `formData.permissions` to `finalPermissions` is correct.
       setFormData(prev => ({ ...prev, permissions: finalPermissions || '' }));
 
     } catch (error) {
@@ -218,11 +227,6 @@ export default function UserDetails() {
     
     setFormData(prev => ({ ...prev, permissions: '' }));
     setHasPermissionsChanges(true);
-    // We could auto-save here or let user click save. 
-    // "resetting of users overrides to organization role one" implies saving.
-    // Let's just update state and let user save to be safe/consistent with "Save Permissions" button.
-    // Or if the requirement implies an action: "add a reset roles button to allow resseting... this will clear the overrides"
-    // I'll make it just update state for now, user hits Save.
   };
 
   if (isUserLoading) {
@@ -276,8 +280,7 @@ export default function UserDetails() {
         }
       }
     });
-    // If visible is empty (e.g. role has nothing enabled), we might want to return empty object
-    // effectively showing nothing.
+   
     return visible;
   };
 
@@ -304,34 +307,6 @@ export default function UserDetails() {
             </div>
           </div>
         </div>
-        
-        {canEdit && (
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/user-management')}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveDetails} 
-              disabled={!hasDetailsChanges || isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -417,6 +392,34 @@ export default function UserDetails() {
                   />
                 </div>
               )}
+
+              {canEdit && (
+                <div className="flex items-center justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/user-management')}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSaveDetails} 
+                    disabled={!hasDetailsChanges || isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Update Details
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -426,9 +429,9 @@ export default function UserDetails() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="space-y-1">
-                <CardTitle>Page Access & Permissions</CardTitle>
+                <CardTitle>User Page Access & Permissions</CardTitle>
                 <CardDescription>
-                  Configure detailed access rights. Uncheck to inherit from role.
+                  Configure access rights for selected user.
                 </CardDescription>
               </div>
               {canEdit && (
@@ -457,6 +460,7 @@ export default function UserDetails() {
               )}
             </CardHeader>
             <CardContent>
+              <div className='max-h-125 overflow-auto'>
               <UserPermissionsEditor 
                 role={formData.role}
                 permissionsJson={formData.permissions}
@@ -464,7 +468,9 @@ export default function UserDetails() {
                 onChange={(newJson) => handleInputChange('permissions', newJson)}
                 readOnly={!canEdit}
                 availablePermissions={getVisiblePermissions()}
+                hideTitleSection={true}
               />
+              </div>
             </CardContent>
           </Card>
         </div>

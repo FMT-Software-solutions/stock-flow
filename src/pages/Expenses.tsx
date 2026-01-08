@@ -12,6 +12,9 @@ import { useExpenses } from '@/hooks/useExpenseQueries';
 import { useCurrency } from '@/hooks/useCurrency';
 import { getExpenseStatsGroups } from './expenses/fields';
 import { useMemo } from 'react';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import type { Expense } from '@/types/expenses';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export function Expenses() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -26,6 +29,17 @@ export function Expenses() {
     () => getExpenseStatsGroups(formatCurrency),
     [formatCurrency]
   );
+  const { checkPermission } = useRoleCheck();
+  const canCreateExpenses = checkPermission('expenses', 'create');
+  const canManageCategories = checkPermission('expense_categories');
+  const canManageTypes = checkPermission('expense_types');
+
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [summaryMode, setSummaryMode] = useLocalStorage<'filtered' | 'all'>(
+    `stockflow-expenses-summary-mode-${currentOrganization?.id || 'global'}`,
+    'filtered'
+  );
+  const summaryData = summaryMode === 'filtered' ? filteredExpenses : expenses;
 
   return (
     <div className="space-y-6">
@@ -36,38 +50,50 @@ export function Expenses() {
             Manage your expenses and categories.
           </p>
         </div>
-        <div className="flex gap-2">
-          <AddExpenseDialog
-            open={isAddExpenseOpen}
-            onOpenChange={setIsAddExpenseOpen}
-          >
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Record Expenses
-            </Button>
-          </AddExpenseDialog>
-        </div>
+        {canCreateExpenses && (
+          <div className="flex gap-2">
+            <AddExpenseDialog
+              open={isAddExpenseOpen}
+              onOpenChange={setIsAddExpenseOpen}
+            >
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Record Expenses
+              </Button>
+            </AddExpenseDialog>
+          </div>
+        )}
       </div>
 
       <StatsContainer
         groups={expenseStatsGroups}
-        data={expenses}
+        data={summaryData}
         storageKey="expenses-stats-is-open"
         summaryLabel="Expenses Summary"
+        summaryMode={summaryMode}
+        onSummaryModeChange={setSummaryMode}
       />
 
       <Tabs defaultValue="list" className="space-y-4">
         <TabsList>
           <TabsTrigger value="list">Expenses List</TabsTrigger>
-          <TabsTrigger value="configuration">Categories & Types</TabsTrigger>
+          {(canManageCategories || canManageTypes) && (
+            <TabsTrigger value="configuration">Categories & Types</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="list" className="space-y-4">
-          <ExpensesList />
+          <ExpensesList
+            onFilteredDataChange={(rows) =>
+              setFilteredExpenses(rows as Expense[])
+            }
+          />
         </TabsContent>
 
-        <TabsContent value="configuration" className="space-y-4">
-          <ExpenseConfiguration />
-        </TabsContent>
+        {(canManageCategories || canManageTypes) && (
+          <TabsContent value="configuration" className="space-y-4">
+            <ExpenseConfiguration />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

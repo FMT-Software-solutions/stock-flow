@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useRef } from "react"
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -36,6 +37,7 @@ interface DataTableProps<TData, TValue> {
   storageKey?: string
   defaultColumnVisibility?: VisibilityState
   canExport?: boolean
+  onFilteredDataChange?: (rows: TData[]) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -48,6 +50,7 @@ export function DataTable<TData, TValue>({
   storageKey,
   defaultColumnVisibility = {},
   canExport = true,
+  onFilteredDataChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -120,6 +123,34 @@ export function DataTable<TData, TValue>({
     },
   })
 
+  const prevSignatureRef = useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!onFilteredDataChange) return
+    const filtered = table.getFilteredRowModel().rows
+    const signature =
+      `${filtered.length}:` +
+      filtered.slice(0, 20).map((r) => (r.original as any)?.id ?? '').join(',')
+    if (prevSignatureRef.current !== signature) {
+      prevSignatureRef.current = signature
+      onFilteredDataChange(filtered.map((r) => r.original as TData))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnFilters, data])
+
+  const shouldTriggerRowClick = React.useCallback((target: HTMLElement | null) => {
+    if (!target) return true;
+    if (target.closest('[data-no-row-click="true"]')) return false;
+    if (target.closest('[data-row-click="true"]')) return true;
+    if (
+      target.closest(
+        'button, a, input, textarea, select, label, [role="button"], [role="menuitem"], [aria-haspopup]'
+      )
+    ) {
+      return false;
+    }
+    return true;
+  }, []);
+
   return (
     <div className="space-y-4">
       <DataTableToolbar
@@ -136,7 +167,14 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className={(header.column.columnDef as any)?.meta?.headerClassName}
+                      style={(header.column.columnDef as any)?.meta?.headerStyle}
+                      data-no-row-click={
+                        (header.column.columnDef as any)?.meta?.noRowClick ? 'true' : undefined
+                      }
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -155,11 +193,23 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onClick={() => onRowClick?.(row.original)}
+                  onClick={(e) => {
+                    if (!onRowClick) return;
+                    const target = e.target as HTMLElement | null;
+                    if (!shouldTriggerRowClick(target)) return;
+                    onRowClick(row.original);
+                  }}
                   className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={(cell.column.columnDef as any)?.meta?.cellClassName}
+                      style={(cell.column.columnDef as any)?.meta?.cellStyle}
+                      data-no-row-click={
+                        (cell.column.columnDef as any)?.meta?.noRowClick ? 'true' : undefined
+                      }
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

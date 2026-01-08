@@ -9,6 +9,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { Order } from '@/types/orders';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { format, formatDistanceToNow } from 'date-fns';
+import { isDateInRange } from '@/lib/utils';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { OrderItemsCell } from '@/components/orders/OrderItemsCell';
 import { Badge } from '@/components/ui/badge';
@@ -16,20 +17,26 @@ import { getOrderStatusVariant } from '@/lib/utils';
 import { customerOrderExportFields } from '../orders/fields';
 import { getCustomerOrderFilterFields } from './fields';
 import { useBranchContext } from '@/contexts/BranchContext';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 
 export default function CustomerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { selectedBranchIds } = useBranchContext();
   const { currentOrganization } = useOrganization();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { data: customer, isLoading: isLoadingCustomer } = useCustomer(id);
   const { data: orders = [] } = useCustomerOrders(
     id,
     currentOrganization?.id,
     selectedBranchIds
   );
+  const { checkPermission } = useRoleCheck();
+  const canExportOrders = checkPermission('orders', 'export');
 
   const filterFields = useMemo(() => {
     const branches = Array.from(
@@ -57,6 +64,19 @@ export default function CustomerDetails() {
     return getCustomerOrderFilterFields(branches, paymentMethods);
   }, [orders]);
 
+  function OrderNumberCell({ order }: { order: Order }) {
+    return (
+      <button
+        type="button"
+        data-row-click="true"
+        className="font-mono font-medium text-primary hover:underline"
+        title={`View details for order #${order.order_number}`}
+      >
+        {order.order_number}
+      </button>
+    );
+  }
+
   const columns: ColumnDef<Order>[] = [
     {
       accessorKey: 'order_number',
@@ -64,11 +84,7 @@ export default function CustomerDetails() {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Order #" />
       ),
-      cell: ({ row }) => (
-        <span className="font-mono font-medium">
-          {row.getValue('orderNumber')}
-        </span>
-      ),
+      cell: ({ row }) => <OrderNumberCell order={row.original} />,
     },
     {
       accessorKey: 'date',
@@ -77,6 +93,9 @@ export default function CustomerDetails() {
       ),
       cell: ({ row }) =>
         format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mm a'),
+      filterFn: (row, id, value) => {
+        return isDateInRange(row.getValue(id), value);
+      },
     },
     {
       id: 'items',
@@ -326,10 +345,25 @@ export default function CustomerDetails() {
               storageKey={`customer-orders-${customer.id}`}
               exportFields={customerOrderExportFields}
               filterFields={filterFields}
+              canExport={canExportOrders}
+              onRowClick={(order) => {
+                setSelectedOrder(order as Order);
+                setDetailsOpen(true);
+              }}
             />
           </CardContent>
         </Card>
       </div>
+      {selectedOrder && (
+        <OrderDetailsModal
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open);
+            if (!open) setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+        />
+      )}
     </div>
   );
 }

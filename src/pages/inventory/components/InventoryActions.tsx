@@ -53,35 +53,41 @@ export function InventoryActions({ inventory }: InventoryActionsProps) {
             Copy Inventory Number
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              if (!canViewInventory) return;
-              setShowDetailsDialog(true);
-            }}
-            disabled={!canViewInventory}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            View Details
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              if (!canEditInventory) return;
-              setShowDetailsDialog(true);
-            }}
-            disabled={!canEditInventory}
-          >
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </DropdownMenuItem>
+          {canViewInventory && (
+            <DropdownMenuItem
+              onClick={() => {
+                if (!canViewInventory) return;
+                setShowDetailsDialog(true);
+              }}
+              disabled={!canViewInventory}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
+          )}
+          {canEditInventory && (
+            <DropdownMenuItem
+              onClick={() => {
+                if (!canEditInventory) return;
+                setShowDetailsDialog(true);
+              }}
+              disabled={!canEditInventory}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={handleDelete}
-            className="text-red-600"
-            disabled={!canDeleteInventory}
-          >
-            <Trash className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
+          {canDeleteInventory && (
+            <DropdownMenuItem
+              onClick={handleDelete}
+              className="text-red-600"
+              disabled={!canDeleteInventory}
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

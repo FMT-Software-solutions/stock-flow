@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useState } from 'react';
 import { ViewEditExpenseDialog } from './components/ViewEditExpenseDialog';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface ExpenseActionsProps {
   expense: Expense;
@@ -34,6 +35,9 @@ export function ExpenseActions({ expense }: ExpenseActionsProps) {
   const [dialogMode, setDialogMode] = useState<'view' | 'edit'>('view');
 
   const deleteExpense = useDeleteExpense();
+  const { checkPermission } = useRoleCheck();
+  const canEdit = checkPermission('expenses', 'edit');
+  const canDelete = checkPermission('expenses', 'delete');
 
   const handleDelete = () => {
     deleteExpense.mutate(expense.id, {
@@ -72,20 +76,24 @@ export function ExpenseActions({ expense }: ExpenseActionsProps) {
           >
             <Eye className="mr-2 h-4 w-4" /> View Details
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              setDialogMode('edit');
-              setShowViewEditDialog(true);
-            }}
-          >
-            <Edit className="mr-2 h-4 w-4" /> Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash className="mr-2 h-4 w-4" /> Delete
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem
+              onClick={() => {
+                setDialogMode('edit');
+                setShowViewEditDialog(true);
+              }}
+            >
+              <Edit className="mr-2 h-4 w-4" /> Edit
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <DropdownMenuItem
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash className="mr-2 h-4 w-4" /> Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

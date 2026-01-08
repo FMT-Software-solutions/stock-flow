@@ -8,6 +8,13 @@ import {
 } from '@/components/ui/collapsible';
 import { ChevronsUpDown } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface StatsContainerProps<TData> {
   groups: StatsGroup<TData>[];
@@ -16,6 +23,8 @@ interface StatsContainerProps<TData> {
   storageKey?: string;
   summaryLabel?: string;
   collapsible?: boolean;
+  summaryMode?: 'filtered' | 'all';
+  onSummaryModeChange?: (mode: 'filtered' | 'all') => void;
 }
 
 export function StatsContainer<TData>({
@@ -25,6 +34,8 @@ export function StatsContainer<TData>({
   storageKey = 'stockflow-stats-container-is-open',
   summaryLabel = 'Summary',
   collapsible = true,
+  summaryMode,
+  onSummaryModeChange,
 }: StatsContainerProps<TData>) {
   const [isOpen, setIsOpen] = useLocalStorage(storageKey, true);
 
@@ -42,7 +53,25 @@ export function StatsContainer<TData>({
     return (
       <div className="mb-6">
         {summaryLabel && (
-          <div className="text-sm font-medium mb-2 px-1">{summaryLabel}</div>
+          <div className="flex items-center gap-3 mb-2 px-1">
+            <span className="text-sm font-medium">{summaryLabel}</span>
+            {summaryMode && onSummaryModeChange && (
+              <Select
+                value={summaryMode}
+                onValueChange={(v) =>
+                  onSummaryModeChange(v as 'filtered' | 'all')
+                }
+              >
+                <SelectTrigger className="h-8 w-44">
+                  <SelectValue placeholder="Summary Mode" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="filtered">Filtered Items</SelectItem>
+                  <SelectItem value="all">All Items</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         )}
         {content}
       </div>
@@ -51,16 +80,36 @@ export function StatsContainer<TData>({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="w-full bg-muted/70 text-left px-4 py-2 mb-2 flex items-center justify-between cursor-pointer">
-        <span className="text-sm font-medium">{summaryLabel}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">
-            Click to {isOpen ? 'Hide' : 'Show'}
-          </span>
-          <ChevronsUpDown className="ml-auto h-4 w-4" />
-          <span className="sr-only">Toggle</span>
+      <div className="w-full bg-muted/70 px-4 py-2 mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium">{summaryLabel}</span>
+          {summaryMode && onSummaryModeChange && (
+            <Select
+              value={summaryMode}
+              onValueChange={(v) =>
+                onSummaryModeChange(v as 'filtered' | 'all')
+              }
+            >
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue placeholder="Summary Mode" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="filtered">Filtered Items</SelectItem>
+                <SelectItem value="all">All Items</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
-      </CollapsibleTrigger>
+        <CollapsibleTrigger asChild>
+          <div className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-sm font-medium">
+              Click to {isOpen ? 'Hide' : 'Show'}
+            </span>
+            <ChevronsUpDown className="ml-auto h-4 w-4" />
+            <span className="sr-only">Toggle</span>
+          </div>
+        </CollapsibleTrigger>
+      </div>
       <CollapsibleContent className="mb-6">{content}</CollapsibleContent>
     </Collapsible>
   );

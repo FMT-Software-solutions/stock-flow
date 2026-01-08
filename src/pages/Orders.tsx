@@ -7,14 +7,18 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useOrders } from '@/hooks/useOrders';
 import { cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { columns } from './orders/columns';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 import {
   getOrderFilterFields,
   getOrderStatsGroups,
   orderExportFields,
 } from './orders/fields';
+import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import type { Order } from '@/types/orders';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export function Orders() {
   const navigate = useNavigate();
@@ -26,6 +30,9 @@ export function Orders() {
     currentOrganization?.id,
     selectedBranchIds
   );
+  const { checkPermission } = useRoleCheck();
+  const canCreateOrders = checkPermission('orders', 'create');
+  const canExportOrders = checkPermission('orders', 'export');
 
   const filterFields = useMemo(() => {
     const branches = Array.from(
@@ -76,6 +83,20 @@ export function Orders() {
     formatCurrency,
   ]);
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [summaryMode, setSummaryMode] = useLocalStorage<'filtered' | 'all'>(
+    `stockflow-orders-summary-mode-${currentOrganization?.id || 'global'}`,
+    'filtered'
+  );
+  const summaryData = summaryMode === 'filtered' ? filteredOrders : orders;
+
+  const handleRowClick = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailsOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -85,19 +106,23 @@ export function Orders() {
             Manage inventory sales and orders
           </p>
         </div>
-        <Button
-          onClick={() => navigate('/orders/new')}
-          className={cn(isLoading && 'opacity-50 cursor-not-allowed')}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Create Order
-        </Button>
+        {canCreateOrders && (
+          <Button
+            onClick={() => navigate('/orders/new')}
+            className={cn(isLoading && 'opacity-50 cursor-not-allowed')}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Create Order
+          </Button>
+        )}
       </div>
 
       <StatsContainer
         groups={orderStatsGroups}
-        data={orders}
+        data={summaryData}
         storageKey="stockflow-orders-stats-container-is-open"
         summaryLabel="Order Summary"
+        summaryMode={summaryMode}
+        onSummaryModeChange={setSummaryMode}
       />
 
       <div className={cn(isLoading && 'opacity-50')}>
@@ -108,8 +133,21 @@ export function Orders() {
           filterFields={filterFields}
           exportFields={orderExportFields}
           storageKey="stockflow-orders-table"
+          canExport={canExportOrders}
+          onRowClick={handleRowClick}
+          onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
         />
       </div>
+      {selectedOrder && (
+        <OrderDetailsModal
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open);
+            if (!open) setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+        />
+      )}
     </div>
   );
 }

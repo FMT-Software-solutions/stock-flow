@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ReceiptDialog } from '@/components/orders/ReceiptDialog';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface OrderActionsProps {
   order: Order;
@@ -36,6 +37,10 @@ export function OrderActions({ order }: OrderActionsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const { checkPermission } = useRoleCheck();
+  const canEdit = checkPermission('orders', 'edit');
+  const canDelete = checkPermission('orders', 'delete');
+  const canExport = checkPermission('orders', 'export');
 
   const handleCopyOrderNumber = () => {
     navigator.clipboard.writeText(order.order_number);
@@ -56,46 +61,76 @@ export function OrderActions({ order }: OrderActionsProps) {
   };
 
   return (
-    <>
+    <div data-no-row-click="true">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             <span className="sr-only">Open menu</span>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuItem onClick={handleCopyOrderNumber}>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCopyOrderNumber();
+            }}
+          >
             <Copy className="mr-2 h-4 w-4" />
             Copy Order No.
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowDetailsModal(true)}>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDetailsModal(true);
+            }}
+          >
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-          {order.payment_status !== 'refunded' &&
+          {canExport &&
+            order.payment_status !== 'refunded' &&
             order.payment_status !== 'unpaid' && (
-              <DropdownMenuItem onClick={() => setShowReceiptDialog(true)}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReceiptDialog(true);
+                }}
+              >
                 <Printer className="mr-2 h-4 w-4" />
                 Print Receipt
               </DropdownMenuItem>
             )}
-          <DropdownMenuItem
-            onClick={() => navigate(`/orders/${order.id}/edit`)}
-          >
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/orders/${order.id}/edit`);
+              }}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -108,10 +143,10 @@ export function OrderActions({ order }: OrderActionsProps) {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              order and remove it from our servers.
+              This action cannot be undone. This will delete the
+              order.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -128,9 +163,11 @@ export function OrderActions({ order }: OrderActionsProps) {
 
       <ReceiptDialog
         open={showReceiptDialog}
-        onOpenChange={setShowReceiptDialog}
+        onOpenChange={(open) => {
+          setShowReceiptDialog(open);
+        }}
         order={order}
       />
-    </>
+    </div>
   );
 }

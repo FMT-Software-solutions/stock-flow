@@ -2,12 +2,26 @@ import { type ColumnDef } from '@tanstack/react-table';
 import type { Order } from '@/types/orders';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { format, formatDistanceToNow } from 'date-fns';
+import { isDateInRange } from '@/lib/utils';
 import { OrderItemsCell } from '@/components/orders/OrderItemsCell';
 import { OrderStatusCell } from '@/components/orders/OrderStatusCell';
 import { OrderPaymentStatusCell } from '@/components/orders/OrderPaymentStatusCell';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { OrderActions } from './OrderActions';
 import { Link } from 'react-router-dom';
+
+function OrderNumberCell({ order }: { order: Order }) {
+  return (
+    <button
+      type="button"
+      data-row-click="true"
+      className="text-xs font-mono font-medium text-primary hover:underline cursor-pointer"
+      title={`View details for order #${order.order_number}`}
+    >
+      {order.order_number}
+    </button>
+  );
+}
 
 export const columns: ColumnDef<Order>[] = [
   // We wll enable select column later
@@ -39,9 +53,7 @@ export const columns: ColumnDef<Order>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Order #" />
     ),
-    cell: ({ row }) => (
-      <span className="text-xs font-mono font-medium">{row.getValue('orderNumber')}</span>
-    ),
+    cell: ({ row }) => <OrderNumberCell order={row.original} />,
     enableSorting: true,
   },
   {
@@ -79,12 +91,7 @@ export const columns: ColumnDef<Order>[] = [
       );
     },
     filterFn: (row, id, value) => {
-        const rowDate = new Date(row.getValue(id));
-        const { from, to } = value;
-        if (!from) return true;
-        if (to && rowDate > to) return false;
-        if (rowDate < from) return false;
-        return true;
+      return isDateInRange(row.getValue(id), value);
     },
   },
   {
@@ -227,12 +234,7 @@ export const columns: ColumnDef<Order>[] = [
     }
     ,
     filterFn: (row, id, value) => {
-        const rowDate = new Date(row.getValue(id));
-        const { from, to } = value;
-        if (!from) return true;
-        if (to && rowDate > to) return false;
-        if (rowDate < from) return false;
-        return true;
+      return isDateInRange(row.getValue(id), value);
     },
     enableHiding: true,
   },
@@ -258,18 +260,19 @@ export const columns: ColumnDef<Order>[] = [
     }
     ,
     filterFn: (row, id, value) => {
-        const rowDate = new Date(row.getValue(id));
-        const { from, to } = value;
-        if (!from) return true;
-        if (to && rowDate > to) return false;
-        if (rowDate < from) return false;
-        return true;
+      return isDateInRange(row.getValue(id), value);
     },
     enableHiding: true,
   },
   
   {
     id: 'actions',
+    header: 'Actions',
+    meta: {
+      headerClassName: 'sticky right-0 bg-background z-10',
+      cellClassName: 'sticky right-0 bg-background z-10',
+      noRowClick: true,
+    },
     cell: ({ row }) => <OrderActions order={row.original} />,
   },
 ];

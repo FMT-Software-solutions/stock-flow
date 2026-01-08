@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface UserPermissionsEditorProps {
   role?: UserRole;
@@ -20,6 +21,8 @@ interface UserPermissionsEditorProps {
   onChange: (newPermissionsJson: string) => void;
   readOnly?: boolean;
   availablePermissions?: UserPermissions;
+  hideTitleSection?: boolean;
+  showResetButtons?: boolean;
 }
 
 export function UserPermissionsEditor({ 
@@ -28,7 +31,9 @@ export function UserPermissionsEditor({
   rolePermissions,
   onChange,
   readOnly = false,
-  availablePermissions: providedAvailablePermissions
+  availablePermissions: providedAvailablePermissions,
+  hideTitleSection = false,
+  showResetButtons = true
 }: UserPermissionsEditorProps) {
   const [permissions, setPermissions] = useState<UserPermissions>({});
 
@@ -47,6 +52,16 @@ export function UserPermissionsEditor({
   const parentScopes = scopes.filter((s) => !APP_PERMISSIONS[s]?.parent);
   const childrenFor = (parent: PermissionScope) =>
     scopes.filter((s) => APP_PERMISSIONS[s]?.parent === parent);
+
+  const handleResetScope = (scope: PermissionScope) => {
+    if (readOnly) return;
+    const next = { ...permissions };
+    delete next[scope];
+    childrenFor(scope).forEach((child) => {
+      delete next[child];
+    });
+    updatePermissions(next);
+  };
 
   const handleScopeToggle = (scope: PermissionScope, enabled: boolean) => {
     if (readOnly) return;
@@ -112,13 +127,13 @@ export function UserPermissionsEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="flex items-center justify-between">
+          {!hideTitleSection && <div>
           <h3 className="text-lg font-medium">Page Access & Permissions</h3>
           <p className="text-sm text-muted-foreground">
             Configure detailed access rights for this user.
           </p>
-        </div>
+        </div>}
         {readOnly && <Badge variant="secondary">Read Only</Badge>}
       </div>
 
@@ -162,6 +177,15 @@ export function UserPermissionsEditor({
                       <span className="text-xs text-muted-foreground">{config.description}</span>
                     </div>
                   </div>
+                  {!readOnly && showResetButtons && <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => handleResetScope(scope)}
+                    disabled={readOnly}
+                    title='Reset scope to organization default'
+                  >
+                    Reset
+                  </Button> }
                 </div>
               </CardHeader>
               
@@ -229,6 +253,16 @@ export function UserPermissionsEditor({
                                   <span className="text-xs text-muted-foreground">{childConfig.description}</span>
                                 </div>
                               </div>
+                              {showResetButtons && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => handleResetScope(child)}
+                                  disabled={readOnly || !isEnabled}
+                                >
+                                  Reset
+                                </Button>
+                              )}
                             </div>
                           </CardHeader>
                           {childEnabled && isEnabled && childAvailableActions.length > 0 && (

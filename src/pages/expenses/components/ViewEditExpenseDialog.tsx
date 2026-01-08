@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { openExternalUrl } from '@/utils/external-url';
 import { ExpenseForm } from './ExpenseForm';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface ViewEditExpenseDialogProps {
   expense: Expense;
@@ -37,6 +38,8 @@ export function ViewEditExpenseDialog({
 }: ViewEditExpenseDialogProps) {
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode);
   const updateExpense = useUpdateExpense();
+  const { checkPermission } = useRoleCheck();
+  const canEdit = checkPermission('expenses', 'edit');
 
   useEffect(() => {
     if (open) {
@@ -90,7 +93,7 @@ export function ViewEditExpenseDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>{mode === 'edit' ? 'Edit Expense' : 'Expense Details'}</span>
-            {mode === 'view' && (
+            {mode === 'view' && canEdit && (
               <Button
                 variant="outline"
                 size="sm"

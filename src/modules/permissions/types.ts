@@ -15,6 +15,8 @@ export type PermissionScope =
   | 'suppliers'
   | 'reports'
   | 'expenses'
+  | 'expense_categories'
+  | 'expense_types'
   | 'settings';
 
 

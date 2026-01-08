@@ -11,6 +11,7 @@ import {
   getCustomerFilterFields,
 } from './customers/fields';
 import { cn } from '@/lib/utils';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 export function Customers() {
   const navigate = useNavigate();
@@ -19,6 +20,9 @@ export function Customers() {
   const { data: customers = [], isLoading } = useCustomers(
     currentOrganization?.id
   );
+  const { checkPermission } = useRoleCheck();
+  const canCreateCustomers = checkPermission('customers', 'create');
+  const canExportCustomers = checkPermission('customers', 'export');
 
   const filterFields = getCustomerFilterFields(
     availableBranches.map((branch) => ({
@@ -36,9 +40,11 @@ export function Customers() {
             Manage your customer base
           </p>
         </div>
-        <Button onClick={() => navigate('/customers/new')} disabled={isLoading}>
-          <Plus className="mr-2 h-4 w-4" /> Add Customer
-        </Button>
+        {canCreateCustomers && (
+          <Button onClick={() => navigate('/customers/new')} disabled={isLoading}>
+            <Plus className="mr-2 h-4 w-4" /> Add Customer
+          </Button>
+        )}
       </div>
 
       <div className={cn(isLoading ? 'opacity-50' : '')}>
@@ -49,6 +55,7 @@ export function Customers() {
           filterFields={filterFields}
           exportFields={customerExportFields}
           defaultColumnVisibility={{ search: false }}
+          canExport={canExportCustomers}
         />
       </div>
     </div>

@@ -10,10 +10,17 @@ import { useBranchContext } from '@/contexts/BranchContext';
 import { getExpenseFilterFields, expenseExportFields } from './fields';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import type { Expense } from '@/types/expenses';
 
-export function ExpensesList() {
+export function ExpensesList({
+  onFilteredDataChange,
+}: {
+  onFilteredDataChange?: (rows: Expense[]) => void;
+}) {
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds } = useBranchContext();
+  const { checkPermission } = useRoleCheck();
 
   const branchIds =
     selectedBranchIds.length > 0 ? selectedBranchIds : undefined;
@@ -47,9 +54,14 @@ export function ExpensesList() {
     const pmOptions: { label: string; value: string }[] = [];
     const statOptions: { label: string; value: string }[] = [];
 
+    let hasUncategorized = false;
+    let hasUnknownType = false;
+
     expenses.forEach((expense) => {
       // Categories
-      if (expense.categoryName && !uniqueCategories.has(expense.categoryName)) {
+      if (!expense.categoryName) {
+        hasUncategorized = true;
+      } else if (!uniqueCategories.has(expense.categoryName)) {
         uniqueCategories.add(expense.categoryName);
         catOptions.push({
           label: expense.categoryName,
@@ -58,7 +70,9 @@ export function ExpensesList() {
       }
 
       // Types
-      if (expense.typeName && !uniqueTypes.has(expense.typeName)) {
+      if (!expense.typeName) {
+        hasUnknownType = true;
+      } else if (!uniqueTypes.has(expense.typeName)) {
         uniqueTypes.add(expense.typeName);
         typeOpts.push({ label: expense.typeName, value: expense.typeName });
       }
@@ -86,15 +100,32 @@ export function ExpensesList() {
       }
     });
 
+    const sortedCategories = catOptions.sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    const sortedTypes = typeOpts.sort((a, b) => a.label.localeCompare(b.label));
+    const sortedPaymentMethods = pmOptions.sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    const sortedStatuses = statOptions.sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+
+    if (hasUncategorized) {
+      sortedCategories.unshift({
+        label: 'Uncategorized',
+        value: 'Uncategorized',
+      });
+    }
+    if (hasUnknownType) {
+      sortedTypes.unshift({ label: 'Unknown Type', value: 'Unknown Type' });
+    }
+
     return {
-      categoryOptions: catOptions.sort((a, b) =>
-        a.label.localeCompare(b.label)
-      ),
-      typeOptions: typeOpts.sort((a, b) => a.label.localeCompare(b.label)),
-      paymentMethodOptions: pmOptions.sort((a, b) =>
-        a.label.localeCompare(b.label)
-      ),
-      statusOptions: statOptions.sort((a, b) => a.label.localeCompare(b.label)),
+      categoryOptions: sortedCategories,
+      typeOptions: sortedTypes,
+      paymentMethodOptions: sortedPaymentMethods,
+      statusOptions: sortedStatuses,
     };
   }, [expenses]);
 
@@ -130,9 +161,14 @@ export function ExpensesList() {
       <DataTable
         columns={columns}
         data={expenses}
-        searchKey="description"
+        searchKey="search"
         filterFields={filterFields}
         exportFields={expenseExportFields}
+        defaultColumnVisibility={{ search: false }}
+        canExport={checkPermission('expenses', 'export')}
+        onFilteredDataChange={
+          onFilteredDataChange as ((rows: Expense[]) => void) | undefined
+        }
       />
     </div>
   );

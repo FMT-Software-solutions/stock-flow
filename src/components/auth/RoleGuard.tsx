@@ -1,5 +1,5 @@
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { hasPermission, buildUserPermissions } from '@/modules/permissions';
+import { hasPermission } from '@/modules/permissions';
 import type {
   PermissionAction,
   PermissionScope,
@@ -48,22 +48,8 @@ export function useRoleCheck() {
   ) => {
     if (!currentOrganization) return false;
 
-    // If no permissions string, we use the role's default permissions
-    if (!currentOrganization.permissions) {
-      const defaultPermissions = buildUserPermissions(
-        currentOrganization.user_role
-      );
-      const allowed = hasPermission(defaultPermissions, scope, action);
-      if (import.meta.env.DEV) {
-        console.debug('checkPermission:defaultRole', {
-          role: currentOrganization.user_role,
-          scope,
-          action,
-          allowed,
-        });
-      }
-      return allowed;
-    }
+    // Require an explicit permissions payload from OrganizationContext
+    if (!currentOrganization.permissions) return false;
 
     try {
       const permissions = JSON.parse(currentOrganization.permissions);
@@ -80,20 +66,7 @@ export function useRoleCheck() {
       return allowed;
     } catch (e) {
       console.error('Failed to parse permissions', e);
-      // Fallback to role defaults on parse error
-      const defaultPermissions = buildUserPermissions(
-        currentOrganization.user_role
-      );
-      const allowed = hasPermission(defaultPermissions, scope, action);
-      if (import.meta.env.DEV) {
-        console.debug('checkPermission:fallbackRole', {
-          role: currentOrganization.user_role,
-          scope,
-          action,
-          allowed,
-        });
-      }
-      return allowed;
+      return false;
     }
   };
 

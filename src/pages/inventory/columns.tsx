@@ -10,6 +10,7 @@ import { Link } from "react-router-dom"
 import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import { ImagePreview } from "@/components/shared/ImagePreview"
+import { isDateInRange } from "@/lib/utils"
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -189,12 +190,7 @@ export const columns: ColumnDef<Product>[] = [
       )
     },
     filterFn: (row, id, value) => {
-        const rowDate = new Date(row.getValue(id))
-        const { from, to } = value
-        if (!from) return true
-        if (to && rowDate > to) return false
-        if (rowDate < from) return false
-        return true
+      return isDateInRange(row.getValue(id), value)
     },
     enableHiding: true,
   },
@@ -361,6 +357,9 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
           </span>
         </div>
       )
+    },
+    filterFn: (row, id, value) => {
+      return isDateInRange(row.getValue(id), value)
     },
   },
   {

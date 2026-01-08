@@ -7,7 +7,6 @@ import {
   useRemoveUser,
   useUpdateOrganization,
   useUpdateUserRole,
-  useUserOrganizations,
   useUserOrganizationsV2,
 } from '../hooks/useOrganizationQueries';
 import type {
@@ -43,38 +42,33 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     removeSelectedOrgId,
   ] = useLocalStorage<string | null>(STORAGE_KEY, null);
 
-  // Use React Query hooks
-  const useRpc = !!import.meta.env.VITE_ORG_RPC_BOOTSTRAP;
+  // Always use RPC v2 for organization context
   const {
     data: userOrganizationsRaw = [],
     isLoading,
     error: queryError,
     refetch: refreshOrganizations,
-  } = useRpc
-    ? useUserOrganizationsV2(user?.id)
-    : useUserOrganizations(user?.id);
+  } = useUserOrganizationsV2(user?.id);
 
-  const userOrganizations: OrganizationWithRole[] = useRpc
-    ? (userOrganizationsRaw as any[]).map((item) => {
-        const effective =
-          item.effective_permissions ||
-          buildUserPermissions(
-            item.user_role,
-            item.user_overrides || undefined,
-            item.base_role_permissions || {}
-          );
-        return {
-          ...item.organization,
-          user_role: item.user_role as OrganizationRole,
-          role_id: item.role_id ?? null,
-          role_name: item.role_name ?? null,
-          permissions: JSON.stringify(effective),
-          branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
-        } as OrganizationWithRole;
-      })
-    : (userOrganizationsRaw as OrganizationWithRole[]);
+  const userOrganizations: OrganizationWithRole[] = (userOrganizationsRaw as any[]).map((item) => {
+    const effective =
+      item.effective_permissions ||
+      buildUserPermissions(
+        item.user_role,
+        item.user_overrides || undefined,
+        item.base_role_permissions || {}
+      );
+    return {
+      ...item.organization,
+      user_role: item.user_role as OrganizationRole,
+      role_id: item.role_id ?? null,
+      role_name: item.role_name ?? null,
+      permissions: JSON.stringify(effective),
+      branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
+    } as OrganizationWithRole;
+  });
 
-  console.log(userOrganizations);
+
 
   const createOrganizationMutation = useCreateOrganization();
   const updateOrganizationMutation = useUpdateOrganization();

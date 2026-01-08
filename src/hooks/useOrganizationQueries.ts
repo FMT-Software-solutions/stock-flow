@@ -7,6 +7,7 @@ import type {
   UpdateOrganizationData,
   OrganizationRole,
 } from '../types/organizations';
+import type { OrganizationContextItem } from '../types/organizations';
 import {
   DEFAULT_BRAND_COLORS,
   DEFAULT_LOGO_SETTINGS,
@@ -18,8 +19,39 @@ import { buildUserPermissions } from '@/modules/permissions';
 export const organizationKeys = {
   all: ['organizations'] as const,
   userOrganizations: (userId: string) => [...organizationKeys.all, 'user', userId] as const,
+  userOrganizationsV2: (userId: string) => [...organizationKeys.all, 'user-v2', userId] as const,
   organization: (id: string) => [...organizationKeys.all, 'detail', id] as const,
 };
+
+export function useUserOrganizationsV2(userId: string | undefined) {
+  return useQuery({
+    queryKey: organizationKeys.userOrganizationsV2(userId || ''),
+    queryFn: async (): Promise<OrganizationContextItem[]> => {
+      if (!userId) throw new Error('User ID is required');
+      const { data, error } = await supabase.rpc('get_user_org_context', { user_id: userId });
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      return rows.map((item: any) => {
+        const basePerms = item.base_role_permissions || {};
+        const overrides = item.user_overrides || undefined;
+        const effective = item.effective_permissions || buildUserPermissions(item.user_role as any, overrides, basePerms);
+        return {
+          organization: item.organization as Organization,
+          user_role: item.user_role as OrganizationRole,
+          role_id: item.role_id ?? null,
+          role_name: item.role_name ?? null,
+          base_role_permissions: basePerms,
+          user_overrides: overrides ?? null,
+          branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
+          effective_permissions: effective,
+          needs_seeding: !!item.needs_seeding
+        };
+      });
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Hook to fetch user organizations
 export function useUserOrganizations(userId: string | undefined) {

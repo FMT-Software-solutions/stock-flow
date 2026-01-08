@@ -46,16 +46,16 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     isLoading: isLoadingAllBranches,
   } = useBranches(organizationId);
 
-  // Fetch assigned branches for the user
   const {
     data: assignedUserBranchesData = [],
     isLoading: isLoadingUserBranches,
   } = useUserBranches(userId, organizationId);
 
-  // Derive user's assigned branches from the join table data
-  const assignedBranches = assignedUserBranchesData
-    .map((ub) => ub.branch)
-    .filter((b): b is Branch => !!b);
+  const orgBranchIds = currentOrganization?.branch_ids || [];
+  const assignedBranches =
+    orgBranchIds.length > 0
+      ? allBranches.filter((b) => orgBranchIds.includes(b.id))
+      : assignedUserBranchesData.map((ub) => ub.branch).filter((b): b is Branch => !!b);
 
   // Determine if user is owner (checking role in current organization)
   const isOwner = currentOrganization?.user_role === 'owner';

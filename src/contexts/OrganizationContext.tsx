@@ -8,6 +8,7 @@ import {
   useUpdateOrganization,
   useUpdateUserRole,
   useUserOrganizations,
+  useUserOrganizationsV2,
 } from '../hooks/useOrganizationQueries';
 import type {
   CreateOrganizationData,
@@ -18,6 +19,7 @@ import type {
   UpdateOrganizationData,
 } from '../types/organizations';
 import { useAuth } from './AuthContext';
+import { buildUserPermissions } from '@/modules/permissions';
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
   undefined
@@ -42,12 +44,37 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
   ] = useLocalStorage<string | null>(STORAGE_KEY, null);
 
   // Use React Query hooks
+  const useRpc = !!import.meta.env.VITE_ORG_RPC_BOOTSTRAP;
   const {
-    data: userOrganizations = [],
+    data: userOrganizationsRaw = [],
     isLoading,
     error: queryError,
     refetch: refreshOrganizations,
-  } = useUserOrganizations(user?.id);
+  } = useRpc
+    ? useUserOrganizationsV2(user?.id)
+    : useUserOrganizations(user?.id);
+
+  const userOrganizations: OrganizationWithRole[] = useRpc
+    ? (userOrganizationsRaw as any[]).map((item) => {
+        const effective =
+          item.effective_permissions ||
+          buildUserPermissions(
+            item.user_role,
+            item.user_overrides || undefined,
+            item.base_role_permissions || {}
+          );
+        return {
+          ...item.organization,
+          user_role: item.user_role as OrganizationRole,
+          role_id: item.role_id ?? null,
+          role_name: item.role_name ?? null,
+          permissions: JSON.stringify(effective),
+          branch_ids: Array.isArray(item.branch_ids) ? item.branch_ids : [],
+        } as OrganizationWithRole;
+      })
+    : (userOrganizationsRaw as OrganizationWithRole[]);
+
+  console.log(userOrganizations);
 
   const createOrganizationMutation = useCreateOrganization();
   const updateOrganizationMutation = useUpdateOrganization();
@@ -64,20 +91,30 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
   // Handle organization selection logic in useEffect to avoid state updates during render
   useEffect(() => {
+    if (userOrganizations.length === 0) return;
     if (userOrganizations.length === 1) {
-      selectOrganization(userOrganizations[0].id);
-    } else if (userOrganizations.length > 1 && selectedOrgId) {
+      const onlyId = userOrganizations[0].id;
+      if (currentOrganization?.id !== onlyId || selectedOrgId !== onlyId) {
+        selectOrganization(onlyId);
+      }
+      return;
+    }
+    if (selectedOrgId && currentOrganization?.id !== selectedOrgId) {
       selectOrganization(selectedOrgId);
     }
-  }, [userOrganizations, selectedOrgId]);
+  }, [userOrganizations, selectedOrgId, currentOrganization?.id]);
 
   const selectOrganization = async (organizationId: string) => {
     const organization = userOrganizations.find(
       (org) => org.id === organizationId
     );
     if (organization) {
-      setSelectedOrgId(organizationId);
-      setCurrentOrganization(organization);
+      if (selectedOrgId !== organizationId) {
+        setSelectedOrgId(organizationId);
+      }
+      if (currentOrganization?.id !== organization.id) {
+        setCurrentOrganization(organization);
+      }
     }
   };
 

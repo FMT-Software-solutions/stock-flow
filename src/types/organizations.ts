@@ -1,4 +1,5 @@
 import { ROLE_HIERARCHY, type UserRole } from "@/lib/auth";
+import type { UserPermissions } from "@/modules/permissions/types";
 import type { CompleteTheme } from "./theme";
 
 // Use UserRole from auth.ts for consistency
@@ -80,6 +81,7 @@ export interface OrganizationWithRole extends Organization {
   role_id?: string | null; // New field
   role_name?: string; // New field for display
   permissions?: string | null; // JSON string of UserPermissions (from user override or role)
+  branch_ids?: string[]; // Assigned branches for current user in this org
 }
 
 // Organization creation/update types
@@ -152,3 +154,15 @@ export const hasPermission = (
 ): boolean => {
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
 };
+
+export interface OrganizationContextItem {
+  organization: Organization;
+  user_role: UserRole;
+  role_id?: string | null;
+  role_name?: string | null;
+  base_role_permissions: UserPermissions;
+  user_overrides?: UserPermissions | null;
+  branch_ids: string[];
+  effective_permissions?: UserPermissions | null;
+  needs_seeding?: boolean;
+}

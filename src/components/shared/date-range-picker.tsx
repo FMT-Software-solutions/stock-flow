@@ -151,7 +151,7 @@ export function DatePickerWithRange({
             variant={'outline'}
             disabled={!!disabled}
             className={cn(
-              'w-75 justify-start text-left font-normal relative',
+              'min-w-75 justify-start text-left font-normal relative',
               !date && 'text-muted-foreground'
             )}
           >

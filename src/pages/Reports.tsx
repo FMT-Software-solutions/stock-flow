@@ -1,406 +1,509 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, TrendingUp, BarChart3, PieChart } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  Pie,
-  Cell,
-  Line,
-  LineChart,
-  CartesianGrid,
-} from 'recharts';
+import { Download } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
-import { mockOrders } from '@/data/mock-orders';
-import { mockCustomers } from '@/data/mock-customers';
-import { useProducts, useSuppliers } from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/utils/supabase';
+import { useQuery } from '@tanstack/react-query';
+import { DatePickerWithRange } from '@/components/shared/date-range-picker';
+import { BranchMultiSelector } from '@/components/shared/BranchMultiSelector';
+import { useBranchContext } from '@/contexts/BranchContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+import { ProductsSection } from './reports/ProductsSection';
+import { InventorySection } from './reports/InventorySection';
+import { SalesSection } from './reports/SalesSection';
+import { OrdersSection } from './reports/OrdersSection';
+import { ExpensesSection } from './reports/ExpensesSection';
+import { CustomersSection } from './reports/CustomersSection';
+import { SuppliersSection } from './reports/SuppliersSection';
 
-// Mock Data Generators
-const getMonthlyRevenue = () => [
-  { name: 'Jan', total: 1200 },
-  { name: 'Feb', total: 2100 },
-  { name: 'Mar', total: 1800 },
-  { name: 'Apr', total: 2400 },
-  { name: 'May', total: 3200 },
-  { name: 'Jun', total: 3600 },
-];
+type TrendPoint = { date: string; value: number };
 
-const getCategoryDistribution = () => [
-  { name: 'Electronics', value: 45 },
-  { name: 'Clothing', value: 25 },
-  { name: 'Home', value: 20 },
-  { name: 'Toys', value: 10 },
-];
+type ProductsReport = {
+  total_products: number;
+  active_products: number;
+  inactive_products: number;
+  low_stock_products: number;
+  out_of_stock_products: number;
+  category_distribution: { category: string; count: number }[];
+  low_stock_list: {
+    id: string;
+    name: string;
+    sku: string | null;
+    category_name: string | null;
+    quantity: number;
+    min_stock_level: number;
+  }[];
+  out_of_stock_list: {
+    id: string;
+    name: string;
+    sku: string | null;
+    category_name: string | null;
+    quantity: number;
+    min_stock_level: number;
+  }[];
+};
 
-const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+type InventoryReport = {
+  total_items: number;
+  low_stock_items: number;
+  out_of_stock_items: number;
+  stock_by_category: { category: string; quantity: number }[];
+};
+
+type SalesReport = {
+  total_orders: number;
+  total_revenue: number;
+  breakdown: Record<string, number>;
+  trend: TrendPoint[];
+};
+
+type OrdersReport = {
+  total_orders: number;
+  breakdown: Record<string, number>;
+};
+
+type ExpensesReport = {
+  total_records: number;
+  total_expenditure: number;
+  grouped: { name: string; amount: number }[];
+  trend: TrendPoint[];
+};
+
+type CustomersReport = {
+  total_customers: number;
+  new_this_period: number;
+  top_customers: { name: string; total_spent: number; orders_count: number }[];
+};
+
+type SuppliersReport = {
+  total_suppliers: number;
+  top_suppliers: { name: string; product_count: number }[];
+};
+
+const chartColors = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
 ];
 
 export function Reports() {
-  const { formatCurrency, currency } = useCurrency();
+  const { formatCurrency } = useCurrency();
   const { currentOrganization } = useOrganization();
-  const { data: products = [] } = useProducts(currentOrganization?.id);
-  const { data: suppliers = [] } = useSuppliers(currentOrganization?.id);
+  const { selectedBranchIds: globalBranchIds } = useBranchContext();
+
+  const [activeTab, setActiveTab] = useState<
+    | 'products'
+    | 'inventory'
+    | 'sales'
+    | 'orders'
+    | 'expenses'
+    | 'customers'
+    | 'suppliers'
+  >('products');
+  const [generalDateRange, setGeneralDateRange] = useState<
+    DateRange | undefined
+  >(undefined);
+  const [productsDateDraft, setProductsDateDraft] = useState<
+    DateRange | undefined
+  >(undefined);
+  const [productsDateApplied, setProductsDateApplied] = useState<
+    DateRange | undefined
+  >(undefined);
+  const [branchIds, setBranchIds] = useState<string[]>(globalBranchIds);
+  const [template, setTemplate] = useState<'compact' | 'detailed' | 'pivot'>(
+    'compact'
+  );
+  const [expensesGroupBy, setExpensesGroupBy] = useState<'category' | 'type'>(
+    'category'
+  );
+
+  const orgId = currentOrganization?.id;
+
+  const normalizedBranchIds = useMemo(() => {
+    return branchIds && branchIds.length > 0 ? branchIds : null;
+  }, [branchIds]);
+
+  const startIso = generalDateRange?.from
+    ? new Date(generalDateRange.from).toISOString()
+    : null;
+  const endIso = generalDateRange?.to
+    ? new Date(generalDateRange.to).toISOString()
+    : null;
+  const productsStartIso = productsDateApplied?.from
+    ? new Date(productsDateApplied.from).toISOString()
+    : null;
+  const productsEndIso = productsDateApplied?.to
+    ? new Date(productsDateApplied.to).toISOString()
+    : null;
+
+  const isBranchScoped = (tab: typeof activeTab) => {
+    return (
+      tab === 'inventory' ||
+      tab === 'sales' ||
+      tab === 'orders' ||
+      tab === 'expenses'
+    );
+  };
+
+  const productsReport = useQuery({
+    queryKey: ['reports', 'products', orgId, productsStartIso, productsEndIso],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_products_report', {
+        p_organization_id: orgId,
+        p_start_date: productsStartIso,
+        p_end_date: productsEndIso,
+      });
+      if (error) throw error;
+      return data as ProductsReport;
+    },
+    enabled: !!orgId && activeTab === 'products',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_products: 0,
+        active_products: 0,
+        inactive_products: 0,
+        low_stock_products: 0,
+        out_of_stock_products: 0,
+        category_distribution: [],
+        low_stock_list: [],
+        out_of_stock_list: [],
+      },
+  });
+
+  const inventoryReport = useQuery({
+    queryKey: [
+      'reports',
+      'inventory',
+      orgId,
+      normalizedBranchIds,
+      startIso,
+      endIso,
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_inventory_report', {
+        p_organization_id: orgId,
+        p_branch_ids: normalizedBranchIds,
+        p_start_date: startIso,
+        p_end_date: endIso,
+      });
+      if (error) throw error;
+      return data as InventoryReport;
+    },
+    enabled: !!orgId && activeTab === 'inventory',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_items: 0,
+        low_stock_items: 0,
+        out_of_stock_items: 0,
+        stock_by_category: [],
+      },
+  });
+
+  const salesReport = useQuery({
+    queryKey: [
+      'reports',
+      'sales',
+      orgId,
+      normalizedBranchIds,
+      startIso,
+      endIso,
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_sales_report', {
+        p_organization_id: orgId,
+        p_branch_ids: normalizedBranchIds,
+        p_start_date: startIso,
+        p_end_date: endIso,
+      });
+      if (error) throw error;
+      return data as SalesReport;
+    },
+    enabled: !!orgId && activeTab === 'sales',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_orders: 0,
+        total_revenue: 0,
+        breakdown: {},
+        trend: [],
+      },
+  });
+
+  const ordersReport = useQuery({
+    queryKey: [
+      'reports',
+      'orders',
+      orgId,
+      normalizedBranchIds,
+      startIso,
+      endIso,
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_orders_report', {
+        p_organization_id: orgId,
+        p_branch_ids: normalizedBranchIds,
+        p_start_date: startIso,
+        p_end_date: endIso,
+      });
+      if (error) throw error;
+      return data as OrdersReport;
+    },
+    enabled: !!orgId && activeTab === 'orders',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_orders: 0,
+        breakdown: {},
+      },
+  });
+
+  const expensesReport = useQuery({
+    queryKey: [
+      'reports',
+      'expenses',
+      orgId,
+      normalizedBranchIds,
+      startIso,
+      endIso,
+      expensesGroupBy,
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_expenses_report', {
+        p_organization_id: orgId,
+        p_branch_ids: normalizedBranchIds,
+        p_start_date: startIso,
+        p_end_date: endIso,
+        p_group_by: expensesGroupBy,
+      });
+      if (error) throw error;
+      return data as ExpensesReport;
+    },
+    enabled: !!orgId && activeTab === 'expenses',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_records: 0,
+        total_expenditure: 0,
+        grouped: [],
+        trend: [],
+      },
+  });
+
+  const customersReport = useQuery({
+    queryKey: ['reports', 'customers', orgId, startIso, endIso],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_customers_report', {
+        p_organization_id: orgId,
+        p_start_date: startIso,
+        p_end_date: endIso,
+      });
+      if (error) throw error;
+      return data as CustomersReport;
+    },
+    enabled: !!orgId && activeTab === 'customers',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_customers: 0,
+        new_this_period: 0,
+        top_customers: [],
+      },
+  });
+
+  const suppliersReport = useQuery({
+    queryKey: ['reports', 'suppliers', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_suppliers_report', {
+        p_organization_id: orgId,
+      });
+      if (error) throw error;
+      return data as SuppliersReport;
+    },
+    enabled: !!orgId && activeTab === 'suppliers',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_suppliers: 0,
+        top_suppliers: [],
+      },
+  });
+
+  const periodLabel = useMemo(() => {
+    const range =
+      activeTab === 'products' ? productsDateApplied : generalDateRange;
+    if (!range?.from && !range?.to) return 'All Time';
+    const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
+    const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
+    return `${from} — ${to}`;
+  }, [activeTab, productsDateApplied, generalDateRange]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Reports & Insights
-          </h1>
-          <p className="text-muted-foreground">
-            Analyze your business performance across all modules
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">Generate and review reports</p>
         </div>
         <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" /> Export All
+          <Download className="mr-2 h-4 w-4" /> Export
         </Button>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Period: {periodLabel}
+        </div>
+        {isBranchScoped(activeTab) && (
+          <div className="text-sm text-muted-foreground">
+            Branches: {branchIds.length > 0 ? branchIds.length : 'All'}
+          </div>
+        )}
+      </div>
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+        className="space-y-4"
+      >
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
+          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
-
-        {/* OVERVIEW TAB */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Revenue
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(
-                    mockOrders.reduce((acc, o) => acc + o.totalAmount, 0)
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  +20.1% from last month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Products
-                </CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{products.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  +2 new items added
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Customers
-                </CardTitle>
-                <PieChart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{mockCustomers.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  +5% new customers
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Active Suppliers
-                </CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{suppliers.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Stable relationships
-                </p>
-              </CardContent>
-            </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            {activeTab === 'products' && (
+              <span className="text-sm font-medium">
+                Filter products by when they were added
+              </span>
+            )}
+            {activeTab === 'products' ? (
+              <div className="flex items-center gap-2">
+                <DatePickerWithRange
+                  date={productsDateDraft}
+                  setDate={setProductsDateDraft}
+                  placeholder="Select product added date range"
+                  className="w-full"
+                />
+                <Button
+                  onClick={() => setProductsDateApplied(productsDateDraft)}
+                  disabled={!productsDateDraft?.from && !productsDateDraft?.to}
+                >
+                  Apply
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setProductsDateDraft(undefined);
+                    setProductsDateApplied(undefined);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            ) : (
+              <DatePickerWithRange
+                date={generalDateRange}
+                setDate={setGeneralDateRange}
+                placeholder="Select date range"
+                className="w-full"
+              />
+            )}
           </div>
+          {activeTab !== 'products' && (
+            <div className="flex items-center gap-2">
+              <Select
+                value={template}
+                onValueChange={(v) =>
+                  setTemplate(v as 'compact' | 'detailed' | 'pivot')
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compact">Compact</SelectItem>
+                  <SelectItem value="detailed">Detailed</SelectItem>
+                  <SelectItem value="pivot">Pivot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {isBranchScoped(activeTab) && (
+            <div className="flex items-center">
+              <BranchMultiSelector
+                value={branchIds}
+                onChange={setBranchIds}
+                placeholder="Select branches"
+              />
+            </div>
+          )}
+          {activeTab === 'expenses' && (
+            <div className="flex items-center">
+              <Select
+                value={expensesGroupBy}
+                onValueChange={(v) =>
+                  setExpensesGroupBy(v as 'category' | 'type')
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Group by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="category">By Category</SelectItem>
+                  <SelectItem value="type">By Type</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Revenue Over Time</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-75 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={getMonthlyRevenue()}>
-                      <XAxis
-                        dataKey="name"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => formatCurrency(value)}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'transparent' }}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          borderColor: 'hsl(var(--border))',
-                          color: 'hsl(var(--foreground))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar
-                        dataKey="total"
-                        fill="hsl(var(--primary))"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Sales by Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-75 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getCategoryDistribution()}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        fill="hsl(var(--primary))"
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {getCategoryDistribution().map((_entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          borderColor: 'hsl(var(--border))',
-                          color: 'hsl(var(--foreground))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="products" className="space-y-4">
+          <ProductsSection data={productsReport.data} colors={chartColors} />
         </TabsContent>
 
-        {/* INVENTORY TAB */}
         <TabsContent value="inventory" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stock Levels</CardTitle>
-              <CardDescription>
-                Current quantity vs Low Stock Threshold
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-100 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={products.slice(0, 10)}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                  >
-                    <XAxis
-                      type="number"
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={100}
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        borderColor: 'hsl(var(--border))',
-                        color: 'hsl(var(--foreground))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="quantity"
-                      name="Current Stock"
-                      fill="hsl(var(--chart-2))"
-                    />
-                    <Bar
-                      dataKey="minStockLevel"
-                      name="Min Level"
-                      fill="hsl(var(--chart-5))"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <InventorySection data={inventoryReport.data} />
         </TabsContent>
 
-        {/* ORDERS TAB */}
+        <TabsContent value="sales" className="space-y-4">
+          <SalesSection
+            data={salesReport.data}
+            formatCurrency={formatCurrency}
+          />
+        </TabsContent>
+
         <TabsContent value="orders" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Order Trends</CardTitle>
-              <CardDescription>Number of orders per month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-100 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={getMonthlyRevenue()}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        borderColor: 'hsl(var(--border))',
-                        color: 'hsl(var(--foreground))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="total"
-                      name={`Order Value (${currency})`}
-                      stroke="hsl(var(--chart-1))"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <OrdersSection data={ordersReport.data} />
         </TabsContent>
 
-        {/* CUSTOMERS TAB */}
-        <TabsContent value="customers" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Customers by Spend</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockCustomers
-                    .sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
-                    .slice(0, 5)
-                    .map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {customer.firstName} {customer.lastName}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {customer.totalOrders || 0} orders
-                          </span>
-                        </div>
-                        <div className="font-bold">
-                          {formatCurrency(customer.totalSpent || 0)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
+        <TabsContent value="expenses" className="space-y-4">
+          <ExpensesSection
+            data={expensesReport.data}
+            formatCurrency={formatCurrency}
+          />
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Customers by Orders</CardTitle>
-                <CardDescription>
-                  Customers with the most orders
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockCustomers
-                    .sort((a, b) => (b.totalOrders || 0) - (a.totalOrders || 0))
-                    .slice(0, 5)
-                    .map((customer, i) => (
-                      <div
-                        key={customer.id}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="font-bold text-lg text-muted-foreground">
-                            #{i + 1}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium leading-none">
-                              {customer.firstName} {customer.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {customer.email}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="font-medium">
-                          {customer.totalOrders || 0} Orders
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="customers" className="space-y-4">
+          <CustomersSection
+            data={customersReport.data}
+            formatCurrency={formatCurrency}
+          />
+        </TabsContent>
+
+        <TabsContent value="suppliers" className="space-y-4">
+          <SuppliersSection data={suppliersReport.data} />
         </TabsContent>
       </Tabs>
     </div>

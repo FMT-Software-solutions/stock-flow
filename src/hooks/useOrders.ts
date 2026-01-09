@@ -14,7 +14,8 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
           *,
           items:order_items(*),
           branch:branches(id, name, abbreviation),
-          customer:customers(id, first_name, last_name, email, phone)
+          customer:customers(id, first_name, last_name, email, phone),
+          creator:profiles!orders_created_by_fkey1(first_name, last_name)
         `)
         .eq('organization_id', organizationId)
         .order('date', { ascending: false });
@@ -26,7 +27,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
       const { data, error } = await query;
       if (error) throw error;
 
-      return data as Order[];
+      return (data || []) as Order[];
     },
     enabled: !!organizationId,
     placeholderData: (prev) => prev ?? [],

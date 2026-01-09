@@ -19,12 +19,9 @@ import type { DateRange } from 'react-day-picker';
 import { CustomersSection } from './reports/CustomersSection';
 import { ExpensesSection } from './reports/ExpensesSection';
 import { InventorySection } from './reports/InventorySection';
-import { OrdersSection } from './reports/OrdersSection';
 import { ProductsSection } from './reports/ProductsSection';
 import { SalesSection } from './reports/SalesSection';
 import { SuppliersSection } from './reports/SuppliersSection';
-
-type TrendPoint = { date: string; value: number };
 
 type ProductsReport = {
   total_products: number;
@@ -76,25 +73,6 @@ type InventoryReport = {
   }[];
 };
 
-type SalesReport = {
-  total_orders: number;
-  total_revenue: number;
-  breakdown: Record<string, number>;
-  trend: TrendPoint[];
-};
-
-type OrdersReport = {
-  total_orders: number;
-  breakdown: Record<string, number>;
-};
-
-type ExpensesReport = {
-  total_records: number;
-  total_expenditure: number;
-  grouped: { name: string; amount: number }[];
-  trend: TrendPoint[];
-};
-
 type CustomersReport = {
   total_customers: number;
   new_this_period: number;
@@ -122,8 +100,7 @@ export function Reports() {
   const [activeTab, setActiveTab] = useState<
     | 'products'
     | 'inventory'
-    | 'sales'
-    | 'orders'
+    | 'sales_orders'
     | 'expenses'
     | 'customers'
     | 'suppliers'
@@ -177,12 +154,7 @@ export function Reports() {
     : null;
 
   const isBranchScoped = (tab: typeof activeTab) => {
-    return (
-      tab === 'inventory' ||
-      tab === 'sales' ||
-      tab === 'orders' ||
-      tab === 'expenses'
-    );
+    return tab === 'inventory' || tab === 'sales_orders' || tab === 'expenses';
   };
 
   const productsReport = useQuery({
@@ -240,93 +212,6 @@ export function Reports() {
         inventory_value_by_category: [],
         low_stock_list: [],
         out_of_stock_list: [],
-      },
-  });
-
-  const salesReport = useQuery({
-    queryKey: [
-      'reports',
-      'sales',
-      orgId,
-      normalizedBranchIds,
-      startIso,
-      endIso,
-    ],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_sales_report', {
-        p_organization_id: orgId,
-        p_branch_ids: normalizedBranchIds,
-        p_start_date: startIso,
-        p_end_date: endIso,
-      });
-      if (error) throw error;
-      return data as SalesReport;
-    },
-    enabled: !!orgId && activeTab === 'sales',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_orders: 0,
-        total_revenue: 0,
-        breakdown: {},
-        trend: [],
-      },
-  });
-
-  const ordersReport = useQuery({
-    queryKey: [
-      'reports',
-      'orders',
-      orgId,
-      normalizedBranchIds,
-      startIso,
-      endIso,
-    ],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_orders_report', {
-        p_organization_id: orgId,
-        p_branch_ids: normalizedBranchIds,
-        p_start_date: startIso,
-        p_end_date: endIso,
-      });
-      if (error) throw error;
-      return data as OrdersReport;
-    },
-    enabled: !!orgId && activeTab === 'orders',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_orders: 0,
-        breakdown: {},
-      },
-  });
-
-  const expensesReport = useQuery({
-    queryKey: [
-      'reports',
-      'expenses',
-      orgId,
-      normalizedBranchIds,
-      startIso,
-      endIso,
-      expensesGroupBy,
-    ],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_expenses_report', {
-        p_organization_id: orgId,
-        p_branch_ids: normalizedBranchIds,
-        p_start_date: startIso,
-        p_end_date: endIso,
-        p_group_by: expensesGroupBy,
-      });
-      if (error) throw error;
-      return data as ExpensesReport;
-    },
-    enabled: !!orgId && activeTab === 'expenses',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_records: 0,
-        total_expenditure: 0,
-        grouped: [],
-        trend: [],
       },
   });
 
@@ -408,8 +293,7 @@ export function Reports() {
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
+          <TabsTrigger value="sales_orders">Sales & Orders</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
@@ -498,21 +382,22 @@ export function Reports() {
           />
         </TabsContent>
 
-        <TabsContent value="sales" className="space-y-4">
+        <TabsContent value="sales_orders" className="space-y-4">
           <SalesSection
-            data={salesReport.data}
-            formatCurrency={formatCurrency}
+            orgId={orgId}
+            branchIds={branchIds}
+            dateRange={generalDateRange}
+            template={template}
           />
-        </TabsContent>
-
-        <TabsContent value="orders" className="space-y-4">
-          <OrdersSection data={ordersReport.data} />
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-4">
           <ExpensesSection
-            data={expensesReport.data}
-            formatCurrency={formatCurrency}
+            orgId={orgId}
+            branchIds={branchIds}
+            dateRange={generalDateRange}
+            template={template}
+            groupBy={expensesGroupBy}
           />
         </TabsContent>
 

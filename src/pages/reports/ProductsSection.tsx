@@ -7,6 +7,10 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { ProductsExportDialog } from './export/ProductsExportDialog';
+import type { DateRange } from 'react-day-picker';
+import { DatePickerWithRange } from '@/components/shared/date-range-picker';
 import { LowStockTable } from './LowStockTable';
 import { OutOfStockTable } from './OutOfStockTable';
 import { useState } from 'react';
@@ -39,15 +43,76 @@ type ProductsReport = {
 interface ProductsSectionProps {
   data?: ProductsReport;
   colors: string[];
+  organizationName?: string;
+  dateRange?: DateRange;
+  productsDateDraft?: DateRange;
+  setProductsDateDraft?: (d: DateRange | undefined) => void;
+  setProductsDateApplied?: (d: DateRange | undefined) => void;
 }
 
-export function ProductsSection({ data, colors }: ProductsSectionProps) {
+export function ProductsSection({
+  data,
+  colors,
+  organizationName,
+  dateRange,
+  productsDateDraft,
+  setProductsDateDraft,
+  setProductsDateApplied,
+}: ProductsSectionProps) {
   const chartConfig: ChartConfig = {
     value: { label: 'Products' },
   };
   const [groupByCategory, setGroupByCategory] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const defaultSections: Array<'stats' | 'category' | 'low' | 'out'> = [
+    'stats',
+    'category',
+    'low',
+    'out',
+  ];
   return (
     <>
+      <div className="flex items-end justify-between mb-4">
+        <div className='flex flex-col gap-1'>
+          <span className="text-sm font-medium">
+            Filter products by when they were added
+          </span>
+          <div className="flex items-center gap-2">
+            <DatePickerWithRange
+              date={productsDateDraft}
+              setDate={setProductsDateDraft}
+              placeholder="Select product added date range"
+              className="w-full"
+            />
+            <Button
+              onClick={() => setProductsDateApplied?.(productsDateDraft)}
+              disabled={!productsDateDraft?.from && !productsDateDraft?.to}
+            >
+              Apply
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setProductsDateDraft?.(undefined);
+                setProductsDateApplied?.(undefined);
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+          </div>
+        <div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setExportOpen(true);
+            }}
+          >
+            Export
+          </Button>
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="gap-0">
@@ -160,6 +225,17 @@ export function ProductsSection({ data, colors }: ProductsSectionProps) {
           <OutOfStockTable products={data?.out_of_stock_list || []} groupByCategory={groupByCategory} />
         </CardContent>
       </Card>
+      
+      {data && (
+        <ProductsExportDialog
+          data={data}
+          open={exportOpen}
+          onClose={() => setExportOpen(false)}
+          defaultSections={defaultSections}
+          organizationName={organizationName}
+          dateRange={dateRange}
+        />
+      )}
     </>
   );
 }

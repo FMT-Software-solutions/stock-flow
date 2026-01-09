@@ -1,13 +1,5 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-import { useCurrency } from '@/hooks/useCurrency';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { supabase } from '@/utils/supabase';
-import { useQuery } from '@tanstack/react-query';
-import { DatePickerWithRange } from '@/components/shared/date-range-picker';
 import { BranchMultiSelector } from '@/components/shared/BranchMultiSelector';
-import { useBranchContext } from '@/contexts/BranchContext';
+import { DatePickerWithRange } from '@/components/shared/date-range-picker';
 import {
   Select,
   SelectContent,
@@ -15,15 +7,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMemo, useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useCurrency } from '@/hooks/useCurrency';
+import { supabase } from '@/utils/supabase';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ProductsSection } from './reports/ProductsSection';
-import { InventorySection } from './reports/InventorySection';
-import { SalesSection } from './reports/SalesSection';
-import { OrdersSection } from './reports/OrdersSection';
-import { ExpensesSection } from './reports/ExpensesSection';
 import { CustomersSection } from './reports/CustomersSection';
+import { ExpensesSection } from './reports/ExpensesSection';
+import { InventorySection } from './reports/InventorySection';
+import { OrdersSection } from './reports/OrdersSection';
+import { ProductsSection } from './reports/ProductsSection';
+import { SalesSection } from './reports/SalesSection';
 import { SuppliersSection } from './reports/SuppliersSection';
 
 type TrendPoint = { date: string; value: number };
@@ -351,9 +349,6 @@ export function Reports() {
           <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
           <p className="text-muted-foreground">Generate and review reports</p>
         </div>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" /> Export
-        </Button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -383,36 +378,7 @@ export function Reports() {
         </TabsList>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-2">
-            {activeTab === 'products' && (
-              <span className="text-sm font-medium">
-                Filter products by when they were added
-              </span>
-            )}
-            {activeTab === 'products' ? (
-              <div className="flex items-center gap-2">
-                <DatePickerWithRange
-                  date={productsDateDraft}
-                  setDate={setProductsDateDraft}
-                  placeholder="Select product added date range"
-                  className="w-full"
-                />
-                <Button
-                  onClick={() => setProductsDateApplied(productsDateDraft)}
-                  disabled={!productsDateDraft?.from && !productsDateDraft?.to}
-                >
-                  Apply
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setProductsDateDraft(undefined);
-                    setProductsDateApplied(undefined);
-                  }}
-                >
-                  Clear
-                </Button>
-              </div>
-            ) : (
+            {activeTab !== 'products' && (
               <DatePickerWithRange
                 date={generalDateRange}
                 setDate={setGeneralDateRange}
@@ -470,7 +436,15 @@ export function Reports() {
         </div>
 
         <TabsContent value="products" className="space-y-4">
-          <ProductsSection data={productsReport.data} colors={chartColors} />
+          <ProductsSection
+            data={productsReport.data}
+            colors={chartColors}
+            organizationName={currentOrganization?.name}
+            dateRange={productsDateApplied}
+            productsDateDraft={productsDateDraft}
+            setProductsDateDraft={setProductsDateDraft}
+            setProductsDateApplied={setProductsDateApplied}
+          />
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">

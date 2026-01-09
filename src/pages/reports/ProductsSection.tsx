@@ -14,6 +14,7 @@ import { DatePickerWithRange } from '@/components/shared/date-range-picker';
 import { LowStockTable } from './LowStockTable';
 import { OutOfStockTable } from './OutOfStockTable';
 import { useState } from 'react';
+import { StatCard } from './components/StatCard';
 
 type ProductsReport = {
   total_products: number;
@@ -114,38 +115,10 @@ export function ProductsSection({
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="gap-0">
-            <CardTitle>Total Products</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xl font-bold">
-            {data?.total_products ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="gap-0">
-            <CardTitle>Active</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xl font-bold">
-            {data?.active_products ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="gap-0">
-            <CardTitle>Low Stock</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xl font-bold text-orange-500">
-            {data?.low_stock_products ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="gap-0">
-            <CardTitle>Out of Stock</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xl font-bold text-red-500">
-            {data?.out_of_stock_products ?? 0}
-          </CardContent>
-        </Card>
+        <StatCard title="Total Products" value={data?.total_products ?? 0} />
+        <StatCard title="Active" value={data?.active_products ?? 0} />
+        <StatCard title="Low Stock" value={data?.low_stock_products ?? 0} valueClassName="text-orange-500" />
+        <StatCard title="Out of Stock" value={data?.out_of_stock_products ?? 0} valueClassName="text-red-500" />
       </div>
 
       <Card>

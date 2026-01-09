@@ -56,6 +56,24 @@ type InventoryReport = {
   low_stock_items: number;
   out_of_stock_items: number;
   stock_by_category: { category: string; quantity: number }[];
+  total_revenue?: number;
+  inventory_value_by_category?: { category: string; value: number }[];
+  low_stock_list?: {
+    id: string;
+    name: string;
+    sku: string | null;
+    category_name: string | null;
+    quantity: number;
+    min_stock_level: number;
+  }[];
+  out_of_stock_list?: {
+    id: string;
+    name: string;
+    sku: string | null;
+    category_name: string | null;
+    quantity: number;
+    min_stock_level: number;
+  }[];
 };
 
 type SalesReport = {
@@ -119,6 +137,12 @@ export function Reports() {
   const [productsDateApplied, setProductsDateApplied] = useState<
     DateRange | undefined
   >(undefined);
+  const [inventoryDateDraft, setInventoryDateDraft] = useState<
+    DateRange | undefined
+  >(undefined);
+  const [inventoryDateApplied, setInventoryDateApplied] = useState<
+    DateRange | undefined
+  >(undefined);
   const [branchIds, setBranchIds] = useState<string[]>(globalBranchIds);
   const [template, setTemplate] = useState<'compact' | 'detailed' | 'pivot'>(
     'compact'
@@ -144,6 +168,12 @@ export function Reports() {
     : null;
   const productsEndIso = productsDateApplied?.to
     ? new Date(productsDateApplied.to).toISOString()
+    : null;
+  const inventoryStartIso = inventoryDateApplied?.from
+    ? new Date(inventoryDateApplied.from).toISOString()
+    : null;
+  const inventoryEndIso = inventoryDateApplied?.to
+    ? new Date(inventoryDateApplied.to).toISOString()
     : null;
 
   const isBranchScoped = (tab: typeof activeTab) => {
@@ -186,15 +216,15 @@ export function Reports() {
       'inventory',
       orgId,
       normalizedBranchIds,
-      startIso,
-      endIso,
+      inventoryStartIso,
+      inventoryEndIso,
     ],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_inventory_report', {
         p_organization_id: orgId,
         p_branch_ids: normalizedBranchIds,
-        p_start_date: startIso,
-        p_end_date: endIso,
+        p_start_date: inventoryStartIso,
+        p_end_date: inventoryEndIso,
       });
       if (error) throw error;
       return data as InventoryReport;
@@ -206,6 +236,10 @@ export function Reports() {
         low_stock_items: 0,
         out_of_stock_items: 0,
         stock_by_category: [],
+        total_revenue: 0,
+        inventory_value_by_category: [],
+        low_stock_list: [],
+        out_of_stock_list: [],
       },
   });
 
@@ -335,12 +369,16 @@ export function Reports() {
 
   const periodLabel = useMemo(() => {
     const range =
-      activeTab === 'products' ? productsDateApplied : generalDateRange;
+      activeTab === 'products'
+        ? productsDateApplied
+        : activeTab === 'inventory'
+        ? inventoryDateApplied
+        : generalDateRange;
     if (!range?.from && !range?.to) return 'All Time';
     const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
     const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
     return `${from} — ${to}`;
-  }, [activeTab, productsDateApplied, generalDateRange]);
+  }, [activeTab, productsDateApplied, inventoryDateApplied, generalDateRange]);
 
   return (
     <div className="space-y-6">
@@ -378,7 +416,7 @@ export function Reports() {
         </TabsList>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-2">
-            {activeTab !== 'products' && (
+            {activeTab !== 'products' && activeTab !== 'inventory' && (
               <DatePickerWithRange
                 date={generalDateRange}
                 setDate={setGeneralDateRange}
@@ -387,7 +425,7 @@ export function Reports() {
               />
             )}
           </div>
-          {activeTab !== 'products' && (
+          {activeTab !== 'products' && activeTab !== 'inventory' && (
             <div className="flex items-center gap-2">
               <Select
                 value={template}
@@ -406,7 +444,7 @@ export function Reports() {
               </Select>
             </div>
           )}
-          {isBranchScoped(activeTab) && (
+          {isBranchScoped(activeTab) && activeTab !== 'inventory' && (
             <div className="flex items-center">
               <BranchMultiSelector
                 value={branchIds}
@@ -448,7 +486,16 @@ export function Reports() {
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">
-          <InventorySection data={inventoryReport.data} />
+          <InventorySection
+            data={inventoryReport.data}
+            branchIds={branchIds}
+            setBranchIds={setBranchIds}
+            inventoryDateDraft={inventoryDateDraft}
+            setInventoryDateDraft={setInventoryDateDraft}
+            inventoryDateApplied={inventoryDateApplied}
+            setInventoryDateApplied={setInventoryDateApplied}
+            organizationName={currentOrganization?.name}
+          />
         </TabsContent>
 
         <TabsContent value="sales" className="space-y-4">

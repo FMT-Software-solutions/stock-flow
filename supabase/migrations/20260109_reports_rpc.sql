@@ -114,6 +114,11 @@ BEGIN
 END;
 $$;
 
+-- Ensure no overloaded legacy signature remains (removes ambiguity in PostgREST)
+DROP FUNCTION IF EXISTS public.get_inventory_report(
+    UUID, UUID[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT
+);
+
 CREATE OR REPLACE FUNCTION get_inventory_report(
     p_organization_id UUID,
     p_branch_ids UUID[] DEFAULT NULL,
@@ -129,21 +134,41 @@ DECLARE
     v_low_stock_items BIGINT;
     v_out_of_stock_items BIGINT;
     v_stock_by_category JSONB;
+    v_total_revenue NUMERIC;
+    v_inventory_value_by_category JSONB;
+    v_low_stock_list JSONB;
+    v_out_of_stock_list JSONB;
 BEGIN
-    SELECT
-        COUNT(*),
-        COUNT(*) FILTER (WHERE quantity <= min_stock_level AND quantity > 0),
-        COUNT(*) FILTER (WHERE quantity <= 0)
-    INTO
-        v_total_items,
-        v_low_stock_items,
-        v_out_of_stock_items
+    -- Total inventory entries
+    SELECT COUNT(*)
+    INTO v_total_items
     FROM inventory
     WHERE organization_id = p_organization_id
     AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR branch_id = ANY(p_branch_ids))
     AND is_deleted = false
     AND (p_start_date IS NULL OR last_updated >= p_start_date)
     AND (p_end_date IS NULL OR last_updated <= p_end_date);
+
+    SELECT COUNT(*)
+    INTO v_low_stock_items
+    FROM inventory i
+    WHERE i.organization_id = p_organization_id
+    AND i.is_deleted = false
+    AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+    AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+    AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
+    AND COALESCE(i.quantity, 0) > 0
+    AND COALESCE(i.quantity, 0) <= COALESCE(i.min_stock_level, 0);
+
+    SELECT COUNT(*)
+    INTO v_out_of_stock_items
+    FROM inventory i
+    WHERE i.organization_id = p_organization_id
+    AND i.is_deleted = false
+    AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+    AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+    AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
+    AND COALESCE(i.quantity, 0) <= 0;
 
     SELECT jsonb_agg(t)
     INTO v_stock_by_category
@@ -155,16 +180,98 @@ BEGIN
         WHERE i.organization_id = p_organization_id
         AND i.is_deleted = false
         AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+        AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+        AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
         GROUP BY pc.id, pc.name
         ORDER BY quantity DESC
         LIMIT 10
+    ) t;
+
+    SELECT COALESCE(SUM(i.quantity * COALESCE(i.price_override, p.selling_price)), 0)
+    INTO v_total_revenue
+    FROM inventory i
+    LEFT JOIN products p ON p.id = i.product_id
+    WHERE i.organization_id = p_organization_id
+    AND i.is_deleted = false
+    AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+    AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+    AND (p_end_date IS NULL OR i.last_updated <= p_end_date);
+
+    SELECT jsonb_agg(t)
+    INTO v_inventory_value_by_category
+    FROM (
+        SELECT 
+            pc.name AS category, 
+            COALESCE(SUM(i.quantity * COALESCE(p.cost_price, 0)), 0) AS value
+        FROM inventory i
+        LEFT JOIN products p ON p.id = i.product_id
+        LEFT JOIN product_categories pc ON pc.id = p.category_id
+        WHERE i.organization_id = p_organization_id
+        AND i.is_deleted = false
+        AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+        AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+        AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
+        GROUP BY pc.id, pc.name
+        ORDER BY value DESC
+        LIMIT 10
+    ) t;
+
+    SELECT jsonb_agg(t)
+    INTO v_low_stock_list
+    FROM (
+        SELECT 
+            i.id AS id,
+            COALESCE(p.name, COALESCE(i.custom_label, 'Unnamed Product')) AS name,
+            COALESCE(p.sku, i.inventory_number) AS sku,
+            COALESCE(pc.name, 'Uncategorized') AS category_name,
+            COALESCE(i.quantity, 0) AS quantity,
+            COALESCE(i.min_stock_level, 0) AS min_stock_level
+        FROM inventory i
+        LEFT JOIN products p ON p.id = i.product_id
+        LEFT JOIN product_categories pc ON pc.id = p.category_id
+        WHERE i.organization_id = p_organization_id
+        AND i.is_deleted = false
+        AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+        AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+        AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
+        AND COALESCE(i.quantity, 0) > 0
+        AND COALESCE(i.quantity, 0) <= COALESCE(i.min_stock_level, 0)
+        ORDER BY quantity ASC
+        LIMIT 100
+    ) t;
+
+    SELECT jsonb_agg(t)
+    INTO v_out_of_stock_list
+    FROM (
+        SELECT 
+            i.id AS id,
+            COALESCE(p.name, COALESCE(i.custom_label, 'Unnamed Product')) AS name,
+            COALESCE(p.sku, i.inventory_number) AS sku,
+            COALESCE(pc.name, 'Uncategorized') AS category_name,
+            COALESCE(i.quantity, 0) AS quantity,
+            COALESCE(i.min_stock_level, 0) AS min_stock_level
+        FROM inventory i
+        LEFT JOIN products p ON p.id = i.product_id
+        LEFT JOIN product_categories pc ON pc.id = p.category_id
+        WHERE i.organization_id = p_organization_id
+        AND i.is_deleted = false
+        AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR i.branch_id = ANY(p_branch_ids))
+        AND (p_start_date IS NULL OR i.last_updated >= p_start_date)
+        AND (p_end_date IS NULL OR i.last_updated <= p_end_date)
+        AND COALESCE(i.quantity, 0) <= 0
+        ORDER BY quantity ASC
+        LIMIT 100
     ) t;
 
     RETURN jsonb_build_object(
         'total_items', COALESCE(v_total_items, 0),
         'low_stock_items', COALESCE(v_low_stock_items, 0),
         'out_of_stock_items', COALESCE(v_out_of_stock_items, 0),
-        'stock_by_category', COALESCE(v_stock_by_category, '[]'::jsonb)
+        'stock_by_category', COALESCE(v_stock_by_category, '[]'::jsonb),
+        'total_revenue', COALESCE(v_total_revenue, 0),
+        'inventory_value_by_category', COALESCE(v_inventory_value_by_category, '[]'::jsonb),
+        'low_stock_list', COALESCE(v_low_stock_list, '[]'::jsonb),
+        'out_of_stock_list', COALESCE(v_out_of_stock_list, '[]'::jsonb)
     );
 END;
 $$;

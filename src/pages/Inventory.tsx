@@ -148,6 +148,13 @@ export function Inventory() {
     value: location as string,
   }));
 
+  const inventoryBranches = Array.from(
+    new Set(inventoryEntries.map((i) => i.branchName).filter(Boolean))
+  ).map((branch) => ({
+    label: branch as string,
+    value: branch as string,
+  }));
+
   const inventoryCreators = Array.from(
     new Set(inventoryEntries.map((i) => i.createdByName).filter(Boolean))
   ).map((name) => ({
@@ -164,6 +171,7 @@ export function Inventory() {
   const inventoryFilterFields = getInventoryFilterFields(
     inventoryProductNames,
     categories,
+    inventoryBranches,
     inventoryLocations,
     inventoryCreators
   );
@@ -329,7 +337,10 @@ export function Inventory() {
                 filterFields={inventoryFilterFields}
                 exportFields={inventoryExportFields}
                 storageKey="inventory-entries-table"
-                defaultColumnVisibility={{ searchable: false }}
+                defaultColumnVisibility={{
+                  searchable: false,
+                  branchName: false,
+                }}
                 canExport={canExportInventory}
                 orgId={currentOrganization?.id}
                 onFilteredDataChange={(rows) =>
@@ -354,10 +365,11 @@ export function Inventory() {
               <DataTable
                 columns={columns}
                 data={products}
-                searchKey="name"
+                searchKey="searchable"
                 filterFields={filterFields}
                 exportFields={productExportFields}
                 storageKey="inventory-products-table"
+                defaultColumnVisibility={{ searchable: false }}
                 canExport={canExportProducts}
                 orgId={currentOrganization?.id}
                 onFilteredDataChange={(rows) =>

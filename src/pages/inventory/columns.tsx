@@ -43,6 +43,15 @@ const formatRelativeTime = (value: string) => {
 }
 
 export const columns: ColumnDef<Product>[] = [
+  {
+    id: "searchable",
+    accessorFn: (row) =>
+      `${row.name} ${row.sku || ""} ${row.category?.name || ""}`.trim(),
+    enableHiding: true,
+    enableSorting: false,
+    header: () => null,
+    cell: () => null,
+  },
   // We do not use the select column at the moment, we will enable it back when we need it
   // {
   //   id: "select",
@@ -203,7 +212,7 @@ export const columns: ColumnDef<Product>[] = [
 export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
   {
     id: "searchable",
-    accessorFn: (row) => `${row.productName} ${row.sku} ${row.inventoryNumber || ''}`,
+    accessorFn: (row) => `${row.productName} ${row.sku} ${row.inventoryNumber || ''} ${row.categoryName || ""} ${row.branchName || ''}`.trim(),
     enableHiding: true,
     enableSorting: false,
     header: () => null,
@@ -269,6 +278,16 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     accessorKey: "categoryName",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Category" />
+    ),
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
+    },
+    enableHiding: true,
+  },
+  {
+    accessorKey: "branchName",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Branch" />
     ),
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id))

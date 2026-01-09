@@ -8,7 +8,7 @@ export function ModernLayout() {
 
   // Calculate margin based on sidebar state
   const getMainMargin = () => {
-    if (isMobile) return 'ml-0'; // No margin on mobile
+    if (isMobile) return 'ml-14'; // No margin on mobile
     return isCollapsed ? 'ml-16' : 'ml-64'; // 16 for collapsed, 64 for expanded
   };
 

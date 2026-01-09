@@ -190,7 +190,7 @@ function DashboardMetricCard<TData>({
 }) {
   return (
     <Card className={cn('flex flex-col', loading && 'opacity-60', className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-column md:flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base font-medium">{title}</CardTitle>
         {setDateRange && (
           <DatePickerWithRange 
@@ -650,7 +650,7 @@ export function Dashboard() {
                         {lowStockProducts.map((item) => (
                           <div
                             key={item.id}
-                            className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                            className="flex flex-col md:flex-row items-center justify-between border-b pb-4 last:border-0 last:pb-0"
                           >
                             <div className="flex items-start gap-3">
                               {item.imageUrl ? (
@@ -673,7 +673,7 @@ export function Dashboard() {
                             </div>
                             
                             <div className="flex items-center gap-4">
-                              <div className="text-right">
+                              <div className="text-left md:text-right">
                                 <div className="text-xs text-muted-foreground">Available</div>
                                 <div className={`text-sm font-bold ${item.quantity <= 0 ? 'text-red-500' : 'text-orange-500'}`}>
                                   {item.quantity} <span className="text-[10px] font-normal text-muted-foreground">{item.unit}</span>
@@ -701,7 +701,7 @@ export function Dashboard() {
                         {lowStockInventories.map((inv) => (
                           <div
                             key={inv.id}
-                            className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                            className="flex flex-col md:flex-row items-center justify-between border-b pb-4 last:border-0 last:pb-0"
                           >
                             <div className="flex items-start gap-3">
                               {inv.imageUrl || inv.productImage ? (
@@ -724,7 +724,7 @@ export function Dashboard() {
                             </div>
                             
                             <div className="flex items-center gap-4">
-                              <div className="text-right">
+                              <div className="text-left md:text-right">
                                 <div className="text-xs text-muted-foreground">Available</div>
                                 <div className={`text-sm font-bold ${inv.quantity <= 0 ? 'text-red-500' : 'text-orange-500'}`}>
                                   {inv.quantity} <span className="text-[10px] font-normal text-muted-foreground">{inv.unit || ''}</span>

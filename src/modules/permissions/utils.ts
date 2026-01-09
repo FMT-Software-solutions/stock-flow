@@ -71,13 +71,6 @@ export function buildUserPermissions(
   customPermissions?: UserPermissions,
   basePermissions?: UserPermissions
 ): UserPermissions {
-  if (import.meta.env.DEV) {
-    console.debug('buildUserPermissions:start', {
-      role,
-      baseScopes: Object.keys(basePermissions || {}),
-      customScopes: Object.keys(customPermissions || {}),
-    });
-  }
   // 1. Start with base permissions (organization role)
   const result: UserPermissions = {};
 
@@ -94,12 +87,6 @@ export function buildUserPermissions(
     });
   }
 
-  if (import.meta.env.DEV) {
-    console.debug('buildUserPermissions:afterBase', {
-      role,
-      scopes: Object.keys(result),
-    });
-  }
   // 2. Apply custom overrides if they exist
   if (customPermissions) {
     (Object.keys(customPermissions) as PermissionScope[]).forEach(scope => {
@@ -126,13 +113,6 @@ export function buildUserPermissions(
     });
   }
 
-  if (import.meta.env.DEV) {
-    console.debug('buildUserPermissions:result', {
-      role,
-      scopes: Object.keys(result),
-      snapshot: result,
-    });
-  }
   return result;
 }
 

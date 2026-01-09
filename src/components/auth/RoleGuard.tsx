@@ -54,15 +54,6 @@ export function useRoleCheck() {
     try {
       const permissions = JSON.parse(currentOrganization.permissions);
       const allowed = hasPermission(permissions, scope, action);
-      if (import.meta.env.DEV) {
-        console.debug('checkPermission:orgEffective', {
-          role: currentOrganization.user_role,
-          scope,
-          action,
-          allowed,
-          availableScopes: Object.keys(permissions || {}),
-        });
-      }
       return allowed;
     } catch (e) {
       console.error('Failed to parse permissions', e);

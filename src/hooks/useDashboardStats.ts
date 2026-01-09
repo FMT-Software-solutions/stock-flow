@@ -91,6 +91,12 @@ export function useDashboardStats({
       return data as InventoryStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_items: 0,
+        low_stock_items: 0,
+        out_of_stock_items: 0,
+      },
   });
 
   const products = useQuery({
@@ -104,6 +110,16 @@ export function useDashboardStats({
       return data as ProductStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_products: 0,
+        active_products: 0,
+        inactive_products: 0,
+        low_stock_products: 0,
+        out_of_stock_products: 0,
+        top_categories: [],
+        least_categories: [],
+      },
   });
 
   const sales = useQuery({
@@ -119,6 +135,15 @@ export function useDashboardStats({
       return data as SalesStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_orders: 0,
+        total_revenue: 0,
+        owings: 0,
+        refunds: 0,
+        breakdown: {},
+        trend: [],
+      },
   });
 
   const expenses = useQuery({
@@ -134,6 +159,13 @@ export function useDashboardStats({
       return data as ExpenseStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_records: 0,
+        total_expenditure: 0,
+        top_category: null,
+        trend: [],
+      },
   });
 
   const customers = useQuery({
@@ -149,6 +181,12 @@ export function useDashboardStats({
       return data as CustomerStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_customers: 0,
+        new_this_period: 0,
+        trend: [],
+      },
   });
 
   const suppliers = useQuery({
@@ -162,6 +200,10 @@ export function useDashboardStats({
       return data as SupplierStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_suppliers: 0,
+      },
   });
 
   const users = useQuery({
@@ -174,6 +216,12 @@ export function useDashboardStats({
       return data as UserStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_users: 0,
+        active_users: 0,
+        inactive_users: 0,
+      },
   });
 
   const branches = useQuery({
@@ -186,6 +234,12 @@ export function useDashboardStats({
       return data as BranchStats;
     },
     enabled,
+    placeholderData: (prev) =>
+      prev ?? {
+        total_branches: 0,
+        active_branches: 0,
+        inactive_branches: 0,
+      },
   });
 
   return {

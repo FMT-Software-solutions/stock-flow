@@ -4,6 +4,7 @@ import type { ExportField } from '@/hooks/useExport';
 export const getInventoryFilterFields = (
   productNames: { label: string; value: string }[],
   categories: { label: string; value: string }[],
+  branches: { label: string; value: string }[],
   locations: { label: string; value: string }[],
   creators: { label: string; value: string }[]
 ): DataTableFilterField[] => [
@@ -18,6 +19,12 @@ export const getInventoryFilterFields = (
     label: 'Category',
     type: 'select',
     options: categories,
+  },
+  {
+    id: 'branchName',
+    label: 'Branch',
+    type: 'select',
+    options: branches,
   },
   {
     id: 'effectivePrice',

@@ -40,10 +40,14 @@ export function DataTableToolbar<TData>({
   }, [filterValue]);
 
   useEffect(() => {
-    if (searchKey && debouncedSearchValue !== filterValue) {
+    if (
+      searchKey &&
+      debouncedSearchValue === searchValue &&
+      debouncedSearchValue !== filterValue
+    ) {
       table.getColumn(searchKey)?.setFilterValue(debouncedSearchValue);
     }
-  }, [debouncedSearchValue, table, searchKey, filterValue]);
+  }, [debouncedSearchValue, searchValue, table, searchKey, filterValue]);
 
   const isFiltered = table.getState().columnFilters.length > 0;
 
@@ -81,7 +85,13 @@ export function DataTableToolbar<TData>({
           {isFiltered && (
             <Button
               variant="ghost"
-              onClick={() => table.resetColumnFilters()}
+              onClick={() => {
+                table.resetColumnFilters();
+                if (searchKey) {
+                  setSearchValue('');
+                  table.getColumn(searchKey)?.setFilterValue('');
+                }
+              }}
               className="h-8 px-2 lg:px-3"
             >
               Reset

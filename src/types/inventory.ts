@@ -55,37 +55,37 @@ export interface Supplier {
 }
 
 export interface VariationType {
-    id: string;
-    name: string;
-    isDefault: boolean;
-    organizationId?: string;
+  id: string;
+  name: string;
+  isDefault: boolean;
+  organizationId?: string;
 }
 
 export interface VariationOption {
-    id: string;
-    variationTypeId: string;
-    value: string;
-    organizationId?: string;
+  id: string;
+  variationTypeId: string;
+  value: string;
+  organizationId?: string;
 }
 
 export interface ProductVariant {
-    id: string;
-    productId: string;
-    sku: string;
-    price: number;
-    attributes: Record<string, string>;
-    organizationId: string;
-    quantity?: number;
-    minStockLevel?: number;
-    location?: string;
+  id: string;
+  productId: string;
+  sku: string;
+  price: number;
+  attributes: Record<string, string>;
+  organizationId: string;
+  quantity?: number;
+  minStockLevel?: number;
+  location?: string;
 }
 
 export interface ProductVariantInput {
-    id?: string;
-    sku: string;
-    price: number;
-    quantity: number;
-    attributes: Record<string, string>;
+  id?: string;
+  sku: string;
+  price: number;
+  quantity: number;
+  attributes: Record<string, string>;
 }
 
 export interface Order {
@@ -100,6 +100,8 @@ export interface Order {
   paymentMethod?: string;
   items: OrderItem[];
 }
+
+import type { Discount } from './discounts';
 
 export interface InventoryEntry {
   id: string;
@@ -126,6 +128,8 @@ export interface InventoryEntry {
   productImage?: string;
   categoryName?: string;
   isDeleted?: boolean;
+  discountId?: string;
+  discount?: Discount;
 }
 
 export interface InventoryEntryInput {

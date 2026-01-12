@@ -50,6 +50,8 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
+import { DiscountManager } from './inventory/DiscountManager';
+
 export function Inventory() {
   const navigate = useNavigate();
   const { currentOrganization } = useOrganization();
@@ -235,6 +237,9 @@ export function Inventory() {
                   Variations
                 </TabsTrigger>
               )}
+              <TabsTrigger value="discounts" disabled={isLoading}>
+                Discounts
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           {activeTab === 'products' && canCreateProduct && (
@@ -388,6 +393,9 @@ export function Inventory() {
         </TabsContent>
         <TabsContent value="variations">
           {canViewVariations && <Variations />}
+        </TabsContent>
+        <TabsContent value="discounts">
+          <DiscountManager />
         </TabsContent>
       </Tabs>
 

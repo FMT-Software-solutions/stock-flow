@@ -2,49 +2,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrders } from '@/hooks/useOrders';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { format, addDays, addWeeks, addMonths, addQuarters, addYears, startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter, formatDistanceToNow } from 'date-fns';
+import { format, startOfDay, isAfter, formatDistanceToNow } from 'date-fns';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
+import { Button } from '@/components/ui/button';
 import MultipleSelector, { type Option } from '@/components/ui/multiselect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/utils/supabase';
+import { SalesSummary } from './sales/SalesSummary';
+import { dateToBucketKey, nextBucket, startOfUnit, formatStatusLabel, paymentStatusDisplay, type GroupUnit, type RowGroup } from './sales/utils';
+import { SalesExportDialog } from './export/SalesExportDialog';
+import { useBranchContext } from '@/contexts/BranchContext';
 
-type GroupUnit = 'day' | 'week' | 'month' | 'quarter' | 'year';
-type RowGroup = 'order' | 'branch' | 'payment_status' | 'payment_method' | 'status' | 'customer';
-
-function dateToBucketKey(dateStr: string, unit: GroupUnit) {
-  const d = new Date(dateStr);
-  if (unit === 'day') return format(d, 'MMM dd, yyyy');
-  if (unit === 'week') {
-    const week = format(d, 'II');
-    return `Wk ${week} ${format(d, 'yyyy')}`;
-  }
-  if (unit === 'month') return format(d, 'MMM yyyy');
-  if (unit === 'quarter') return `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`;
-  return format(d, 'yyyy');
-}
-
-function nextBucket(date: Date, unit: GroupUnit): Date {
-  if (unit === 'day') return addDays(date, 1);
-  if (unit === 'week') return addWeeks(date, 1);
-  if (unit === 'month') return addMonths(date, 1);
-  if (unit === 'quarter') return addQuarters(date, 1);
-  return addYears(date, 1);
-}
-
-function startOfUnit(date: Date, unit: GroupUnit): Date {
-  if (unit === 'day') return startOfDay(date);
-  if (unit === 'week') return startOfWeek(date, { weekStartsOn: 1 });
-  if (unit === 'month') return startOfMonth(date);
-  if (unit === 'quarter') return startOfQuarter(date);
-  return startOfYear(date);
-}
+ 
 
 interface SalesSectionProps {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
-  template: 'compact' | 'detailed' | 'pivot';
+  template: 'detailed' | 'pivot' | 'summary';
 }
 
 export function SalesSection({
@@ -59,6 +35,14 @@ export function SalesSection({
   const [groupUnit, setGroupUnit] = useState<GroupUnit>('month');
   const [rowGroup, setRowGroup] = useState<RowGroup>('order');
   const [selectedCustomers, setSelectedCustomers] = useState<Option[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
+  const { availableBranches } = useBranchContext();
+  const exportBranchNames =
+    branchIds && branchIds.length
+      ? branchIds
+          .map((id) => availableBranches.find((b) => b.id === id)?.name)
+          .filter((n): n is string => !!n)
+      : [];
   const startIso = dateRange?.from ? new Date(dateRange.from).toISOString() : null;
   const endIso = dateRange?.to ? new Date(dateRange.to).toISOString() : null;
   const { data: salesStats } = useQuery({
@@ -124,22 +108,7 @@ export function SalesSection({
     0
   );
 
-  function formatStatusLabel(s?: string | null) {
-    if (!s) return 'Unknown';
-    return s
-      .toString()
-      .split('_')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-  }
-  function paymentStatusDisplay(s?: string | null) {
-    const k = (s || '').toLowerCase();
-    if (k === 'paid') return 'Fully Paid';
-    if (k === 'partial') return 'Partially Paid';
-    if (k === 'refunded') return 'Refunded';
-    if (k === 'unpaid') return 'Unpaid';
-    return formatStatusLabel(s);
-  }
+ 
 
   const customerOptions = useMemo<Option[]>(() => {
     const set = new Set<string>();
@@ -251,6 +220,11 @@ export function SalesSection({
 
   return (
     <>
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="outline" onClick={() => setExportOpen(true)}>
+          Export
+        </Button>
+      </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Card>
           <CardHeader>
@@ -349,7 +323,33 @@ export function SalesSection({
                     className="w-full"
                   />
                 </div>
-              
+                
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {template === 'summary' && (
+          <Card className="md:col-span-3 lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Summary Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Time Group</span>
+                  <Select value={groupUnit} onValueChange={(v) => setGroupUnit(v as GroupUnit)}>
+                    <SelectTrigger className="h-8 w-full">
+                      <SelectValue placeholder="Group by time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Daily</SelectItem>
+                      <SelectItem value="week">Weekly</SelectItem>
+                      <SelectItem value="month">Monthly</SelectItem>
+                      <SelectItem value="quarter">Quarterly</SelectItem>
+                      <SelectItem value="year">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -493,14 +493,18 @@ export function SalesSection({
           </CardContent>
         </Card>
       )}
+      
+      {template === 'summary' && (
+        <SalesSummary orders={filteredOrders} groupUnit={groupUnit} dateRange={dateRange} />
+      )}
 
-      {template !== 'pivot' && (
+      {template === 'detailed' && (
         <Card>
           <CardHeader>
             <CardTitle>Sales & Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="max-h-125 overflow-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr>
@@ -516,7 +520,7 @@ export function SalesSection({
                     <th className="text-left p-2">Status</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody >
                   {filteredOrders.map((o) => {
                     const d = new Date(o.date || o.created_at);
                     const customerName =
@@ -576,6 +580,17 @@ export function SalesSection({
           </CardContent>
         </Card>
       )}
-    </>
+      <SalesExportDialog
+        template={template}
+        orders={filteredOrders}
+        groupUnit={groupUnit}
+        rowGroup={rowGroup}
+        organizationName={undefined}
+        dateRange={dateRange}
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        branchNames={exportBranchNames}
+      />
+      </>
   );
 }

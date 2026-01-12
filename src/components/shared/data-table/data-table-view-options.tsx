@@ -40,7 +40,8 @@ export function DataTableViewOptions<TData>({
               typeof column.accessorFn !== 'undefined' &&
               column.getCanHide() &&
               column.id !== 'searchable' &&
-              column.id !== 'branchName'
+              column.id !== 'branchName' &&
+              column.id !== 'search'
           )
           .map((column) => {
             return (

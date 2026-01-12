@@ -91,7 +91,7 @@ export function DatePickerWithRange({
       value: 'this_month',
       getRange: () => ({
         from: startOfMonth(new Date()),
-        to: endOfMonth(new Date()),
+        to: endOfDay(new Date()),
       }),
     },
     {
@@ -110,7 +110,7 @@ export function DatePickerWithRange({
       value: 'this_year',
       getRange: () => ({
         from: startOfYear(new Date()),
-        to: endOfYear(new Date()),
+        to: endOfDay(new Date()),
       }),
     },
     {

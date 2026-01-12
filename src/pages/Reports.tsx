@@ -121,8 +121,8 @@ export function Reports() {
     DateRange | undefined
   >(undefined);
   const [branchIds, setBranchIds] = useState<string[]>(globalBranchIds);
-  const [template, setTemplate] = useState<'compact' | 'detailed' | 'pivot'>(
-    'compact'
+  const [template, setTemplate] = useState<'detailed' | 'pivot' | 'summary'>(
+    'detailed'
   );
   const [expensesGroupBy, setExpensesGroupBy] = useState<'category' | 'type'>(
     'category'
@@ -314,16 +314,16 @@ export function Reports() {
               <Select
                 value={template}
                 onValueChange={(v) =>
-                  setTemplate(v as 'compact' | 'detailed' | 'pivot')
+                  setTemplate(v as 'detailed' | 'pivot' | 'summary')
                 }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select template" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="compact">Compact</SelectItem>
                   <SelectItem value="detailed">Detailed</SelectItem>
                   <SelectItem value="pivot">Pivot</SelectItem>
+                  <SelectItem value="summary">Summary</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -335,24 +335,6 @@ export function Reports() {
                 onChange={setBranchIds}
                 placeholder="Select branches"
               />
-            </div>
-          )}
-          {activeTab === 'expenses' && (
-            <div className="flex items-center">
-              <Select
-                value={expensesGroupBy}
-                onValueChange={(v) =>
-                  setExpensesGroupBy(v as 'category' | 'type')
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Group by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="category">By Category</SelectItem>
-                  <SelectItem value="type">By Type</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           )}
         </div>
@@ -398,6 +380,7 @@ export function Reports() {
             dateRange={generalDateRange}
             template={template}
             groupBy={expensesGroupBy}
+            setGroupBy={setExpensesGroupBy}
           />
         </TabsContent>
 

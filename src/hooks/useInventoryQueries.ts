@@ -56,7 +56,7 @@ const mapSupplierFromDB = (data: any): Supplier => ({
 const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
   let productName = data.product?.name ?? '';
   let sku = data.product?.sku ?? '';
-  
+
   if (data.variant) {
     const attributes = data.variant.attributes || {};
     const attributeString = Object.entries(attributes)
@@ -70,8 +70,8 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     productName = `${productName} (${data.custom_label})`;
   }
 
-  const categoryData = Array.isArray(data.product?.category) 
-    ? data.product.category[0] 
+  const categoryData = Array.isArray(data.product?.category)
+    ? data.product.category[0]
     : data.product?.category;
 
   return {
@@ -99,6 +99,24 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     productImage: data.product?.image_url || undefined,
     categoryName: categoryData?.name,
     isDeleted: data.is_deleted,
+    discountId: data.discount_id,
+    discount: data.discount ? {
+      id: data.discount.id,
+      organizationId: data.discount.organization_id,
+      name: data.discount.name,
+      code: data.discount.code,
+      description: data.discount.description,
+      type: data.discount.type,
+      value: Number(data.discount.value),
+      startAt: data.discount.start_at,
+      expiresAt: data.discount.expires_at,
+      customerIds: data.discount.customer_ids,
+      branchIds: data.discount.branch_ids,
+      targetMode: data.discount.target_mode as 'all' | 'category' | 'product' | 'inventory' | undefined,
+      isActive: data.discount.is_active,
+      createdAt: data.discount.created_at,
+      updatedAt: data.discount.updated_at,
+    } : undefined,
   };
 };
 
@@ -238,7 +256,7 @@ export function useUpdateInventoryEntry() {
   return useMutation({
     mutationFn: async (updates: Partial<InventoryEntryInput> & { id: string }) => {
       const { id, ...data } = updates;
-      
+
       const updateData: any = {};
       if (data.quantity !== undefined) updateData.quantity = data.quantity;
       if (data.minStockLevel !== undefined) updateData.min_stock_level = data.minStockLevel;
@@ -307,7 +325,7 @@ export function useProduct(id?: string) {
         .single();
 
       if (error) throw error;
-      
+
       const product = mapProductFromDB(data);
 
       if (product.hasVariations) {
@@ -315,10 +333,10 @@ export function useProduct(id?: string) {
           .from('product_variants')
           .select('*')
           .eq('product_id', id);
-        
+
         if (variantsError) {
-           console.error('Error fetching variants:', variantsError);
-           throw variantsError;
+          console.error('Error fetching variants:', variantsError);
+          throw variantsError;
         }
 
         if (variantsData) {
@@ -435,17 +453,17 @@ export function useUpdateProduct() {
 
       // Update inventory logic handling both simple and variant products
       const hasVariations = updates.hasVariations;
-      
+
       if (hasVariations && updates.variants) {
         // 1. Get existing variants to handle deletions
         const { data: existingVariants } = await supabase
           .from('product_variants')
           .select('id')
           .eq('product_id', id);
-        
+
         const existingIds = existingVariants?.map(v => v.id) || [];
         const incomingIds = updates.variants.filter(v => v.id).map(v => v.id as string);
-        
+
         // 2. Delete removed variants
         const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
         if (idsToDelete.length > 0) {
@@ -467,19 +485,19 @@ export function useUpdateProduct() {
                 attributes: variant.attributes,
               })
               .eq('id', variant.id);
-            
+
             // Update inventory for variant (maintain for backward compatibility/views)
             await supabase
               .from('inventory')
-              .update({ 
+              .update({
                 quantity: variant.quantity,
               })
               .eq('variant_id', variant.id);
           } else {
             // Insert new variant
             if (!updates.organizationId) {
-               console.warn("Organization ID missing for new variant creation during update");
-               continue; 
+              console.warn("Organization ID missing for new variant creation during update");
+              continue;
             }
 
             const { data: newVariant, error: insertError } = await supabase
@@ -493,7 +511,7 @@ export function useUpdateProduct() {
               })
               .select()
               .single();
-            
+
             if (insertError) throw insertError;
 
             // Insert inventory
@@ -512,10 +530,10 @@ export function useUpdateProduct() {
         }
       } else {
         // Simple Product Logic
-        
+
         // If explicitly switched to no variations, clean up any leftovers
         if (updates.hasVariations === false) {
-           await supabase.from('product_variants').delete().eq('product_id', id);
+          await supabase.from('product_variants').delete().eq('product_id', id);
         }
 
         const inventoryData: any = {};
@@ -523,14 +541,14 @@ export function useUpdateProduct() {
         if (updates.minStockLevel !== undefined) inventoryData.min_stock_level = updates.minStockLevel;
         if (updates.location !== undefined) inventoryData.location = updates.location;
         if (updates.branchId !== undefined) inventoryData.branch_id = updates.branchId;
-  
+
         if (Object.keys(inventoryData).length > 0) {
           const { error: inventoryError } = await supabase
             .from('inventory')
             .update(inventoryData)
             .eq('product_id', id)
             .is('variant_id', null);
-            
+
           if (inventoryError) throw inventoryError;
         }
       }
@@ -816,11 +834,14 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
           creator:profiles!inventory_created_by_fkey2 (
             first_name,
             last_name
+          ),
+          discount:discounts (
+            *
           )
         `)
         .eq('organization_id', organizationId)
         .eq('is_deleted', false)
-        
+
       if (!includeAllProductStatuses) {
         query = query.eq('product.status', 'published');
       }

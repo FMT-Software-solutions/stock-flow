@@ -12,6 +12,8 @@ export const discountFormSchema = z.object({
   endTime: z.string().optional(),
   customerIds: z.array(z.string()).default([]),
   branchIds: z.array(z.string()).default([]),
+  usageMode: z.enum(['automatic','manual']).default('manual'),
+  usageLimit: z.coerce.number().int().min(0).nullable().optional(),
 
   // Targeting
   targetType: z.enum(['all', 'category', 'product', 'inventory']).default('all'),

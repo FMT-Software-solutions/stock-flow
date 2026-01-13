@@ -8,10 +8,11 @@ import { CreateDiscountSheet } from './components/CreateDiscountSheet';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Discount } from '@/types/discounts';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { discountExportFields } from './fields/discountFields';
 import { DiscountTargetsCell } from '@/components/discounts/DiscountTargetsCell';
+import { DiscountDetailsDialog } from '@/components/discounts/DiscountDetailsDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,14 @@ export function DiscountManager() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+
+  const sortedDiscounts = [...discounts].sort((a, b) => {
+    const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bd - ad;
+  });
 
   const columns: ColumnDef<Discount>[] = [
     {
@@ -77,9 +86,15 @@ export function DiscountManager() {
       accessorKey: 'isActive',
       header: 'Status',
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
-          {row.original.isActive ? 'Active' : 'Inactive'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
+            {row.original.isActive ? 'Active' : 'Inactive'}
+          </Badge>
+          {row.original.expiresAt &&
+            new Date(row.original.expiresAt).getTime() < Date.now() && (
+              <Badge variant="destructive">Expired</Badge>
+            )}
+        </div>
       ),
     },
     {
@@ -94,18 +109,41 @@ export function DiscountManager() {
           ? new Date(row.original.expiresAt)
           : undefined;
         const start = startDate
-          ? `${format(startDate, 'MMM dd, yyyy')} ${format(
+          ? `${format(startDate, 'MMMM dd, yyyy')} ${format(
               startDate,
               'h:mm a'
             )}`
           : 'Any';
         const end = endDate
-          ? `${format(endDate, 'MMM dd, yyyy')} ${format(endDate, 'h:mm a')}`
+          ? `${format(endDate, 'MMMM dd, yyyy')} ${format(endDate, 'h:mm a')}`
           : 'Forever';
+        const startRel =
+          startDate?.getTime() != null
+            ? formatDistanceToNow(startDate, { addSuffix: true })
+            : null;
+        const endRel =
+          endDate?.getTime() != null
+            ? formatDistanceToNow(endDate, { addSuffix: true })
+            : null;
         return (
-          <span className="text-xs text-muted-foreground">
-            {start} - {end}
-          </span>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div>
+              {start} - {end}
+            </div>
+            <div className="flex gap-2">
+              {startRel && (
+                <span>
+                  Start: {' '}
+                  {startRel === 'in less than a minute' ? 'now' : startRel}
+                </span>
+              )}
+              {endRel && (
+                <span>
+                  Ends {endRel === 'less than a minute ago' ? 'now' : endRel}
+                </span>
+              )}
+            </div>
+          </div>
         );
       },
     },
@@ -124,6 +162,14 @@ export function DiscountManager() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => {
+                  setDetailsId(discount.id);
+                  setDetailsOpen(true);
+                }}
+              >
+                View Details
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   setEditingDiscount(discount);
@@ -184,7 +230,7 @@ export function DiscountManager() {
 
       <DataTable
         columns={columns}
-        data={discounts}
+        data={sortedDiscounts}
         searchKey="search"
         exportFields={discountExportFields}
         defaultColumnVisibility={{ search: false }}
@@ -201,6 +247,16 @@ export function DiscountManager() {
         }}
         discount={editingDiscount ?? undefined}
       />
+      {detailsId && (
+        <DiscountDetailsDialog
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open);
+            if (!open) setDetailsId(null);
+          }}
+          discountId={detailsId}
+        />
+      )}
     </div>
   );
 }

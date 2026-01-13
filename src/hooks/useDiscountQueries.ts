@@ -19,6 +19,8 @@ export function useManageInventoryDiscount() {
           expires_at: discount.expiresAt,
           customer_ids: Array.isArray(discount.customerIds) ? discount.customerIds : [],
           branch_ids: Array.isArray(discount.branchIds) ? discount.branchIds : [],
+          usage_mode: discount.usageMode,
+          usage_limit: discount.usageLimit,
         }
         : null;
 
@@ -73,6 +75,9 @@ export function useDiscounts(organizationId?: string) {
         customerIds: d.customer_ids,
         branchIds: d.branch_ids,
         targetMode: d.target_mode as 'all' | 'category' | 'product' | 'inventory' | undefined,
+        usageMode: d.usage_mode as 'automatic' | 'manual' | undefined,
+        usageLimit: d.usage_limit ?? null,
+        timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
         isActive: d.is_active,
         createdAt: d.created_at,
         updatedAt: d.updated_at

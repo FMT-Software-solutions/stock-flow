@@ -56,12 +56,14 @@ BEGIN
                 expires_at = (p_discount->>'expires_at')::timestamptz,
                 customer_ids = (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'customer_ids') t(x)),
                 branch_ids = (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'branch_ids') t(x)),
+                usage_mode = COALESCE(p_discount->>'usage_mode', usage_mode),
+                usage_limit = CASE WHEN (p_discount->>'usage_limit') IS NULL THEN usage_limit ELSE (p_discount->>'usage_limit')::int END,
                 updated_at = now()
             WHERE id = (p_discount->>'id')::uuid
             RETURNING id INTO v_discount_id;
         ELSE
             INSERT INTO public.discounts (
-                organization_id, name, code, description, type, value, start_at, expires_at, customer_ids, branch_ids, created_by
+                organization_id, name, code, description, type, value, start_at, expires_at, customer_ids, branch_ids, usage_mode, usage_limit, created_by
             ) VALUES (
                 p_organization_id,
                 p_discount->>'name',
@@ -73,6 +75,8 @@ BEGIN
                 (p_discount->>'expires_at')::timestamptz,
                 (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'customer_ids') t(x)),
                 (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'branch_ids') t(x)),
+                COALESCE(p_discount->>'usage_mode','manual'),
+                CASE WHEN (p_discount->>'usage_limit') IS NULL THEN NULL ELSE (p_discount->>'usage_limit')::int END,
                 auth.uid()
             ) RETURNING id INTO v_discount_id;
         END IF;
@@ -107,12 +111,14 @@ BEGIN
                 customer_ids = (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'customer_ids') t(x)),
                 branch_ids = (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'branch_ids') t(x)),
                 target_mode = v_target_mode,
+                usage_mode = COALESCE(p_discount->>'usage_mode', usage_mode),
+                usage_limit = CASE WHEN (p_discount->>'usage_limit') IS NULL THEN usage_limit ELSE (p_discount->>'usage_limit')::int END,
                 updated_at = now()
             WHERE id = (p_discount->>'id')::uuid
             RETURNING id INTO v_discount_id;
         ELSE
             INSERT INTO public.discounts (
-                organization_id, name, code, description, type, value, start_at, expires_at, customer_ids, branch_ids, target_mode, created_by
+                organization_id, name, code, description, type, value, start_at, expires_at, customer_ids, branch_ids, target_mode, usage_mode, usage_limit, created_by
             ) VALUES (
                 p_organization_id,
                 p_discount->>'name',
@@ -125,6 +131,8 @@ BEGIN
                 (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'customer_ids') t(x)),
                 (SELECT array_agg(x::uuid) FROM jsonb_array_elements_text(p_discount->'branch_ids') t(x)),
                 v_target_mode,
+                COALESCE(p_discount->>'usage_mode','manual'),
+                CASE WHEN (p_discount->>'usage_limit') IS NULL THEN NULL ELSE (p_discount->>'usage_limit')::int END,
                 auth.uid()
             ) RETURNING id INTO v_discount_id;
         END IF;

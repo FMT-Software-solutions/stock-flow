@@ -11,6 +11,9 @@ export interface Discount {
   customerIds?: string[] | null;
   branchIds?: string[] | null;
   targetMode?: 'all' | 'category' | 'product' | 'inventory';
+  usageMode?: 'automatic' | 'manual';
+  usageLimit?: number | null;
+  timesUsed?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

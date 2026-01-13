@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import {
@@ -77,6 +77,8 @@ export function CreateDiscountSheet({
       description: discount?.description ?? '',
       type: discount?.type ?? 'percentage',
       value: discount?.value ?? 0,
+      usageMode: discount?.usageMode ?? 'manual',
+      usageLimit: discount?.usageLimit ?? null,
       customerIds: (discount?.customerIds ?? []) as string[],
       branchIds: (discount?.branchIds ?? []) as string[],
       startAt: discount?.startAt ? format(new Date(discount.startAt), 'yyyy-MM-dd') : undefined,
@@ -97,6 +99,8 @@ export function CreateDiscountSheet({
         description: discount.description ?? '',
         type: discount.type,
         value: discount.value,
+        usageMode: discount.usageMode ?? 'manual',
+        usageLimit: discount.usageLimit ?? null,
         customerIds: (discount.customerIds ?? []) as string[],
         branchIds: (discount.branchIds ?? []) as string[],
         startAt: discount.startAt ? format(new Date(discount.startAt), 'yyyy-MM-dd') : undefined,
@@ -172,7 +176,7 @@ export function CreateDiscountSheet({
     return dateTime.toISOString();
   };
 
-  const onSubmit = (values: DiscountFormValues) => {
+  const onSubmit: SubmitHandler<DiscountFormValues> = (values) => {
     if (!currentOrganization?.id) return;
 
     const targets: DiscountTarget & { apply_to_all?: boolean } = {
@@ -200,6 +204,8 @@ export function CreateDiscountSheet({
           description: values.description || undefined,
           type: values.type,
           value: values.value,
+          usageMode: values.usageMode,
+          usageLimit: values.usageLimit ?? null,
           startAt: combineDateTimeToIso(values.startAt, values.startTime),
           expiresAt: combineDateTimeToIso(values.expiresAt, values.endTime),
           customerIds: values.customerIds || [],
@@ -481,6 +487,53 @@ export function CreateDiscountSheet({
                         <FormDescription className='text-xs'>
                           Leave empty to make valid in all branches.
                         </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField
+                    control={form.control as any}
+                    name="usageMode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Usage Mode</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className='w-full'>
+                              <SelectValue placeholder="Select usage mode" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="automatic">Automatic</SelectItem>
+                            <SelectItem value="manual">Manual (Discount Code Required)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control as any}
+                    name="usageLimit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Usage Limit</FormLabel>
+                        <FormControl>
+                          <Input 
+                          type="number" 
+                          value={field.value ?? ''} 
+                          onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                          placeholder='Leave empty for unlimited usage'
+                          min={1}
+                          />
+                        </FormControl>
+                        
                         <FormMessage />
                       </FormItem>
                     )}

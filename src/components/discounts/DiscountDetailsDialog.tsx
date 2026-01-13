@@ -141,6 +141,14 @@ export function DiscountDetailsDialog({
               </div>
             </div>
             <div className="space-y-1">
+              <span className="text-xs text-muted-foreground">Mode</span>
+              <div className="text-lg font-medium">
+                {(discount.usageMode ?? 'manual') === 'automatic'
+                  ? 'Automatic'
+                  : 'Manual'}
+              </div>
+            </div>
+            <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Usage</span>
               <div className="font-medium">
                 {discount.usageLimit != null

@@ -76,6 +76,32 @@ export function DiscountManager() {
       },
     },
     {
+      accessorKey: 'usageMode',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Mode" />
+      ),
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {(row.original.usageMode ?? 'manual') === 'automatic'
+            ? 'Automatic'
+            : 'Manual'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'usageLimit',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Usage Limit" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {row.original.usageLimit != null
+            ? row.original.usageLimit
+            : 'Unlimited'}
+        </span>
+      ),
+    },
+    {
       id: 'targets',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Targets" />
@@ -133,7 +159,7 @@ export function DiscountManager() {
             <div className="flex gap-2">
               {startRel && (
                 <span>
-                  Start: {' '}
+                  Start:{' '}
                   {startRel === 'in less than a minute' ? 'now' : startRel}
                 </span>
               )}

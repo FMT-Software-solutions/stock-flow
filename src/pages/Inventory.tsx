@@ -34,6 +34,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Product, InventoryEntry } from '@/types/inventory';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { CreateDiscountSheet } from './inventory/components/CreateDiscountSheet';
 
 import {
   Command,
@@ -73,15 +74,18 @@ export function Inventory() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   );
+  const [createDiscountOpen, setCreateDiscountOpen] = useState(false);
 
   const canViewInventory = checkPermission('inventory');
   const canViewProducts = checkPermission('products');
   const canViewCategories = checkPermission('product_categories');
   const canViewVariations = checkPermission('variations');
+  const canViewDiscounts = checkPermission('discounts');
   const canCreateInventory = checkPermission('inventory', 'create');
   const canCreateProduct = checkPermission('products', 'create');
   const canCreateCategory = checkPermission('product_categories', 'create');
   const canCreateVariation = checkPermission('variations', 'create');
+  const canCreateDiscount = checkPermission('discounts', 'create') || isOwner();
   const canExportInventory = checkPermission('inventory', 'export');
   const canExportProducts = checkPermission('products', 'export');
   const canEditCategory = checkPermission('product_categories', 'edit');
@@ -92,6 +96,7 @@ export function Inventory() {
     canViewProducts ? 'products' : null,
     canViewCategories ? 'categories' : null,
     canViewVariations ? 'variations' : null,
+    canViewDiscounts ? 'discounts' : null,
   ].filter(Boolean) as string[];
 
   const [activeTab, setActiveTab] = useState<string>(
@@ -207,7 +212,7 @@ export function Inventory() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground">
-            Manage your products and stock levels
+            Manage your products and stocks
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -237,11 +242,21 @@ export function Inventory() {
                   Variations
                 </TabsTrigger>
               )}
-              <TabsTrigger value="discounts" disabled={isLoading}>
-                Discounts
-              </TabsTrigger>
+              {canViewDiscounts && (
+                <TabsTrigger value="discounts" disabled={isLoading}>
+                  Discounts
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
+          {activeTab === 'discounts' && canCreateDiscount && (
+            <Button
+              onClick={() => setCreateDiscountOpen(true)}
+              disabled={isLoading}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Create Discount
+            </Button>
+          )}
           {activeTab === 'products' && canCreateProduct && (
             <Button
               onClick={() => navigate('/inventory/new')}
@@ -315,6 +330,11 @@ export function Inventory() {
           )}
         </div>
       </div>
+
+      <CreateDiscountSheet
+        open={createDiscountOpen}
+        onOpenChange={setCreateDiscountOpen}
+      />
 
       <Tabs
         value={activeTab}
@@ -395,7 +415,7 @@ export function Inventory() {
           {canViewVariations && <Variations />}
         </TabsContent>
         <TabsContent value="discounts">
-          <DiscountManager />
+          {canViewDiscounts && <DiscountManager />}
         </TabsContent>
       </Tabs>
 

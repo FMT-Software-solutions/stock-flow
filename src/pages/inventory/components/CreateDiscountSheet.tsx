@@ -42,6 +42,7 @@ import { useCustomers } from '@/hooks/useCustomerQueries';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { DiscountTarget, Discount } from '@/types/discounts';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateDiscountSheetProps {
   open: boolean;
@@ -57,7 +58,8 @@ export function CreateDiscountSheet({
   discount,
 }: CreateDiscountSheetProps) {
   const { currentOrganization } = useOrganization();
-  const { availableBranches } = useBranchContext();
+  const { availableBranches, isOwner } = useBranchContext();
+  const { user } = useAuth();
   const { data: categories } = useCategories(currentOrganization?.id);
   const { data: products } = useProducts(currentOrganization?.id);
   const { data: inventoryEntries } = useInventoryEntries(
@@ -80,7 +82,10 @@ export function CreateDiscountSheet({
       usageMode: discount?.usageMode ?? 'manual',
       usageLimit: discount?.usageLimit ?? null,
       customerIds: (discount?.customerIds ?? []) as string[],
-      branchIds: (discount?.branchIds ?? []) as string[],
+      branchIds: (discount?.branchIds ??
+        (!isEditing && !isOwner && availableBranches.length === 1
+          ? [availableBranches[0].id]
+          : [])) as string[],
       startAt: discount?.startAt ? format(new Date(discount.startAt), 'yyyy-MM-dd') : undefined,
       startTime: discount?.startAt ? format(new Date(discount.startAt), 'HH:mm') : '00:00',
       expiresAt: discount?.expiresAt ? format(new Date(discount.expiresAt), 'yyyy-MM-dd') : undefined,
@@ -118,6 +123,15 @@ export function CreateDiscountSheet({
   useEffect(() => {
     if (!open) setStep(0);
   }, [open]);
+
+  useEffect(() => {
+    if (!isEditing && !isOwner && availableBranches.length === 1) {
+      const current = form.getValues('branchIds') || [];
+      if (current.length === 0) {
+        form.setValue('branchIds', [availableBranches[0].id]);
+      }
+    }
+  }, [isEditing, isOwner, availableBranches, form]);
 
   const targetType = form.watch('targetType');
 
@@ -179,8 +193,15 @@ export function CreateDiscountSheet({
   const onSubmit: SubmitHandler<DiscountFormValues> = (values) => {
     if (!currentOrganization?.id) return;
 
+    const computedBranchIds =
+      isOwner
+        ? (values.branchIds || [])
+        : (values.branchIds && values.branchIds.length > 0
+            ? values.branchIds
+            : availableBranches.map((b) => b.id));
+
     const targets: DiscountTarget & { apply_to_all?: boolean } = {
-      targetBranchIds: values.branchIds || [],
+      targetBranchIds: computedBranchIds,
     };
 
     if (values.targetType === 'all') {
@@ -209,7 +230,8 @@ export function CreateDiscountSheet({
           startAt: combineDateTimeToIso(values.startAt, values.startTime),
           expiresAt: combineDateTimeToIso(values.expiresAt, values.endTime),
           customerIds: values.customerIds || [],
-          branchIds: values.branchIds || [],
+          branchIds: computedBranchIds,
+          createdBy: !isEditing ? user?.id : undefined,
         },
         targets: (targets as any),
       },
@@ -461,16 +483,17 @@ export function CreateDiscountSheet({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Valid Only in Branches</FormLabel>
-                        <MultipleSelector
-                          value={branchOptions.filter((o) =>
-                            field.value?.includes(o.value)
-                          )}
-                          defaultOptions={branchOptions}
-                          triggerSearchOnFocus
-                          onSearchSync={(term: string) => {
-                            const t = term?.toLowerCase() ?? '';
-                            if (!t) return branchOptions;
-                            return branchOptions.filter((o) =>
+                      <MultipleSelector
+                        value={branchOptions.filter((o) =>
+                          field.value?.includes(o.value)
+                        )}
+                        defaultOptions={branchOptions}
+                        disabled={!isOwner && availableBranches.length === 1}
+                        triggerSearchOnFocus
+                        onSearchSync={(term: string) => {
+                          const t = term?.toLowerCase() ?? '';
+                          if (!t) return branchOptions;
+                          return branchOptions.filter((o) =>
                               o.label.toLowerCase().includes(t)
                             );
                           }}
@@ -484,8 +507,8 @@ export function CreateDiscountSheet({
                             </p>
                           }
                         />
-                        <FormDescription className='text-xs'>
-                          Leave empty to make valid in all branches.
+                      <FormDescription className='text-xs'>
+                         {isOwner ? 'Leave empty for all branches' : 'Leave empty to make valid in all your assigned branches.' } 
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

@@ -2,6 +2,14 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/utils/supabase';
 import type { ManageDiscountParams, Discount } from '@/types/discounts';
 
+export interface ValidInventoryDiscountsRow {
+  inventoryId: string;
+  productId: string;
+  variantId?: string | null;
+  branchId?: string | null;
+  discounts: Discount[];
+}
+
 export function useManageInventoryDiscount() {
   const queryClient = useQueryClient();
 
@@ -12,6 +20,8 @@ export function useManageInventoryDiscount() {
           id: discount.id,
           name: discount.name,
           code: discount.code,
+          created_by: (discount as any).createdBy,
+          updated_by: (discount as any).updatedBy,
           description: discount.description,
           type: discount.type,
           value: discount.value,
@@ -45,6 +55,7 @@ export function useManageInventoryDiscount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
     },
   });
 }
@@ -67,6 +78,8 @@ export function useDiscounts(organizationId?: string) {
         organizationId: d.organization_id,
         name: d.name,
         code: d.code,
+        createdBy: d.created_by ?? undefined,
+        updatedBy: d.updated_by ?? undefined,
         description: d.description,
         type: d.type,
         value: Number(d.value),
@@ -79,6 +92,7 @@ export function useDiscounts(organizationId?: string) {
         usageLimit: d.usage_limit ?? null,
         timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
         isActive: d.is_active,
+        isExpired: !!d.expires_at && new Date(d.expires_at).getTime() < Date.now(),
         createdAt: d.created_at,
         updatedAt: d.updated_at
       })) as Discount[];
@@ -97,6 +111,91 @@ export function useDeleteDiscount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['discounts'] });
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
     }
+  });
+}
+
+export function useValidInventoryDiscounts(organizationId?: string, branchIds?: string[]) {
+  return useQuery({
+    queryKey: ['valid_inventory_discounts', organizationId, branchIds?.join(',') || 'all'],
+    queryFn: async () => {
+      if (!organizationId) return [] as ValidInventoryDiscountsRow[];
+      const { data, error } = await supabase.rpc('get_valid_inventory_discounts', {
+        p_organization_id: organizationId,
+        p_branch_ids: Array.isArray(branchIds) && branchIds.length > 0 ? branchIds : null,
+      });
+      if (error) throw error;
+      const rows = Array.isArray(data) ? data : [];
+      return rows.map((r: any) => {
+        const discounts: Discount[] = Array.isArray(r.discounts)
+          ? r.discounts.map((d: any) => ({
+            id: d.id,
+            organizationId: d.organization_id,
+            name: d.name,
+            code: d.code ?? undefined,
+            createdBy: d.created_by ?? undefined,
+            updatedBy: d.updated_by ?? undefined,
+            description: d.description ?? undefined,
+            type: d.type,
+            value: Number(d.value),
+            startAt: d.start_at ?? undefined,
+            expiresAt: d.expires_at ?? undefined,
+            customerIds: d.customer_ids ?? null,
+            branchIds: d.branch_ids ?? null,
+            targetMode: d.target_mode ?? undefined,
+            usageMode: d.usage_mode as 'automatic' | 'manual' | undefined,
+            usageLimit: d.usage_limit ?? null,
+            timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
+            isActive: d.is_active,
+            createdAt: d.created_at,
+            updatedAt: d.updated_at,
+          }))
+          : [];
+        return {
+          inventoryId: r.inventory_id as string,
+          productId: r.product_id as string,
+          variantId: r.variant_id ?? null,
+          branchId: r.branch_id ?? null,
+          discounts,
+        } as ValidInventoryDiscountsRow;
+      }) as ValidInventoryDiscountsRow[];
+    },
+    enabled: !!organizationId,
+  });
+}
+
+export interface UpdateDiscountFieldsInput {
+  id: string;
+  startAt?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+  timesUsed?: number;
+  usageMode?: 'automatic' | 'manual';
+}
+
+export function useUpdateDiscountFields() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: UpdateDiscountFieldsInput) => {
+      const update: any = {};
+      const { data: authData } = await supabase.auth.getUser();
+      const uid = authData?.user?.id;
+      if (payload.startAt !== undefined) update.start_at = payload.startAt;
+      if (payload.expiresAt !== undefined) update.expires_at = payload.expiresAt;
+      if (payload.isActive !== undefined) update.is_active = payload.isActive;
+      if (payload.timesUsed !== undefined) update.times_used = payload.timesUsed;
+      if (payload.usageMode !== undefined) update.usage_mode = payload.usageMode;
+      if (uid) update.updated_by = uid;
+      const { error } = await supabase
+        .from('discounts')
+        .update(update)
+        .eq('id', payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['discounts'] });
+      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
+    },
   });
 }

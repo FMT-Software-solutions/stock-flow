@@ -51,6 +51,8 @@ export function useDiscountDetails(organizationId?: string, discountId?: string)
           organizationId: d.organization_id,
           name: d.name,
           code: d.code ?? undefined,
+          createdBy: d.created_by ?? undefined,
+          updatedBy: d.updated_by ?? undefined,
           description: d.description ?? undefined,
           type: d.type,
           value: Number(d.value),
@@ -63,6 +65,7 @@ export function useDiscountDetails(organizationId?: string, discountId?: string)
           usageLimit: d.usage_limit ?? null,
           timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
           isActive: d.is_active,
+          isExpired: !!d.expires_at && new Date(d.expires_at).getTime() < Date.now(),
           createdAt: d.created_at,
           updatedAt: d.updated_at,
         }

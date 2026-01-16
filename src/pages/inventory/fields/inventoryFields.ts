@@ -8,52 +8,52 @@ export const getInventoryFilterFields = (
   locations: { label: string; value: string }[],
   creators: { label: string; value: string }[]
 ): DataTableFilterField[] => [
-  {
-    id: 'productName',
-    label: 'Product',
-    type: 'select',
-    options: productNames,
-  },
-  {
-    id: 'categoryName',
-    label: 'Category',
-    type: 'select',
-    options: categories,
-  },
-  {
-    id: 'branchName',
-    label: 'Branch',
-    type: 'select',
-    options: branches,
-  },
-  {
-    id: 'effectivePrice',
-    label: 'Price',
-    type: 'number',
-  },
-  {
-    id: 'quantity',
-    label: 'Stock',
-    type: 'number',
-  },
-  {
-    id: 'location',
-    label: 'Location',
-    type: 'select',
-    options: locations,
-  },
-  {
-    id: 'createdByName',
-    label: 'Created By',
-    type: 'select',
-    options: creators,
-  },
-  {
-    id: 'lastUpdated',
-    label: 'Last Updated',
-    type: 'date-range',
-  },
-];
+    {
+      id: 'productName',
+      label: 'Product',
+      type: 'select',
+      options: productNames,
+    },
+    {
+      id: 'categoryName',
+      label: 'Category',
+      type: 'select',
+      options: categories,
+    },
+    {
+      id: 'branchName',
+      label: 'Branch',
+      type: 'select',
+      options: branches,
+    },
+    {
+      id: 'effectivePrice',
+      label: 'Price',
+      type: 'number',
+    },
+    {
+      id: 'quantity',
+      label: 'Stock',
+      type: 'number',
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      type: 'select',
+      options: locations,
+    },
+    {
+      id: 'createdByName',
+      label: 'Created By',
+      type: 'select',
+      options: creators,
+    },
+    {
+      id: 'lastUpdated',
+      label: 'Last Updated',
+      type: 'date-range',
+    },
+  ];
 
 export const inventoryExportFields: ExportField[] = [
   {
@@ -103,3 +103,6 @@ export const inventoryExportFields: ExportField[] = [
     isSelectedByDefault: false,
   },
 ];
+
+
+

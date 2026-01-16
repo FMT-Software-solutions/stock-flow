@@ -6,18 +6,24 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/hooks/useCurrency';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useDiscountDetails } from '@/hooks/useDiscountDetails';
 import { ImagePreview } from '../shared/ImagePreview';
 import { Button } from '../ui/button';
-import { Copy } from 'lucide-react';
+import { Copy, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/utils/supabase';
+import type { Discount } from '@/types/discounts';
 
 interface DiscountDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   discountId: string;
+  discount?: Discount;
 }
 
 const targetModeLabel = (
@@ -41,13 +47,24 @@ export function DiscountDetailsDialog({
   open,
   onOpenChange,
   discountId,
+  discount: initialDiscount,
 }: DiscountDetailsDialogProps) {
   const { currentOrganization } = useOrganization();
-  const { data } = useDiscountDetails(currentOrganization?.id, discountId);
+  const shouldSkipFetch =
+    initialDiscount && initialDiscount.targetMode === 'all';
+  const { data } = useDiscountDetails(
+    shouldSkipFetch ? undefined : currentOrganization?.id,
+    shouldSkipFetch ? undefined : discountId
+  );
   const { formatCurrency } = useCurrency();
+  const { isOwner, checkPermission } = useRoleCheck();
+  const { user } = useAuth();
 
-  const discount = data?.discount || null;
+  const discount = initialDiscount ?? (data?.discount || null);
   const inventories = data?.inventories || [];
+  const isExpired =
+    !!discount?.expiresAt &&
+    new Date(discount.expiresAt).getTime() < Date.now();
 
   const startDate = discount?.startAt
     ? format(new Date(discount.startAt), 'MMMM dd, yyyy')
@@ -61,6 +78,74 @@ export function DiscountDetailsDialog({
   const endTime = discount?.expiresAt
     ? format(new Date(discount.expiresAt), 'h:mm a')
     : '-';
+  const canViewCodeGlobal =
+    checkPermission('discounts', 'view_code') || isOwner();
+  const isCreator =
+    discount?.createdBy && user?.id ? discount.createdBy === user.id : false;
+  const canViewCode = !!discount?.code && (canViewCodeGlobal || isCreator);
+
+  function UserInfo({
+    userId,
+    label,
+    date,
+  }: {
+    userId?: string | null;
+    label: string;
+    date?: Date | null;
+  }) {
+    const { data: profile, isLoading } = useQuery({
+      queryKey: ['profile', userId],
+      queryFn: async () => {
+        if (!userId) return null;
+        const { data } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', userId)
+          .single();
+        return data;
+      },
+      enabled: !!userId,
+    });
+
+    const activityDate = date || new Date();
+    const relativeTime = formatDistanceToNow(activityDate, { addSuffix: true });
+
+    if (!userId) return null;
+
+    return (
+      <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/20">
+        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <User className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+            {label}
+          </span>
+          <span className="text-sm font-medium">
+            {isLoading
+              ? 'Loading...'
+              : profile
+              ? `${profile.first_name} ${profile.last_name}`
+              : 'Unknown User'}
+          </span>
+
+          {date && (
+            <div className="flex flex-col">
+              <span className="text-xs">
+                {format(activityDate, 'MMMM dd, yyyy h:mm a')}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {relativeTime === 'in less than a minute' ||
+                relativeTime === 'less than a minute ago'
+                  ? 'now'
+                  : relativeTime}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (!discount) {
     return (
@@ -101,9 +186,13 @@ export function DiscountDetailsDialog({
                   className="text-lg font-medium flex-1 truncate"
                   title={discount.code || '-'}
                 >
-                  {discount.code || '-'}
+                  {discount.code
+                    ? canViewCode
+                      ? discount.code
+                      : 'Hidden'
+                    : '-'}
                 </span>
-                {discount.code && (
+                {discount.code && !isExpired && canViewCode && (
                   <Button
                     variant={'ghost'}
                     className="text-sm text-muted-foreground hover:bg-transparent"
@@ -129,9 +218,13 @@ export function DiscountDetailsDialog({
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Status</span>
               <div>
-                <Badge variant={discount.isActive ? 'default' : 'secondary'}>
-                  {discount.isActive ? 'Active' : 'Inactive'}
-                </Badge>
+                {isExpired ? (
+                  <Badge variant="destructive">Expired</Badge>
+                ) : (
+                  <Badge variant={discount.isActive ? 'default' : 'secondary'}>
+                    {discount.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="space-y-1">
@@ -188,62 +281,84 @@ export function DiscountDetailsDialog({
             </div>
           </div>
 
+          {/* Meta Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <UserInfo
+              userId={discount.createdBy}
+              label="Created By"
+              date={
+                discount.createdAt ? new Date(discount.createdAt) : undefined
+              }
+            />
+            {discount.updatedBy && (
+              <UserInfo
+                userId={discount.updatedBy}
+                label="Last Updated By"
+                date={
+                  discount.updatedAt ? new Date(discount.updatedAt) : undefined
+                }
+              />
+            )}
+          </div>
+
           {/* Inventories List */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-muted/50 p-3 text-xs font-medium uppercase tracking-wider grid grid-cols-12 gap-4">
-              <div className="col-span-6">Inventory</div>
-              <div className="col-span-3">Branch</div>
-              <div className="col-span-3 text-right">Qty</div>
-            </div>
+          {discount.targetMode !== 'all' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-muted/50 p-3 text-xs font-medium uppercase tracking-wider grid grid-cols-12 gap-4">
+                <div className="col-span-6">Inventory</div>
+                <div className="col-span-3">Branch</div>
+                <div className="col-span-3 text-right">Qty</div>
+              </div>
 
-            <div className="divide-y max-h-75 overflow-y-auto">
-              {inventories.map((inv) => {
-                const name = inv.variant_id
-                  ? `${inv.product_name} (${Object.entries(
-                      inv.variant_attributes || {}
-                    )
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(', ')})`
-                  : inv.custom_label
-                  ? `${inv.product_name} (${inv.custom_label})`
-                  : inv.product_name;
+              <div className="divide-y max-h-75 overflow-y-auto">
+                {inventories.map((inv) => {
+                  const name = inv.variant_id
+                    ? `${inv.product_name} (${Object.entries(
+                        inv.variant_attributes || {}
+                      )
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ')})`
+                    : inv.custom_label
+                    ? `${inv.product_name} (${inv.custom_label})`
+                    : inv.product_name;
 
-                const imageUrl = inv.image_url || inv.product_image;
+                  const imageUrl = inv.image_url || inv.product_image;
 
-                return (
-                  <div
-                    key={inv.id}
-                    className="grid grid-cols-12 gap-4 items-center p-3 text-sm"
-                  >
-                    <div className="col-span-6 flex items-center gap-1">
-                      {imageUrl && (
-                        <ImagePreview
-                          src={imageUrl}
-                          alt={inv.product_name}
-                          className="h-8 w-8 rounded-md object-cover"
-                        />
-                      )}
-                      <div>
-                        <div className="font-medium flex gap-1">{name}</div>
-                        <div className="text-muted-foreground text-xs">
-                          {inv.product_sku || inv.variant_sku || '-'}
+                  return (
+                    <div
+                      key={inv.id}
+                      className="grid grid-cols-12 gap-4 items-center p-3 text-sm"
+                    >
+                      <div className="col-span-6 flex items-center gap-1">
+                        {imageUrl && (
+                          <ImagePreview
+                            src={imageUrl}
+                            alt={inv.product_name}
+                            className="h-8 w-8 rounded-md object-cover"
+                          />
+                        )}
+                        <div>
+                          <div className="font-medium flex gap-1">{name}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {inv.product_sku || inv.variant_sku || '-'}
+                          </div>
                         </div>
                       </div>
+                      <div className="col-span-3">{inv.branch_name || '-'}</div>
+                      <div className="col-span-3 text-right">
+                        {Number(inv.quantity ?? 0)}
+                      </div>
                     </div>
-                    <div className="col-span-3">{inv.branch_name || '-'}</div>
-                    <div className="col-span-3 text-right">
-                      {Number(inv.quantity ?? 0)}
-                    </div>
+                  );
+                })}
+                {inventories.length === 0 && (
+                  <div className="p-3 text-sm text-muted-foreground">
+                    No inventory found.
                   </div>
-                );
-              })}
-              {inventories.length === 0 && (
-                <div className="p-3 text-sm text-muted-foreground">
-                  No inventory found.
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

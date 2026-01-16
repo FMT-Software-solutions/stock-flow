@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useDiscounts, useDeleteDiscount } from '@/hooks/useDiscountQueries';
+import {
+  useDiscounts,
+  useDeleteDiscount,
+  useUpdateDiscountFields,
+} from '@/hooks/useDiscountQueries';
 import { Button } from '@/components/ui/button';
-import { Plus, MoreHorizontal, Trash, Copy, Pencil } from 'lucide-react';
+import { MoreHorizontal, Trash, Copy, Pencil } from 'lucide-react';
 import { DataTable } from '@/components/shared/data-table/data-table';
 import { CreateDiscountSheet } from './components/CreateDiscountSheet';
+import { ActivateDiscountDialog } from '@/components/discounts/ActivateDiscountDialog';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Discount } from '@/types/discounts';
 import { Badge } from '@/components/ui/badge';
@@ -22,16 +27,44 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function DiscountManager() {
   const { currentOrganization } = useOrganization();
   const { data: discounts = [] } = useDiscounts(currentOrganization?.id);
   const { mutate: deleteDiscount } = useDeleteDiscount();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { mutate: updateDiscountFields } = useUpdateDiscountFields();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [isActivateOpen, setIsActivateOpen] = useState(false);
+  const [activatingDiscount, setActivatingDiscount] = useState<Discount | null>(
+    null
+  );
+  const { isOwner, hasRole, checkPermission } = useRoleCheck();
+  const { user } = useAuth();
+
+  const isWrite = () => hasRole(['write']);
+  const canEdit =
+    checkPermission('discounts', 'edit') || isOwner() || isWrite();
+  const canDelete = checkPermission('discounts', 'delete') || isOwner();
+  const canExport = checkPermission('discounts', 'export') || isOwner();
+  const canViewCode = checkPermission('discounts', 'view_code') || isOwner();
+
+  const isCreator = (d?: Discount | null) => {
+    if (!d?.createdBy || !user?.id) return false;
+    return d.createdBy === user.id;
+  };
+  const canUpdateDiscount = (d: Discount) => {
+    if (isOwner()) return true;
+    return !!canEdit && isCreator(d);
+  };
+  const canViewCodeFor = (d: Discount) => {
+    if (!d.code) return false;
+    return canViewCode || isOwner() || isCreator(d);
+  };
 
   const sortedDiscounts = [...discounts].sort((a, b) => {
     const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -59,12 +92,15 @@ export function DiscountManager() {
     {
       accessorKey: 'code',
       header: 'Code',
-      cell: ({ row }) =>
-        row.original.code ? (
-          <span className="font-mono text-xs">{row.original.code}</span>
-        ) : (
-          '-'
-        ),
+      cell: ({ row }) => {
+        const d = row.original;
+        if (!d.code) return '-';
+        if (!canViewCodeFor(d))
+          return (
+            <span className="text-xs italic text-muted-foreground">Hidden</span>
+          );
+        return <span className="font-mono text-xs">{d.code}</span>;
+      },
     },
     {
       accessorKey: 'value',
@@ -80,13 +116,63 @@ export function DiscountManager() {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Mode" />
       ),
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {(row.original.usageMode ?? 'manual') === 'automatic'
-            ? 'Automatic'
-            : 'Manual'}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const discount = row.original;
+        const isAutomatic = (discount.usageMode ?? 'manual') === 'automatic';
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Badge
+                variant="outline"
+                className="cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+                title="Click to change mode"
+              >
+                {isAutomatic ? 'Automatic' : 'Manual'}
+              </Badge>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>Mode</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() =>
+                  updateDiscountFields(
+                    { id: discount.id, usageMode: 'automatic' },
+                    {
+                      onSuccess: () => toast.success('Mode set to Automatic'),
+                      onError: (e: unknown) =>
+                        toast.error(
+                          (e as { message?: string })?.message ||
+                            'Failed to update mode'
+                        ),
+                    }
+                  )
+                }
+                disabled={isAutomatic || !canUpdateDiscount(discount)}
+              >
+                Automatic
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  updateDiscountFields(
+                    { id: discount.id, usageMode: 'manual' },
+                    {
+                      onSuccess: () => toast.success('Mode set to Manual'),
+                      onError: (e: unknown) =>
+                        toast.error(
+                          (e as { message?: string })?.message ||
+                            'Failed to update mode'
+                        ),
+                    }
+                  )
+                }
+                disabled={!isAutomatic || !canUpdateDiscount(discount)}
+              >
+                Manual
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
     {
       accessorKey: 'usageLimit',
@@ -111,17 +197,96 @@ export function DiscountManager() {
     {
       accessorKey: 'isActive',
       header: 'Status',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
-            {row.original.isActive ? 'Active' : 'Inactive'}
-          </Badge>
-          {row.original.expiresAt &&
-            new Date(row.original.expiresAt).getTime() < Date.now() && (
-              <Badge variant="destructive">Expired</Badge>
-            )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const discount = row.original;
+        const isExpired =
+          !!discount.expiresAt &&
+          new Date(discount.expiresAt).getTime() < Date.now();
+        const variant = isExpired
+          ? 'destructive'
+          : discount.isActive
+          ? 'default'
+          : 'secondary';
+        const label = isExpired
+          ? 'Expired'
+          : discount.isActive
+          ? 'Active'
+          : 'Inactive';
+        return (
+          <div className="flex items-center gap-2" data-no-row-click="true">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Badge
+                  variant={variant as any}
+                  className="cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Click for status actions"
+                >
+                  {label}
+                </Badge>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Status Actions</DropdownMenuLabel>
+                {!isExpired && canUpdateDiscount(discount) && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        updateDiscountFields(
+                          {
+                            id: discount.id,
+                            expiresAt: new Date().toISOString(),
+                            isActive: false,
+                          },
+                          {
+                            onSuccess: () => toast.success('Discount expired'),
+                            onError: (e: unknown) =>
+                              toast.error(
+                                (e as { message?: string })?.message ||
+                                  'Failed to expire discount'
+                              ),
+                          }
+                        )
+                      }
+                    >
+                      Expire Now
+                    </DropdownMenuItem>
+                    {discount.isActive && canUpdateDiscount(discount) && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          updateDiscountFields(
+                            { id: discount.id, isActive: false },
+                            {
+                              onSuccess: () =>
+                                toast.success('Discount disabled'),
+                              onError: (e: unknown) =>
+                                toast.error(
+                                  (e as { message?: string })?.message ||
+                                    'Failed to disable discount'
+                                ),
+                            }
+                          )
+                        }
+                      >
+                        Disable
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+                {isExpired && canUpdateDiscount(discount) && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setActivatingDiscount(discount);
+                      setIsActivateOpen(true);
+                    }}
+                  >
+                    Activate…
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
     },
     {
       header: 'Validity',
@@ -135,14 +300,18 @@ export function DiscountManager() {
           ? new Date(row.original.expiresAt)
           : undefined;
         const start = startDate
-          ? `${format(startDate, 'MMMM dd, yyyy')} ${format(
+          ? `${format(startDate, 'MMM dd, yyyy')} ${format(
               startDate,
               'h:mm a'
             )}`
           : 'Any';
         const end = endDate
-          ? `${format(endDate, 'MMMM dd, yyyy')} ${format(endDate, 'h:mm a')}`
+          ? `${format(endDate, 'MMM dd, yyyy')} ${format(endDate, 'h:mm a')}`
           : 'Forever';
+        const startIsPast = startDate
+          ? startDate.getTime() < Date.now()
+          : undefined;
+        const endIsPast = endDate ? endDate.getTime() < Date.now() : undefined;
         const startRel =
           startDate?.getTime() != null
             ? formatDistanceToNow(startDate, { addSuffix: true })
@@ -159,13 +328,14 @@ export function DiscountManager() {
             <div className="flex gap-2">
               {startRel && (
                 <span>
-                  Start:{' '}
+                  {startIsPast ? 'Started' : 'Starts'}{' '}
                   {startRel === 'in less than a minute' ? 'now' : startRel}
                 </span>
               )}
               {endRel && (
                 <span>
-                  Ends {endRel === 'less than a minute ago' ? 'now' : endRel}
+                  {endIsPast ? 'Ended' : 'Ends'}{' '}
+                  {endRel === 'less than a minute ago' ? 'now' : endRel}
                 </span>
               )}
             </div>
@@ -177,6 +347,9 @@ export function DiscountManager() {
       id: 'actions',
       cell: ({ row }) => {
         const discount = row.original;
+        const isExpired =
+          !!discount.expiresAt &&
+          new Date(discount.expiresAt).getTime() < Date.now();
 
         return (
           <DropdownMenu>
@@ -198,39 +371,100 @@ export function DiscountManager() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  setEditingDiscount(discount);
-                  setIsEditOpen(true);
+                  if (!isExpired && canUpdateDiscount(discount)) {
+                    setEditingDiscount(discount);
+                    setIsEditOpen(true);
+                  }
                 }}
+                disabled={isExpired || !canUpdateDiscount(discount)}
               >
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  if (discount.code) {
+                  if (discount.code && !isExpired && canViewCodeFor(discount)) {
                     navigator.clipboard.writeText(discount.code);
                     toast.success('Code copied to clipboard');
                   }
                 }}
-                disabled={!discount.code}
+                disabled={
+                  !discount.code || isExpired || !canViewCodeFor(discount)
+                }
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Copy Code
               </DropdownMenuItem>
+              {!isExpired && canUpdateDiscount(discount) && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      updateDiscountFields(
+                        {
+                          id: discount.id,
+                          expiresAt: new Date().toISOString(),
+                          isActive: false,
+                        },
+                        {
+                          onSuccess: () => toast.success('Discount expired'),
+                          onError: (e: unknown) =>
+                            toast.error(
+                              (e as { message?: string })?.message ||
+                                'Failed to expire discount'
+                            ),
+                        }
+                      );
+                    }}
+                  >
+                    Expire Now
+                  </DropdownMenuItem>
+                  {discount.isActive && canUpdateDiscount(discount) && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        updateDiscountFields(
+                          { id: discount.id, isActive: false },
+                          {
+                            onSuccess: () => toast.success('Discount disabled'),
+                            onError: (e: unknown) =>
+                              toast.error(
+                                (e as { message?: string })?.message ||
+                                  'Failed to disable discount'
+                              ),
+                          }
+                        );
+                      }}
+                    >
+                      Disable
+                    </DropdownMenuItem>
+                  )}
+                </>
+              )}
+              {isExpired && canUpdateDiscount(discount) && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setActivatingDiscount(discount);
+                    setIsActivateOpen(true);
+                  }}
+                >
+                  Activate…
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => {
-                  // Simple confirm for now
                   if (
                     window.confirm(
                       'Are you sure you want to delete this discount? This will remove it from all associated inventory items.'
                     )
                   ) {
-                    deleteDiscount(discount.id);
-                    toast.success('Discount deleted');
+                    if (canDelete) {
+                      deleteDiscount(discount.id);
+                      toast.success('Discount deleted');
+                    }
                   }
                 }}
+                disabled={!canDelete}
               >
                 <Trash className="mr-2 h-4 w-4" />
                 Delete
@@ -244,27 +478,17 @@ export function DiscountManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-lg font-medium">Discounts</h2>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Discount
-        </Button>
-      </div>
-
       <DataTable
         columns={columns}
         data={sortedDiscounts}
         searchKey="search"
         exportFields={discountExportFields}
-        defaultColumnVisibility={{ search: false }}
+        defaultColumnVisibility={{ search: false, code: canViewCode }}
+        canExport={!!canExport}
       />
       {/* Hide the search column by default and exclude from exports via DataTable defaults */}
       {/* The DataTable view toggles will not include 'search' since enableHiding is false */}
 
-      <CreateDiscountSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} />
       <CreateDiscountSheet
         open={isEditOpen}
         onOpenChange={(val) => {
@@ -281,6 +505,17 @@ export function DiscountManager() {
             if (!open) setDetailsId(null);
           }}
           discountId={detailsId}
+          discount={discounts.find((d) => d.id === detailsId)}
+        />
+      )}
+      {activatingDiscount && (
+        <ActivateDiscountDialog
+          open={isActivateOpen}
+          onOpenChange={(open) => {
+            setIsActivateOpen(open);
+            if (!open) setActivatingDiscount(null);
+          }}
+          discount={activatingDiscount}
         />
       )}
     </div>

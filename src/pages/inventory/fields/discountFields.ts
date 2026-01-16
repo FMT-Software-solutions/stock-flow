@@ -47,4 +47,16 @@ export const discountExportFields: ExportField[] = [
         accessorFn: (row: any) => row.original.updatedAt,
         isSelectedByDefault: false,
     },
+    {
+        id: 'usageMode',
+        label: 'Mode',
+        accessorFn: (row: any) =>
+            (row.original.usageMode ?? 'manual') === 'automatic' ? 'Automatic' : 'Manual',
+    },
+    {
+        id: 'usageLimit',
+        label: 'Usage Limit',
+        accessorFn: (row: any) =>
+            row.original.usageLimit != null ? row.original.usageLimit : 'Unlimited',
+    },
 ];

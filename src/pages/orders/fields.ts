@@ -178,7 +178,7 @@ export const getOrderStatsGroups = (
       fields: [
         {
           id: 'paid_revenue',
-          label: 'Revenue (Paid)',
+          label: 'Revenue',
           calculate: (data) => {
             const total = data.reduce((sum, o) => {
               const val = o.paid_amount as unknown as number | string | undefined;

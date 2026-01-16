@@ -183,7 +183,7 @@ export function InventoryDetailsDialog({
                 <div>
                   <h3 className="font-semibold text-lg leading-none tracking-tight">
                     <Link
-                      to={`/inventory/${inventory.productId}`}
+                      to={`/inventory/entry/${inventory.id}`}
                       className="hover:underline flex items-center gap-1 text-primary"
                     >
                       {inventory.productName}

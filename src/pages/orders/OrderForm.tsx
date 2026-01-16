@@ -720,7 +720,7 @@ function OrderFormInner({
                              }
                           }}
                           readOnly={paymentStatus === 'paid'}
-                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-white/80'}
+                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-white/80 dark:bg-muted/30'}
                         />
                         {fieldState.error && (
                           <FieldError>{fieldState.error.message}</FieldError>

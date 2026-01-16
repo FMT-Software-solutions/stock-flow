@@ -3,6 +3,8 @@ export interface Discount {
   organizationId: string;
   name: string;
   code?: string;
+  createdBy?: string;
+  updatedBy?: string;
   description?: string;
   type: 'percentage' | 'fixed';
   value: number;
@@ -15,6 +17,7 @@ export interface Discount {
   usageLimit?: number | null;
   timesUsed?: number;
   isActive: boolean;
+  isExpired?: boolean;
   createdAt: string;
   updatedAt: string;
 }

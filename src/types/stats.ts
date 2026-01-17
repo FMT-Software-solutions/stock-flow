@@ -22,6 +22,7 @@ export interface StatsGroup<TData> {
   description?: string;
   icon?: LucideIcon;
   fields: StatsField<TData>[];
+  cardVariant?: 'default' | 'glass';
   action?: {
     label?: string;
     icon?: LucideIcon;

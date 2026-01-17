@@ -8,18 +8,29 @@ import { OrderStatusCell } from '@/components/orders/OrderStatusCell';
 import { OrderPaymentStatusCell } from '@/components/orders/OrderPaymentStatusCell';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { OrderActions } from './OrderActions';
+import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 
 function OrderNumberCell({ order }: { order: Order }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
-    <button
-      type="button"
-      data-row-click="true"
-      className="text-xs font-mono font-medium text-primary hover:underline cursor-pointer"
-      title={`View details for order #${order.order_number}`}
-    >
-      {order.order_number}
-    </button>
+    <>
+      <button
+        type="button"
+        className="text-xs font-mono font-medium text-primary hover:underline cursor-pointer"
+        title={`View details for order #${order.order_number}`}
+        onClick={() => setDetailsOpen(true)}
+      >
+        {order.order_number}
+      </button>
+      <OrderDetailsModal
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        order={order}
+      />
+    </>
   );
 }
 

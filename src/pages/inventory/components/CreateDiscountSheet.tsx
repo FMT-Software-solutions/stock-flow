@@ -33,6 +33,7 @@ import {
   type DiscountFormValues,
 } from '../form-schema/discount-form-schema';
 import { useManageInventoryDiscount } from '@/hooks/useDiscountQueries';
+import { useDiscountDetails } from '@/hooks/useDiscountDetails';
 import {
   useCategories,
   useProducts,
@@ -62,11 +63,12 @@ export function CreateDiscountSheet({
   const { user } = useAuth();
   const { data: categories } = useCategories(currentOrganization?.id);
   const { data: products } = useProducts(currentOrganization?.id);
-  const { data: inventoryEntries } = useInventoryEntries(
-    currentOrganization?.id
-  );
   const { data: customers } = useCustomers(currentOrganization?.id);
   const { mutate: manageDiscount, isPending } = useManageInventoryDiscount();
+  const { data: discountDetails } = useDiscountDetails(
+    currentOrganization?.id,
+    discount?.id
+  );
 
   const isEditing = !!discount;
   const [step, setStep] = useState<number>(0);
@@ -96,6 +98,22 @@ export function CreateDiscountSheet({
     },
   });
 
+  const watchedBranchIds = form.watch('branchIds') as string[] | undefined;
+  const inventoryBranchIds = useMemo(() => {
+    const selected = Array.isArray(watchedBranchIds) ? watchedBranchIds : [];
+    if (isOwner) {
+      return selected.length > 0 ? selected : undefined;
+    }
+    const effective =
+      selected.length > 0 ? selected : availableBranches.map((b) => b.id);
+    return effective.length > 0 ? effective : undefined;
+  }, [isOwner, watchedBranchIds, availableBranches]);
+
+  const { data: inventoryEntries } = useInventoryEntries(
+    currentOrganization?.id,
+    inventoryBranchIds
+  );
+
   useEffect(() => {
     if (discount && open) {
       form.reset({
@@ -118,7 +136,21 @@ export function CreateDiscountSheet({
       } as any);
       setStep(0);
     }
-  }, [discount, open]); 
+  }, [discount, open]);
+
+  useEffect(() => {
+    if (
+      discountDetails?.inventories &&
+      discountDetails.inventories.length > 0 &&
+      form.getValues('targetType') === 'inventory'
+    ) {
+      const ids = discountDetails.inventories.map((i) => i.id);
+      const current = form.getValues('targetIds');
+      if (JSON.stringify(current) !== JSON.stringify(ids)) {
+        form.setValue('targetIds', ids);
+      }
+    }
+  }, [discountDetails, form]);
 
   useEffect(() => {
     if (!open) setStep(0);
@@ -172,16 +204,27 @@ export function CreateDiscountSheet({
     [availableBranches]
   );
 
-  const inventoryOptions: Option[] = useMemo(
-    () =>
+  const inventoryOptions: Option[] = useMemo(() => {
+    const opts =
       inventoryEntries?.map((i) => ({
-        label: `${i.productName} - ${i.branchName || 'No Branch'} (${
-          i.quantity
-        })`,
+        label: `${i.productName} - ${i.branchName || 'No Branch'} (${i.quantity})`,
         value: i.id,
-      })) || [],
-    [inventoryEntries]
-  );
+      })) || [];
+
+    if (discountDetails?.inventories) {
+      const existingIds = new Set(opts.map((o) => o.value));
+      discountDetails.inventories.forEach((target) => {
+        if (!existingIds.has(target.id)) {
+          opts.push({
+            label: `${target.product_name} - ${target.branch_name || 'No Branch'} (${target.quantity})`,
+            value: target.id,
+          });
+        }
+      });
+    }
+
+    return opts;
+  }, [inventoryEntries, discountDetails]);
 
   const combineDateTimeToIso = (date?: string, time?: string) => {
     if (!date) return undefined;
@@ -668,7 +711,7 @@ export function CreateDiscountSheet({
                             value={inventoryOptions.filter((o) =>
                               field.value?.includes(o.value)
                             )}
-                            defaultOptions={inventoryOptions}
+                            options={inventoryOptions}
                             triggerSearchOnFocus
                             onSearchSync={(term: string) => {
                               const t = term?.toLowerCase() ?? '';

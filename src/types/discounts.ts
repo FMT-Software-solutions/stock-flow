@@ -16,6 +16,7 @@ export interface Discount {
   usageMode?: 'automatic' | 'manual';
   usageLimit?: number | null;
   timesUsed?: number;
+  remainingUsage?: number | null;
   isActive: boolean;
   isExpired?: boolean;
   createdAt: string;

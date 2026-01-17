@@ -58,6 +58,53 @@ export function useCustomer(id?: string) {
   });
 }
 
+export interface CustomerDebtSummary {
+  total_owing: number;
+  open_orders: number;
+  last_owing_date: string | null;
+}
+
+export function useCustomerDebtSummary(params: {
+  organizationId?: string;
+  customerId?: string;
+  branchIds?: string[];
+  requestId?: number;
+}) {
+  const { organizationId, customerId, branchIds, requestId = 0 } = params;
+  const normalizedBranchIds = branchIds && branchIds.length > 0 ? branchIds : null;
+
+  return useQuery({
+    queryKey: [
+      'customers',
+      'debt_summary',
+      organizationId,
+      customerId,
+      normalizedBranchIds,
+      requestId,
+    ],
+    queryFn: async () => {
+      if (!organizationId || !customerId) return null;
+      const { data, error } = await supabase.rpc('get_customer_debt_summary', {
+        p_organization_id: organizationId,
+        p_customer_id: customerId,
+        p_branch_ids: normalizedBranchIds,
+      });
+      if (error) throw error;
+      return data as CustomerDebtSummary;
+    },
+    enabled: !!organizationId && !!customerId,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    placeholderData: (prev) =>
+      prev ?? {
+        total_owing: 0,
+        open_orders: 0,
+        last_owing_date: null,
+      },
+  });
+}
+
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
   return useMutation({

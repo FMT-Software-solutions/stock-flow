@@ -1,4 +1,4 @@
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, FieldError } from '@/components/ui/field';
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X } from 'lucide-react';
+import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
@@ -22,7 +22,7 @@ import { InventorySelector } from '@/components/orders/InventorySelector';
 import { CustomerSelector } from '@/components/orders/CustomerSelector';
 import { RecentOrders } from '@/components/orders/RecentOrders';
 import { toast } from 'sonner';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   orderSchema,
@@ -32,11 +32,16 @@ import {
 import { useOrderForm } from '@/hooks/useOrderForm';
 import type { Order } from '@/types/orders';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
+import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
+import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
+import { useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -183,19 +188,70 @@ function OrderFormInner({
   });
 
   // Calculate total
-  const items = form.watch('items');
+  const items = useWatch({
+    control: form.control,
+    name: 'items',
+  }) || [];
   const paymentStatus = form.watch('paymentStatus');
   const paidAmount = form.watch('paidAmount');
+  const customerId = form.watch('customerId');
+  const [customerDebtRequestId, setCustomerDebtRequestId] = useState(0);
+  const { data: customerDebtSummary } = useCustomerDebtSummary({
+    organizationId: currentOrganization?.id,
+    customerId: customerId || undefined,
+    branchIds: selectedBranchId ? [selectedBranchId] : undefined,
+    requestId: customerDebtRequestId,
+  });
+  const orderItems: DiscountOrderItem[] = useMemo(() => {
+    return items
+      .map((item) => {
+        const invItem = inventory.find((i) => i.id === item.inventoryId);
+        if (!invItem) return null;
+        return {
+          inventoryId: invItem.id,
+          productId: invItem.productId,
+          branchId: invItem.branchId || undefined,
+          unitPrice: Number(item.unitPrice || invItem.productPrice || invItem.variantPrice || 0),
+          quantity: Number(item.quantity || 0),
+        } as DiscountOrderItem;
+      })
+      .filter(Boolean) as DiscountOrderItem[];
+  }, [items, inventory]);
+
+  const {
+    discountCode, setDiscountCode,
+    setSelectedAutoId,
+    appliedDiscount, autoOptions,
+    resetState,
+    clearDiscount,
+    setManuallyCleared,
+    discountEligibleMap,
+    validateCode
+  } = useOrderDiscounts(currentOrganization?.id, selectedBranchId, orderItems, customerId);
+
+  const prevBranchIdRef = useRef(selectedBranchId);
+  useEffect(() => {
+    if (prevBranchIdRef.current !== selectedBranchId) {
+      form.setValue('items', []);
+      resetState();
+      prevBranchIdRef.current = selectedBranchId;
+    }
+  }, [selectedBranchId, form, resetState]);
+
+  const [discountCardOpen, setDiscountCardOpen] = useState(false);
+
+  const incrementUsage = useIncrementDiscountUsage();
+  const validateDiscount = useValidateDiscountServerSide();
+
   const totalAmount = items.reduce((sum, item) => {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unitPrice) || 0;
     return sum + qty * price;
   }, 0);
+  const effectiveTotal = Math.max(0, totalAmount - (appliedDiscount?.amount ?? 0));
 
   // Auto-fill paid amount based on status logic
   useEffect(() => {
-    if (isEditing) return; // Only auto-fill on new order creation or status change?
-    
     // "If the payment status is selected as unpaid or partial but paid amount entered is same as total amount, we should save the status is paid automatically."
     // "same for when paid status is selected but amount entered is not full total amount. we should automatically save status as partial."
     // "If status changed to unpaid or refunded, it should set paid amount to zero automatically."
@@ -203,20 +259,38 @@ function OrderFormInner({
 
     // Let's handle status changes first
     if (paymentStatus === 'paid') {
-        form.setValue('paidAmount', totalAmount);
+        form.setValue('paidAmount', effectiveTotal);
     } else if (paymentStatus === 'unpaid' || paymentStatus === 'refunded') {
         form.setValue('paidAmount', 0);
     } 
+    if (paymentStatus === 'refunded') {
+        form.setValue('status', 'refunded');
+    }
     // partial -> do nothing, let user enter
-  }, [paymentStatus, totalAmount, form, isEditing]);
+  }, [paymentStatus, effectiveTotal, form]);
 
   async function onSubmit(values: OrderFormValues) {
     if (!currentOrganization?.id) return;
 
     try {
+      if (appliedDiscount) {
+        await validateDiscount.mutateAsync(appliedDiscount.discount.id);
+      }
+
+      // Calculate discount distribution if any
+      let discountDistribution: Record<string, number> = {};
+      if (appliedDiscount) {
+         discountDistribution = distributeDiscount(
+             appliedDiscount.discount, 
+             orderItems, 
+             discountEligibleMap
+         );
+      }
+
       // Enrich items with product details (snapshot)
       const enrichedItems = values.items.map((item) => {
         const invItem = inventory.find((i) => i.id === item.inventoryId);
+        const discountAmount = discountDistribution[item.inventoryId] || 0;
         return {
           inventory_id: item.inventoryId,
           product_id: invItem?.productId,
@@ -227,9 +301,11 @@ function OrderFormInner({
           quantity: item.quantity,
           unit_price: item.unitPrice,
           total_price: item.quantity * item.unitPrice,
+          discount_amount: discountAmount,
         };
       });
 
+      const orderDiscountAmount = appliedDiscount?.amount ?? 0;
       const orderData = {
         organization_id: currentOrganization.id,
         branch_id: values.branchId,
@@ -237,24 +313,28 @@ function OrderFormInner({
         status: values.status,
         payment_status: values.paymentStatus,
         payment_method: values.paymentMethod,
-        total_amount: totalAmount,
-        paid_amount: values.paidAmount ?? (values.paymentStatus === 'paid' ? totalAmount : 0),
-        subtotal: totalAmount, // For now assuming no tax/discount calculation separately
+        total_amount: Math.max(0, totalAmount - orderDiscountAmount),
+        paid_amount: values.paidAmount ?? (values.paymentStatus === 'paid' ? Math.max(0, totalAmount - orderDiscountAmount) : 0),
+        subtotal: totalAmount,
         tax: 0,
-        discount: 0,
+        discount: orderDiscountAmount,
         notes: values.notes,
         items: enrichedItems,
       };
 
       // Final check for status consistency before submitting
+      if (orderData.payment_status === 'refunded') {
+         orderData.status = 'refunded';
+         orderData.paid_amount = 0;
+      }
       if (orderData.payment_status === 'unpaid' && orderData.paid_amount > 0) {
-         if (orderData.paid_amount >= totalAmount) orderData.payment_status = 'paid';
+         if (orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) orderData.payment_status = 'paid';
          else orderData.payment_status = 'partial';
       }
-      if (orderData.payment_status === 'paid' && orderData.paid_amount < totalAmount) {
+      if (orderData.payment_status === 'paid' && orderData.paid_amount < Math.max(0, totalAmount - orderDiscountAmount)) {
          orderData.payment_status = 'partial';
       }
-      if (orderData.payment_status === 'partial' && orderData.paid_amount >= totalAmount) {
+      if (orderData.payment_status === 'partial' && orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) {
          orderData.payment_status = 'paid';
       }
       if (orderData.payment_status === 'partial' && orderData.paid_amount <= 0) {
@@ -270,6 +350,8 @@ function OrderFormInner({
         navigate('/orders');
       } else {
         await createOrder.mutateAsync(orderData);
+        if (appliedDiscount) await incrementUsage.mutateAsync(appliedDiscount.discount.id);
+
         toast.success('Order created successfully');
         if (currentDraftId) {
           setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
@@ -288,6 +370,7 @@ function OrderFormInner({
           notes: '',
           items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
         });
+        resetState();
       }
     } catch (error) {
       console.error(error);
@@ -587,8 +670,25 @@ function OrderFormInner({
                       <FieldLabel>Customer (Optional)</FieldLabel>
                       <CustomerSelector
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(nextCustomerId) => {
+                          field.onChange(nextCustomerId);
+                          setCustomerDebtRequestId((prev) => prev + 1);
+                        }}
                       />
+                      {!!field.value && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {customerDebtSummary?.total_owing && customerDebtSummary.total_owing > 0 ? (
+                            <div className="flex items-center justify-between">
+                              <span>Outstanding balance</span>
+                              <span className="font-medium text-destructive">
+                                {formatCurrency(customerDebtSummary.total_owing)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>No outstanding balance.</div>
+                          )}
+                        </div>
+                      )}
                       {fieldState.error && (
                         <FieldError>{fieldState.error.message}</FieldError>
                       )}
@@ -683,17 +783,160 @@ function OrderFormInner({
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/50">
+            <Card className={discountCardOpen ? 'py-4' : 'py-2'}>
+              <Collapsible open={discountCardOpen} onOpenChange={setDiscountCardOpen}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Discounts</CardTitle>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-9 p-0">
+                        {discountCardOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Toggle</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                  {!discountCardOpen && appliedDiscount && (
+                    <div className="mt-2 text-sm text-muted-foreground flex items-center justify-between">
+                       <span>Applied: {appliedDiscount.discount.code || appliedDiscount.discount.name}</span>
+                       <span className="font-medium text-green-600">-{formatCurrency(appliedDiscount.amount)}</span>
+                    </div>
+                  )}
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="space-y-2">
+                      <Field>
+                        <FieldLabel>Discount Code</FieldLabel>
+                        <div className="flex gap-1">
+                          <Input
+                            value={discountCode}
+                            onChange={(e) => {
+                              setDiscountCode(e.target.value);
+                              setSelectedAutoId(undefined);
+                            }}
+                            placeholder="Enter discount code"
+                            disabled={orderItems.length === 0}
+                          />
+                          <Button
+                            type="button"
+                            variant="default"
+                            onClick={() => {
+                              const trimmed = discountCode.trim();
+                              setDiscountCode(trimmed);
+                              setSelectedAutoId(undefined);
+                              setManuallyCleared(false);
+                              
+                              // Check validation
+                              if (trimmed) {
+                                  const error = validateCode(trimmed);
+                                  if (error) {
+                                      toast.error(error);
+                                  }
+                              }
+                            }}
+                            disabled={!discountCode.trim() || orderItems.length === 0}
+                          >
+                            Apply
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={clearDiscount}
+                            disabled={!discountCode.trim() || orderItems.length === 0}
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      </Field>
+                    </div>
+                    {appliedDiscount && (
+                      <div className="flex items-center justify-between border rounded-md p-2">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            {appliedDiscount.discount.code ? (
+                              <span title={appliedDiscount.discount.name}>{appliedDiscount.discount.code}</span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium">
+                          {formatCurrency(appliedDiscount.amount)}
+                        </div>
+                        <div className='flex items-center'>
+                          <span className='text-[10px] text-green-500 italic'>Applied</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearDiscount}
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {autoOptions.length > 0 && (
+                      <div className="space-y-2">
+                        <FieldLabel>Other Available Discounts</FieldLabel>
+                        <div className="flex flex-col gap-2">
+                          {autoOptions.map((d) => {
+                            const amount = computeDiscountAmount(d, orderItems, discountEligibleMap);
+                            const isSelected = appliedDiscount?.discount.id === d.id;
+                            return (
+                              <div key={d.id} className="flex items-center justify-between border rounded-md p-2">
+                                
+                                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                  {d.code ? <span>{d.code}</span> : null}
+                                </div>
+                                <div className="text-sm font-medium">{formatCurrency(amount)}</div>
+                                <Button
+                                  type="button"
+                                  variant={isSelected ? 'secondary' : 'outline'}
+                                  size="sm"
+                                  onClick={() => {
+                                      setSelectedAutoId(d.id);
+                                      setDiscountCode((d.code ?? '').trim());
+                                      setManuallyCleared(false);
+                                    }}
+                                >
+                                  {isSelected ? 'Applied' : 'Use'}
+                                </Button>
+                              
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            <Card className="bg-card/50">
               <CardHeader>
                 <CardTitle>Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Total</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Subtotal</span>
                   <span>{formatCurrency(totalAmount)}</span>
                 </div>
+                {appliedDiscount?.amount ? (
+                  <div className="flex justify-between items-center text-sm text-green-600 mt-2">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(appliedDiscount.amount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between items-center text-lg font-bold pt-2 mt-2 border-t">
+                  <span>Total</span>
+                  <span>{formatCurrency(effectiveTotal)}</span>
+                </div>
                 
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-2 pt-2 border-t">
                   <Controller
                     control={form.control}
                     name="paidAmount"
@@ -708,9 +951,8 @@ function OrderFormInner({
                           onChange={(e) => {
                              const val = parseFloat(e.target.value);
                              field.onChange(val);
-                             // Auto-update status based on amount
                              if (!isNaN(val)) {
-                                if (val >= totalAmount) {
+                                if (val >= effectiveTotal) {
                                    form.setValue('paymentStatus', 'paid');
                                 } else if (val > 0) {
                                    form.setValue('paymentStatus', 'partial');
@@ -720,7 +962,7 @@ function OrderFormInner({
                              }
                           }}
                           readOnly={paymentStatus === 'paid'}
-                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-white/80 dark:bg-muted/30'}
+                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-muted/30'}
                         />
                         {fieldState.error && (
                           <FieldError>{fieldState.error.message}</FieldError>
@@ -728,11 +970,10 @@ function OrderFormInner({
                       </Field>
                     )}
                   />
-                  {/* Show arrears/remaining */}
-                  {(paidAmount !== undefined && paidAmount < totalAmount) && (
+                  {(paidAmount !== undefined && paidAmount < effectiveTotal) && (
                      <div className="flex justify-between items-center text-sm text-red-600 mt-2">
                        <span>Remaining (Arrears)</span>
-                       <span>{formatCurrency(totalAmount - (paidAmount || 0))}</span>
+                       <span>{formatCurrency(effectiveTotal - (paidAmount || 0))}</span>
                      </div>
                   )}
                 </div>

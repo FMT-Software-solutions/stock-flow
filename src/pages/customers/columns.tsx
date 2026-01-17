@@ -3,7 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { Customer } from '@/types/customer';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit, Trash, Copy } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash, Copy, Eye } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +67,14 @@ const CustomerActions = ({ customer }: { customer: Customer }) => {
             Copy Email
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link
+              to={`/customers/details/${customer.id}`}
+              className="flex items-center"
+            >
+              <Eye className="mr-2 h-4 w-4" /> View Details
+            </Link>
+          </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem asChild>
               <Link

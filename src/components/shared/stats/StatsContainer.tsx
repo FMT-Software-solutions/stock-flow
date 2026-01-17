@@ -40,13 +40,22 @@ export function StatsContainer<TData>({
   orgId,
 }: StatsContainerProps<TData>) {
   const [isOpen, setIsOpen] = useOrgPreference<boolean>(orgId, `stats.${storageKey}.isOpen`, true);
+  const glassCardClassName =
+    'relative overflow-hidden border-primary/20 bg-card/40 bg-linear-to-br from-primary/15 via-primary/10 to-background/25 shadow-md backdrop-blur-sm';
 
   const content = (
     <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
       {groups
         .filter((group) => !group.isHidden)
         .map((group) => (
-          <StatsGroupCard key={group.id} group={group} data={data} />
+          <StatsGroupCard
+            key={group.id}
+            group={group}
+            data={data}
+            className={cn(
+              group.cardVariant === 'glass' && glassCardClassName
+            )}
+          />
         ))}
     </div>
   );

@@ -172,11 +172,17 @@ export function useUpdateOrder() {
   return useMutation({
     mutationFn: async (input: UpdateOrderInput) => {
       const { items, id, ...orderData } = input;
+      const patchedOrderData = { ...orderData };
+
+      if (patchedOrderData.payment_status === 'refunded') {
+        patchedOrderData.status = 'refunded';
+        patchedOrderData.paid_amount = 0;
+      }
 
       // 1. Update Order Details
       const { error: orderError } = await supabase
         .from('orders')
-        .update(orderData)
+        .update(patchedOrderData)
         .eq('id', id);
 
       if (orderError) throw orderError;
@@ -219,6 +225,8 @@ export function useUpdateOrder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },

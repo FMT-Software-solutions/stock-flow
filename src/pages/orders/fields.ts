@@ -127,6 +127,7 @@ export const getOrderStatsGroups = (
       id: 'orders_overview',
       title: 'Orders Overview',
       icon: ShoppingCart,
+      cardVariant: 'glass',
       fields: [
         {
           id: 'total_orders',

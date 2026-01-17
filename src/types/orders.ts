@@ -14,6 +14,7 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  discount_amount?: number;
   created_at: string;
 }
 

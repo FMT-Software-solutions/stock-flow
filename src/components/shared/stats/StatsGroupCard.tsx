@@ -22,14 +22,26 @@ export function StatsGroupCard<TData>({
 }: StatsGroupCardProps<TData>) {
   const Icon = group.icon;
   const ActionIcon = group.action?.icon;
+  const isGlass = group.cardVariant === 'glass';
 
   return (
     <Card className={cn('h-full py-4', className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex flex-col space-y-1.5">
           <div className="flex items-center gap-2">
-            {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-            <CardTitle className="text-sm font-medium">{group.title}</CardTitle>
+            {Icon && (
+              <Icon
+                className={cn(
+                  'h-4 w-4',
+                  isGlass ? 'text-primary/80' : 'text-muted-foreground'
+                )}
+              />
+            )}
+            <CardTitle
+              className={cn('text-sm font-medium', isGlass && 'text-primary')}
+            >
+              {group.title}
+            </CardTitle>
           </div>
           {group.description && (
             <CardDescription>{group.description}</CardDescription>
@@ -68,7 +80,9 @@ export function StatsGroupCard<TData>({
                 <span>{field.label}</span>
               </div>
               <div className="flex flex-col items-end text-right max-w-[60%]">
-                <span className={cn('font-bold wrap-break-word', field.className)}>
+                <span
+                  className={cn('font-bold wrap-break-word', field.className)}
+                >
                   {result.value}
                 </span>
                 {result.subValue && (

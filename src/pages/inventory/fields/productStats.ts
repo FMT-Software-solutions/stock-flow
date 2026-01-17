@@ -7,6 +7,7 @@ export const getProductStatsGroups = (formatCurrency: (amount: number) => string
     id: "overview",
     title: "Product Overview",
     icon: Box,
+    cardVariant: 'glass',
     fields: [
       {
         id: "total",

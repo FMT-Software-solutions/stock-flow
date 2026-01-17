@@ -21,6 +21,14 @@ import { useMemo, useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function CustomerDetails() {
   const { id } = useParams();
@@ -64,13 +72,73 @@ export default function CustomerDetails() {
     return getCustomerOrderFilterFields(branches, paymentMethods);
   }, [orders]);
 
+  const owingOrders = useMemo(() => {
+    return orders
+      .filter((o) => {
+        const status = String(o.status || '').toLowerCase();
+        const paymentStatus = String(o.payment_status || '').toLowerCase();
+        if (
+          status === 'cancelled' ||
+          status === 'canceled' ||
+          status === 'refunded'
+        )
+          return false;
+        if (paymentStatus === 'refunded') return false;
+
+        const totalRaw = (o.total_amount as unknown) as
+          | number
+          | string
+          | undefined;
+        const paidRaw = (o.paid_amount as unknown) as
+          | number
+          | string
+          | undefined;
+        const total =
+          typeof totalRaw === 'string' ? parseFloat(totalRaw) : totalRaw ?? 0;
+        const paid =
+          typeof paidRaw === 'string' ? parseFloat(paidRaw) : paidRaw ?? 0;
+        const owing = Math.max(
+          0,
+          (Number.isNaN(total) ? 0 : total) - (Number.isNaN(paid) ? 0 : paid)
+        );
+        return owing > 0;
+      })
+      .sort((a, b) => {
+        const da = new Date(a.date || a.created_at).getTime();
+        const db = new Date(b.date || b.created_at).getTime();
+        return db - da;
+      });
+  }, [orders]);
+
+  const totalOwing = useMemo(() => {
+    return owingOrders.reduce((sum, o) => {
+      const totalRaw = (o.total_amount as unknown) as
+        | number
+        | string
+        | undefined;
+      const paidRaw = (o.paid_amount as unknown) as number | string | undefined;
+      const total =
+        typeof totalRaw === 'string' ? parseFloat(totalRaw) : totalRaw ?? 0;
+      const paid =
+        typeof paidRaw === 'string' ? parseFloat(paidRaw) : paidRaw ?? 0;
+      const owing = Math.max(
+        0,
+        (Number.isNaN(total) ? 0 : total) - (Number.isNaN(paid) ? 0 : paid)
+      );
+      return sum + owing;
+    }, 0);
+  }, [owingOrders]);
+
   function OrderNumberCell({ order }: { order: Order }) {
     return (
       <button
         type="button"
-        data-row-click="true"
         className="font-mono font-medium text-primary hover:underline"
         title={`View details for order #${order.order_number}`}
+        onClick={() => {
+          setSelectedOrder(order);
+          setDetailsOpen(true);
+        }}
       >
         {order.order_number}
       </button>
@@ -229,7 +297,7 @@ export default function CustomerDetails() {
       <div className="flex items-center gap-4">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={() => navigate('/customers')}
         >
@@ -246,9 +314,9 @@ export default function CustomerDetails() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+        <Card className="relative overflow-hidden border-primary/20 bg-card/40 bg-linear-to-br from-primary/15 via-primary/10 to-background/25 shadow-md backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Details</CardTitle>
+            <CardTitle className="text-primary">Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -296,6 +364,17 @@ export default function CustomerDetails() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
+                  Total Owing
+                </p>
+                <div className="text-xl font-bold">
+                  <CurrencyDisplay amount={totalOwing} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {owingOrders.length} outstanding order(s)
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
                   Last Order
                 </p>
                 <div className="text-lg font-medium">
@@ -335,22 +414,102 @@ export default function CustomerDetails() {
 
         <Card className="md:col-span-3">
           <CardHeader>
+            <CardTitle>Customer Debts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {owingOrders.length ? (
+              <div className="rounded-md border max-h-125 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead className="text-right">Owing</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {owingOrders.map((order) => {
+                      const totalRaw = (order.total_amount as unknown) as
+                        | number
+                        | string
+                        | undefined;
+                      const paidRaw = (order.paid_amount as unknown) as
+                        | number
+                        | string
+                        | undefined;
+                      const total =
+                        typeof totalRaw === 'string'
+                          ? parseFloat(totalRaw)
+                          : totalRaw ?? 0;
+                      const paid =
+                        typeof paidRaw === 'string'
+                          ? parseFloat(paidRaw)
+                          : paidRaw ?? 0;
+                      const owing = Math.max(
+                        0,
+                        (Number.isNaN(total) ? 0 : total) -
+                          (Number.isNaN(paid) ? 0 : paid)
+                      );
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>
+                            <OrderNumberCell order={order} />
+                          </TableCell>
+                          <TableCell>
+                            {format(
+                              new Date(order.date),
+                              'MMMM dd, yyyy h:mm a'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={getOrderStatusVariant(order.status)}
+                              className="capitalize"
+                            >
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="uppercase text-xs">
+                            {String(order.payment_status || '').replace(
+                              '_',
+                              ' '
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <CurrencyDisplay amount={owing} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No outstanding customer debts.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-3">
+          <CardHeader>
             <CardTitle>Order History</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable
-              columns={columns}
-              data={orders}
-              searchKey="orderNumber"
-              storageKey={`customer-orders-${customer.id}`}
-              exportFields={customerOrderExportFields}
-              filterFields={filterFields}
-              canExport={canExportOrders}
-              onRowClick={(order) => {
-                setSelectedOrder(order as Order);
-                setDetailsOpen(true);
-              }}
-            />
+            <div className="max-h-125 overflow-auto">
+              <DataTable
+                columns={columns}
+                data={orders}
+                searchKey="orderNumber"
+                storageKey={`customer-orders-${customer.id}`}
+                exportFields={customerOrderExportFields}
+                filterFields={filterFields}
+                canExport={canExportOrders}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

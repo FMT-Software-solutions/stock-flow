@@ -1,5 +1,4 @@
 import * as React from "react"
-import { useRef } from "react"
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -91,17 +90,10 @@ export function DataTable<TData, TValue>({
     },
   })
 
-  const prevSignatureRef = useRef<string | null>(null)
   React.useEffect(() => {
     if (!onFilteredDataChange) return
     const filtered = table.getFilteredRowModel().rows
-    const signature =
-      `${filtered.length}:` +
-      filtered.slice(0, 20).map((r) => (r.original as any)?.id ?? '').join(',')
-    if (prevSignatureRef.current !== signature) {
-      prevSignatureRef.current = signature
-      onFilteredDataChange(filtered.map((r) => r.original as TData))
-    }
+    onFilteredDataChange(filtered.map((r) => r.original as TData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnFilters, data])
 

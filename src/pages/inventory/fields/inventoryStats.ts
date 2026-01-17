@@ -7,6 +7,7 @@ export const getInventoryStatsGroups = (formatCurrency: (amount: number) => stri
         id: "inventory_overview",
         title: "Inventory Overview",
         icon: Package,
+        cardVariant: 'glass',
         fields: [
             {
                 id: "total_entries",

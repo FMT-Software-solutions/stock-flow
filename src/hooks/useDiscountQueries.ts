@@ -52,10 +52,16 @@ export function useManageInventoryDiscount() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['discounts'] });
       queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
+      queryClient.invalidateQueries({ queryKey: ['discount_details', variables.organizationId] });
+      if (variables.discount?.id) {
+        queryClient.invalidateQueries({
+          queryKey: ['discount_details', variables.organizationId, variables.discount.id],
+        });
+      }
     },
   });
 }
@@ -91,6 +97,9 @@ export function useDiscounts(organizationId?: string) {
         usageMode: d.usage_mode as 'automatic' | 'manual' | undefined,
         usageLimit: d.usage_limit ?? null,
         timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
+        remainingUsage: d.usage_limit !== null && d.usage_limit !== undefined
+          ? Math.max(0, d.usage_limit - (typeof d.times_used === 'number' ? d.times_used : 0))
+          : null,
         isActive: d.is_active,
         isExpired: !!d.expires_at && new Date(d.expires_at).getTime() < Date.now(),
         createdAt: d.created_at,
@@ -147,6 +156,9 @@ export function useValidInventoryDiscounts(organizationId?: string, branchIds?: 
             usageMode: d.usage_mode as 'automatic' | 'manual' | undefined,
             usageLimit: d.usage_limit ?? null,
             timesUsed: typeof d.times_used === 'number' ? d.times_used : 0,
+            remainingUsage: d.usage_limit !== null && d.usage_limit !== undefined
+              ? Math.max(0, d.usage_limit - (typeof d.times_used === 'number' ? d.times_used : 0))
+              : null,
             isActive: d.is_active,
             createdAt: d.created_at,
             updatedAt: d.updated_at,
@@ -198,4 +210,39 @@ export function useUpdateDiscountFields() {
       queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
     },
   });
+}
+
+export function useIncrementDiscountUsage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (discountId: string) => {
+      const { data, error } = await supabase.rpc('increment_discount_usage', { p_discount_id: discountId });
+      if (error) throw error;
+      if (data === false) throw new Error('Discount usage limit exceeded or discount invalid');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
+      queryClient.invalidateQueries({ queryKey: ['discounts'] });
+    }
+  });
+}
+
+export function useValidateDiscountServerSide() {
+  return useMutation({
+    mutationFn: async (discountId: string) => {
+      const { data, error } = await supabase
+        .from('discounts')
+        .select('usage_limit, times_used, expires_at, is_active')
+        .eq('id', discountId)
+        .single();
+
+      if (error) throw error;
+
+      if (data.is_active === false) throw new Error('Discount is not active');
+      if (data.expires_at && new Date(data.expires_at) < new Date()) throw new Error('Discount has expired');
+      if (data.usage_limit !== null && data.times_used >= data.usage_limit) throw new Error('Discount usage limit exceeded');
+      return data;
+    }
+  })
 }

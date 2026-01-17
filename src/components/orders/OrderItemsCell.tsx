@@ -42,8 +42,26 @@ export function OrderItemsCell({ items }: OrderItemsCellProps) {
               <div key={item.id} className="text-sm">
                 <div className="font-medium">{item.product_name}</div>
                 <div className="text-muted-foreground text-xs">
-                  Qty: {item.quantity} × {formatCurrency(item.unit_price)} ={' '}
-                  {formatCurrency(item.total_price)}
+                  {(() => {
+                    const quantity = Number(item.quantity ?? 0);
+                    const unitPrice = Number(item.unit_price ?? 0);
+                    const grossTotal = Number(item.total_price ?? 0);
+                    const discountAmount = Number(item.discount_amount ?? 0);
+                    const netTotalCandidate = grossTotal - discountAmount;
+                    const netTotal =
+                      discountAmount > 0 && netTotalCandidate >= 0
+                        ? netTotalCandidate
+                        : grossTotal;
+                    const netUnit =
+                      quantity > 0 ? netTotal / quantity : unitPrice;
+
+                    return (
+                      <>
+                        Qty: {quantity} × {formatCurrency(netUnit)} ={' '}
+                        {formatCurrency(netTotal)}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

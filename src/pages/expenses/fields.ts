@@ -92,6 +92,7 @@ export const getExpenseStatsGroups = (
       id: 'expenses_overview',
       title: 'Expenses Overview',
       icon: ClipboardList,
+      cardVariant: 'glass',
       fields: [
         {
           id: 'total_expenses',

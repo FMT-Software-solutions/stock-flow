@@ -124,11 +124,33 @@ export function OrderDetailsModal({
                     )}
                   </div>
                   <div className="col-span-2 text-right text-muted-foreground">
-                    {formatCurrency(item.unit_price)}
+                    {(() => {
+                      const quantity = Number(item.quantity ?? 0);
+                      const unitPrice = Number(item.unit_price ?? 0);
+                      const grossTotal = Number(item.total_price ?? 0);
+                      const discountAmount = Number(item.discount_amount ?? 0);
+                      const netTotalCandidate = grossTotal - discountAmount;
+                      const netTotal =
+                        discountAmount > 0 && netTotalCandidate >= 0
+                          ? netTotalCandidate
+                          : grossTotal;
+                      const netUnit =
+                        quantity > 0 ? netTotal / quantity : unitPrice;
+                      return formatCurrency(netUnit);
+                    })()}
                   </div>
                   <div className="col-span-2 text-right">{item.quantity}</div>
                   <div className="col-span-2 text-right font-medium">
-                    {formatCurrency(item.total_price)}
+                    {(() => {
+                      const grossTotal = Number(item.total_price ?? 0);
+                      const discountAmount = Number(item.discount_amount ?? 0);
+                      const netTotalCandidate = grossTotal - discountAmount;
+                      const netTotal =
+                        discountAmount > 0 && netTotalCandidate >= 0
+                          ? netTotalCandidate
+                          : grossTotal;
+                      return formatCurrency(netTotal);
+                    })()}
                   </div>
                 </div>
               ))}

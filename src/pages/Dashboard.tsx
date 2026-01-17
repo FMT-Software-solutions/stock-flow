@@ -364,6 +364,7 @@ export function Dashboard() {
     {
       id: 'sales-main',
       title: 'Sales & Revenue',
+      cardVariant: 'glass',
       fields: [
         {
           id: 'revenue',
@@ -434,6 +435,7 @@ export function Dashboard() {
     {
       id: 'customers-main',
       title: 'Customers',
+      cardVariant: 'glass',
       fields: [
         {
           id: 'total',

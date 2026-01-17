@@ -31,6 +31,7 @@ export const useOrderForm = ({ id }: UseOrderFormProps) => {
         paymentStatus: (order.payment_status as string)?.toLowerCase() as any,
         paymentMethod: (order.payment_method as string)?.toLowerCase() as any || 'cash',
         notes: order.notes || '',
+        paidAmount: order.paid_amount,
         items:
           formattedItems.length > 0
             ? formattedItems

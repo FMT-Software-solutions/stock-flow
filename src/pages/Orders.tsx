@@ -16,7 +16,6 @@ import {
   getOrderStatsGroups,
   orderExportFields,
 } from './orders/fields';
-import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 import type { Order } from '@/types/orders';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 
@@ -83,8 +82,6 @@ export function Orders() {
     formatCurrency,
   ]);
 
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [summaryMode, setSummaryMode] = useOrgPreference<'filtered' | 'all'>(
     currentOrganization?.id,
@@ -92,11 +89,6 @@ export function Orders() {
     'filtered'
   );
   const summaryData = summaryMode === 'filtered' ? filteredOrders : orders;
-
-  const handleRowClick = (order: Order) => {
-    setSelectedOrder(order);
-    setDetailsOpen(true);
-  };
 
   return (
     <div className="space-y-6">
@@ -137,20 +129,9 @@ export function Orders() {
           storageKey="stockflow-orders-table"
           canExport={canExportOrders}
           orgId={currentOrganization?.id}
-          onRowClick={handleRowClick}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
         />
       </div>
-      {selectedOrder && (
-        <OrderDetailsModal
-          open={detailsOpen}
-          onOpenChange={(open) => {
-            setDetailsOpen(open);
-            if (!open) setSelectedOrder(null);
-          }}
-          order={selectedOrder}
-        />
-      )}
     </div>
   );
 }

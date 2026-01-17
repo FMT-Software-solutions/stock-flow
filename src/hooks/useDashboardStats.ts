@@ -63,17 +63,13 @@ export interface BranchStats {
 interface DashboardStatsParams {
   organizationId: string | undefined;
   branchIds?: string[];
-  salesDateRange?: { from: Date | undefined; to?: Date | undefined };
-  expensesDateRange?: { from: Date | undefined; to?: Date | undefined };
-  customersDateRange?: { from: Date | undefined; to?: Date | undefined };
+  dateRange?: { from: Date | undefined; to?: Date | undefined };
 }
 
 export function useDashboardStats({
   organizationId,
   branchIds,
-  salesDateRange,
-  expensesDateRange,
-  customersDateRange,
+  dateRange,
 }: DashboardStatsParams) {
   const enabled = !!organizationId;
 
@@ -123,13 +119,13 @@ export function useDashboardStats({
   });
 
   const sales = useQuery({
-    queryKey: ['dashboard', 'sales', organizationId, normalizedBranchIds, salesDateRange?.from?.toISOString(), salesDateRange?.to?.toISOString()],
+    queryKey: ['dashboard', 'sales', organizationId, normalizedBranchIds, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_sales_stats', {
         p_organization_id: organizationId,
         p_branch_ids: normalizedBranchIds,
-        p_start_date: salesDateRange?.from?.toISOString() || null,
-        p_end_date: salesDateRange?.to?.toISOString() || null,
+        p_start_date: dateRange?.from?.toISOString() || null,
+        p_end_date: dateRange?.to?.toISOString() || null,
       });
       if (error) throw error;
       return data as SalesStats;
@@ -147,13 +143,13 @@ export function useDashboardStats({
   });
 
   const expenses = useQuery({
-    queryKey: ['dashboard', 'expenses', organizationId, normalizedBranchIds, expensesDateRange?.from?.toISOString(), expensesDateRange?.to?.toISOString()],
+    queryKey: ['dashboard', 'expenses', organizationId, normalizedBranchIds, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_expense_stats', {
         p_organization_id: organizationId,
         p_branch_ids: normalizedBranchIds,
-        p_start_date: expensesDateRange?.from?.toISOString() || null,
-        p_end_date: expensesDateRange?.to?.toISOString() || null,
+        p_start_date: dateRange?.from?.toISOString() || null,
+        p_end_date: dateRange?.to?.toISOString() || null,
       });
       if (error) throw error;
       return data as ExpenseStats;
@@ -169,13 +165,13 @@ export function useDashboardStats({
   });
 
   const customers = useQuery({
-    queryKey: ['dashboard', 'customers', organizationId, normalizedBranchIds, customersDateRange?.from?.toISOString(), customersDateRange?.to?.toISOString()],
+    queryKey: ['dashboard', 'customers', organizationId, normalizedBranchIds, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_customer_stats', {
         p_organization_id: organizationId,
         p_branch_ids: normalizedBranchIds,
-        p_start_date: customersDateRange?.from?.toISOString() || null,
-        p_end_date: customersDateRange?.to?.toISOString() || null,
+        p_start_date: dateRange?.from?.toISOString() || null,
+        p_end_date: dateRange?.to?.toISOString() || null,
       });
       if (error) throw error;
       return data as CustomerStats;

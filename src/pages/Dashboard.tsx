@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -55,6 +55,8 @@ import {
   YAxis,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { endOfDay, startOfDay, startOfMonth, subDays, subMonths, subYears } from 'date-fns';
+import type { DataLookback, UserPermissions } from '@/modules/permissions';
 
 // --- Types ---
 type SectionId = 
@@ -102,9 +104,19 @@ function ChartSection({
 }) {
   if (!data || data.length === 0) return null;
 
+  const formatValue = (value: unknown) => {
+    if (!currency || !formatCurrency) return value;
+    return typeof value === 'number' ? formatCurrency(value) : value;
+  };
+
+  const formatTick = (value: unknown) => {
+    const formatted = formatValue(value);
+    return typeof formatted === 'string' ? formatted : String(formatted);
+  };
+
   return (
-    <div className="h-50 w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full mt-4">
+      <ResponsiveContainer width="100%" height={200}>
         {type === 'area' ? (
           <AreaChart data={data}>
             <defs>
@@ -125,10 +137,10 @@ function ChartSection({
               tickLine={false} 
               axisLine={false} 
               tick={{ fontSize: 12 }}
-              tickFormatter={(val) => currency && formatCurrency ? formatCurrency(val) : val}
+              tickFormatter={(val) => formatTick(val)}
             />
             <Tooltip 
-              formatter={(val: number) => currency && formatCurrency ? formatCurrency(val) : val}
+              formatter={(val) => formatValue(val) as string | number}
               labelStyle={{ color: 'black' }}
             />
             <Area
@@ -153,10 +165,10 @@ function ChartSection({
               tickLine={false} 
               axisLine={false} 
               tick={{ fontSize: 12 }}
-              tickFormatter={(val) => currency && formatCurrency ? formatCurrency(val) : val}
+              tickFormatter={(val) => formatTick(val)}
             />
             <Tooltip 
-               formatter={(val: number) => currency && formatCurrency ? formatCurrency(val) : val}
+               formatter={(val) => formatValue(val) as string | number}
                cursor={{ fill: 'transparent' }}
                labelStyle={{ color: 'black' }}
             />
@@ -173,8 +185,6 @@ function DashboardMetricCard<TData>({
   title,
   groups,
   data,
-  dateRange,
-  setDateRange,
   chart,
   className,
   loading,
@@ -182,8 +192,6 @@ function DashboardMetricCard<TData>({
   title: string;
   groups: StatsGroup<TData>[];
   data: TData[];
-  dateRange?: DateRange;
-  setDateRange?: (range: DateRange | undefined) => void;
   chart?: React.ReactNode;
   className?: string;
   loading?: boolean;
@@ -192,14 +200,6 @@ function DashboardMetricCard<TData>({
     <Card className={cn('flex flex-col', loading && 'opacity-60', className)}>
       <CardHeader className="flex flex-column md:flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base font-medium">{title}</CardTitle>
-        {setDateRange && (
-          <DatePickerWithRange 
-            date={dateRange} 
-            setDate={setDateRange} 
-            disabled={!!loading}
-            className="w-auto [&>button]:w-60 [&>button]:h-8 [&>button]:text-xs" 
-          />
-        )}
       </CardHeader>
       <CardContent className="flex-1">
         <div className={cn('grid gap-4', loading && 'pointer-events-none')}>
@@ -255,9 +255,10 @@ export function Dashboard() {
   const { selectedBranchIds } = useBranchContext();
   
   // --- State ---
-  const [salesDateRange, setSalesDateRange] = useState<DateRange | undefined>(undefined);
-  const [expensesDateRange, setExpensesDateRange] = useState<DateRange | undefined>(undefined);
-  const [customersDateRange, setCustomersDateRange] = useState<DateRange | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => ({
+    from: startOfMonth(new Date()),
+    to: endOfDay(new Date()),
+  }));
   
   // Visibility State
   const [visibleSections, setVisibleSections] = useOrgArrayPreference<SectionId>(
@@ -266,13 +267,95 @@ export function Dashboard() {
     ALL_SECTIONS.map(s => s.id)
   );
 
+  const userPermissions = useMemo<UserPermissions | undefined>(() => {
+    if (!currentOrganization?.permissions) return undefined;
+    try {
+      return JSON.parse(currentOrganization.permissions) as UserPermissions;
+    } catch {
+      return undefined;
+    }
+  }, [currentOrganization?.permissions]);
+
+  const maxLookback = useMemo<DataLookback>(() => {
+    if (currentOrganization?.user_role === 'owner') {
+      return { unit: 'forever' };
+    }
+    return (
+      userPermissions?.dashboard?.dataAccess?.maxLookback ?? {
+        unit: 'months',
+        value: 1,
+      }
+    );
+  }, [currentOrganization?.user_role, userPermissions]);
+
+  const { minDate, maxDate } = useMemo(() => {
+    const now = new Date();
+    const max = endOfDay(now);
+
+    if (maxLookback.unit === 'forever') {
+      return { minDate: undefined, maxDate: max };
+    }
+
+    const value = maxLookback.value;
+    const rawMin =
+      maxLookback.unit === 'days'
+        ? subDays(now, value)
+        : maxLookback.unit === 'months'
+          ? subMonths(now, value)
+          : subYears(now, value);
+
+    return { minDate: startOfDay(rawMin), maxDate: max };
+  }, [maxLookback]);
+
+  const defaultDateRange = useMemo<DateRange>(() => {
+    const now = new Date();
+    const baseFrom = startOfMonth(now);
+    const baseTo = endOfDay(now);
+    const clampedFrom = minDate && baseFrom < minDate ? minDate : baseFrom;
+    return { from: clampedFrom, to: baseTo };
+  }, [minDate]);
+
+  useEffect(() => {
+    setDateRange((prev) => {
+      if (maxLookback.unit === 'forever' && prev === undefined) return prev;
+      if (!prev?.from || !prev?.to) return defaultDateRange;
+      if (!minDate) return prev;
+
+      const nextFrom = prev.from < minDate ? minDate : prev.from;
+      const nextTo = prev.to;
+      if (nextFrom === prev.from) return prev;
+      return nextTo < nextFrom ? { from: nextFrom, to: nextFrom } : { from: nextFrom, to: nextTo };
+    });
+  }, [defaultDateRange, maxLookback.unit, minDate]);
+
+  const handleGlobalDateChange = (next: DateRange | undefined) => {
+    if (!next) {
+      setDateRange(maxLookback.unit === 'forever' ? undefined : defaultDateRange);
+      return;
+    }
+    if (!next.from) {
+      setDateRange(defaultDateRange);
+      return;
+    }
+
+    const normalizedFrom = startOfDay(next.from);
+    const normalizedTo = endOfDay(next.to ?? next.from);
+
+    const clampedFrom = minDate && normalizedFrom < minDate ? minDate : normalizedFrom;
+    const clampedTo = maxDate && normalizedTo > maxDate ? maxDate : normalizedTo;
+
+    setDateRange(
+      clampedTo < clampedFrom
+        ? { from: clampedFrom, to: clampedFrom }
+        : { from: clampedFrom, to: clampedTo }
+    );
+  };
+
   // --- Queries ---
   const stats = useDashboardStats({
     organizationId: currentOrganization?.id,
     branchIds: selectedBranchIds,
-    salesDateRange,
-    expensesDateRange,
-    customersDateRange,
+    dateRange,
   });
 
   // Low stock query
@@ -523,6 +606,9 @@ export function Dashboard() {
     });
   };
 
+  const isDashboardRangeLoading =
+    stats.sales.isFetching || stats.expenses.isFetching || stats.customers.isFetching;
+
   return (
     <div className="space-y-6 pb-10">
       {/* Header Controls */}
@@ -533,6 +619,15 @@ export function Dashboard() {
         </div>
         
         <div className="flex items-center gap-2">
+          <DatePickerWithRange
+            date={dateRange}
+            setDate={handleGlobalDateChange}
+            disabled={isDashboardRangeLoading}
+            minDate={minDate}
+            maxDate={maxDate}
+            onClear={() => setDateRange(defaultDateRange)}
+            className="w-auto [&>button]:w-64 [&>button]:h-8 [&>button]:text-xs"
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon" title="Customize Dashboard">
@@ -566,8 +661,6 @@ export function Dashboard() {
              className="lg:col-span-2"
              groups={salesGroups}
              data={stats.sales.data ? [stats.sales.data] : ([] as SalesStats[])}
-             dateRange={salesDateRange}
-             setDateRange={setSalesDateRange}
              loading={stats.sales.isFetching}
              chart={
                <ChartSection
@@ -587,8 +680,6 @@ export function Dashboard() {
              className="lg:col-span-2"
              groups={expenseGroups}
              data={stats.expenses.data ? [stats.expenses.data] : ([] as ExpenseStats[])}
-             dateRange={expensesDateRange}
-             setDateRange={setExpensesDateRange}
              loading={stats.expenses.isFetching}
              chart={
                <ChartSection
@@ -609,8 +700,6 @@ export function Dashboard() {
              className="lg:col-span-2"
              groups={customerGroups}
              data={stats.customers.data ? [stats.customers.data] : ([] as CustomerStats[])}
-             dateRange={customersDateRange}
-             setDateRange={setCustomersDateRange}
              loading={stats.customers.isFetching}
              chart={
                <ChartSection

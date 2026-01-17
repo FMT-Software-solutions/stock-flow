@@ -35,6 +35,13 @@ export function DataTableFilterSheet<TData>({
   const [localFilters, setLocalFilters] = React.useState<
     { id: string; value: any }[]
   >([])
+  const defaultFilters = React.useMemo(
+    () =>
+      filterFields
+        .filter((f) => f.defaultValue !== undefined)
+        .map((f) => ({ id: f.id, value: f.defaultValue })),
+    [filterFields]
+  )
 
   // Initialize local filters from table state when sheet opens
   React.useEffect(() => {
@@ -54,7 +61,7 @@ export function DataTableFilterSheet<TData>({
   }
 
   const handleClear = () => {
-    setLocalFilters([])
+    setLocalFilters(defaultFilters)
   }
 
   const updateFilter = (id: string, value: any) => {
@@ -174,6 +181,15 @@ export function DataTableFilterSheet<TData>({
                      <DatePickerWithRange
                         date={value as DateRange}
                         setDate={(date) => updateFilter(field.id, date)}
+                        minDate={field.minDate}
+                        maxDate={field.maxDate}
+                        onClear={() => {
+                          if (field.defaultValue !== undefined) {
+                            updateFilter(field.id, field.defaultValue)
+                            return
+                          }
+                          updateFilter(field.id, undefined)
+                        }}
                      />
                   )}
                 </div>

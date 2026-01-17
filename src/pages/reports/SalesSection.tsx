@@ -2,9 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrders } from '@/hooks/useOrders';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { format, startOfDay, isAfter, formatDistanceToNow } from 'date-fns';
+import {
+  format,
+  startOfDay,
+  startOfWeek,
+  startOfMonth,
+  differenceInDays,
+  isAfter,
+  formatDistanceToNow,
+} from 'date-fns';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
-import { Button } from '@/components/ui/button';
 import MultipleSelector, { type Option } from '@/components/ui/multiselect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +20,25 @@ import { SalesSummary } from './sales/SalesSummary';
 import { dateToBucketKey, nextBucket, startOfUnit, formatStatusLabel, paymentStatusDisplay, type GroupUnit, type RowGroup } from './sales/utils';
 import { SalesExportDialog } from './export/SalesExportDialog';
 import { useBranchContext } from '@/contexts/BranchContext';
+import { useCurrency } from '@/hooks/useCurrency';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
  
 
@@ -21,6 +47,8 @@ interface SalesSectionProps {
   branchIds: string[];
   dateRange?: DateRange;
   template: 'detailed' | 'pivot' | 'summary';
+  exportOpen: boolean;
+  onExportClose: () => void;
 }
 
 export function SalesSection({
@@ -28,14 +56,16 @@ export function SalesSection({
   branchIds,
   dateRange,
   template,
+  exportOpen,
+  onExportClose,
 }: SalesSectionProps) {
+  const { formatCurrency } = useCurrency();
   const normalizedBranchIds =
     branchIds && branchIds.length > 0 ? branchIds : undefined;
   const { data: orders = [] } = useOrders(orgId, normalizedBranchIds);
   const [groupUnit, setGroupUnit] = useState<GroupUnit>('month');
   const [rowGroup, setRowGroup] = useState<RowGroup>('order');
   const [selectedCustomers, setSelectedCustomers] = useState<Option[]>([]);
-  const [exportOpen, setExportOpen] = useState(false);
   const { availableBranches } = useBranchContext();
   const exportBranchNames =
     branchIds && branchIds.length
@@ -107,6 +137,73 @@ export function SalesSection({
     (sum, o) => sum + Math.max(0, (o.total_amount || 0) - (o.paid_amount || 0)),
     0
   );
+
+  const salesTrendConfig: ChartConfig = {
+    revenue: { label: 'Revenue' },
+    owings: { label: 'Owings' },
+  };
+
+  const revenueColor = '#16a34a';
+  const owingsColor = '#dc2626';
+
+  const salesTrendUnit = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return 'month' as const;
+    const days = differenceInDays(dateRange.to, dateRange.from);
+    if (days <= 45) return 'day' as const;
+    if (days <= 180) return 'week' as const;
+    return 'month' as const;
+  }, [dateRange?.from, dateRange?.to]);
+
+  const salesTrendData = useMemo(() => {
+    const buckets = new Map<number, { revenue: number; owings: number; orders: number }>();
+
+    const getBucketStart = (d: Date) => {
+      if (salesTrendUnit === 'day') return startOfDay(d);
+      if (salesTrendUnit === 'week')
+        return startOfWeek(d, { weekStartsOn: 1 });
+      return startOfMonth(d);
+    };
+
+    filteredOrders.forEach((o) => {
+      const d = new Date(o.date || o.created_at);
+      const bucketStart = getBucketStart(d).getTime();
+      const cur = buckets.get(bucketStart) || { revenue: 0, owings: 0, orders: 0 };
+      const paid = Number(o.paid_amount ?? 0);
+      const owing = Math.max(0, Number(o.total_amount ?? 0) - paid);
+      cur.revenue += paid;
+      cur.owings += owing;
+      cur.orders += 1;
+      buckets.set(bucketStart, cur);
+    });
+
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, agg]) => ({
+        period: format(new Date(ts), 'MMMM dd, yyyy'),
+        revenue: agg.revenue,
+        owings: agg.owings,
+        orders: agg.orders,
+      }));
+  }, [filteredOrders, salesTrendUnit]);
+
+  const ordersTrendConfig: ChartConfig = {
+    orders: { label: 'Orders' },
+  };
+
+  const paymentBreakdownConfig: ChartConfig = {
+    value: { label: 'Orders' },
+  };
+
+  const paymentBreakdownData = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredOrders.forEach((o) => {
+      const k = paymentStatusDisplay(o.payment_status || 'Unknown');
+      counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredOrders]);
 
  
 
@@ -220,11 +317,6 @@ export function SalesSection({
 
   return (
     <>
-      <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => setExportOpen(true)}>
-          Export
-        </Button>
-      </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Card>
           <CardHeader>
@@ -328,6 +420,7 @@ export function SalesSection({
             </CardContent>
           </Card>
         )}
+
         {template === 'summary' && (
           <Card className="md:col-span-3 lg:col-span-2">
             <CardHeader>
@@ -354,6 +447,165 @@ export function SalesSection({
             </CardContent>
           </Card>
         )}
+
+        <Card className="md:col-span-3 lg:col-span-4">
+          <CardHeader>
+            <CardTitle>Revenue & Owings Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {salesTrendData.length ? (
+              <ChartContainer config={salesTrendConfig} className="h-72 w-full">
+                <AreaChart data={salesTrendData} margin={{ left: 12, right: 12 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCurrency(Number(v))}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        valueFormatter={(value) => formatCurrency(Number(value))}
+                      />
+                    }
+                  />
+                  <Area
+                    dataKey="revenue"
+                    type="monotone"
+                    stroke={revenueColor}
+                    fill={revenueColor}
+                    fillOpacity={0.15}
+                  />
+                  <Area
+                    dataKey="owings"
+                    type="monotone"
+                    stroke={owingsColor}
+                    fill={owingsColor}
+                    fillOpacity={0.12}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No data for the selected filters.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Orders Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {salesTrendData.length ? (
+              <ChartContainer config={ordersTrendConfig} className="h-72 w-full">
+                <BarChart data={salesTrendData} margin={{ left: 12, right: 12 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent />}
+                  />
+                  <Bar
+                    dataKey="orders"
+                    fill="var(--chart-3)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No data for the selected filters.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-1 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Payment Status Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {paymentBreakdownData.length ? (
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-3">
+                  {paymentBreakdownData.map((s, i) => (
+                    <div
+                      key={`${s.name}-${i}`}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-block h-3 w-3 rounded-full"
+                          style={{
+                            backgroundColor: `var(--chart-${(i % 5) + 1})`,
+                          }}
+                        />
+                        <div className="font-medium">{s.name}</div>
+                      </div>
+                      <div className="font-bold">{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="w-full">
+                  <ChartContainer
+                    config={paymentBreakdownConfig}
+                    className="mx-auto aspect-square max-h-62.5 max-w-62.5"
+                  >
+                    <PieChart>
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            nameKey="name"
+                            formatter={(value) =>
+                              Number(value ?? 0).toLocaleString()
+                            }
+                          />
+                        }
+                      />
+                      <Pie
+                        data={paymentBreakdownData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={4}
+                      >
+                        {paymentBreakdownData.map((_entry, i) => (
+                          <Cell
+                            key={`p-cell-${i}`}
+                            fill={`var(--chart-${(i % 5) + 1})`}
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No data for the selected filters.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
       </div>
 
       {template === 'pivot' && (
@@ -588,7 +840,7 @@ export function SalesSection({
         organizationName={undefined}
         dateRange={dateRange}
         open={exportOpen}
-        onClose={() => setExportOpen(false)}
+        onClose={onExportClose}
         branchNames={exportBranchNames}
       />
       </>

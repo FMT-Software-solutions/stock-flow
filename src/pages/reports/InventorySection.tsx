@@ -48,6 +48,8 @@ interface InventorySectionProps {
   inventoryDateApplied?: DateRange;
   setInventoryDateApplied?: (d: DateRange | undefined) => void;
   organizationName?: string;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }
 
 export function InventorySection({
@@ -59,9 +61,10 @@ export function InventorySection({
   setInventoryDateApplied,
   inventoryDateApplied,
   organizationName,
+  exportOpen,
+  onExportClose,
 }: InventorySectionProps) {
   const [groupByCategory, setGroupByCategory] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const chartConfig: ChartConfig = {
     value: { label: 'Inventory' },
   };
@@ -127,14 +130,6 @@ export function InventorySection({
               placeholder="Select branches"
             />
           </div>
-          
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setExportOpen(true)}
-            >
-              Export
-            </Button>
         </div>
       </div>
 
@@ -277,7 +272,7 @@ export function InventorySection({
         <InventoryExportDialog
           data={data}
           open={exportOpen}
-          onClose={() => setExportOpen(false)}
+          onClose={onExportClose}
           organizationName={organizationName}
           dateRange={inventoryDateApplied}
           defaultSections={defaultSections}

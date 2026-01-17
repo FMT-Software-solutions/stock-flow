@@ -49,6 +49,8 @@ interface ProductsSectionProps {
   productsDateDraft?: DateRange;
   setProductsDateDraft?: (d: DateRange | undefined) => void;
   setProductsDateApplied?: (d: DateRange | undefined) => void;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }
 
 export function ProductsSection({
@@ -59,12 +61,13 @@ export function ProductsSection({
   productsDateDraft,
   setProductsDateDraft,
   setProductsDateApplied,
+  exportOpen,
+  onExportClose,
 }: ProductsSectionProps) {
   const chartConfig: ChartConfig = {
     value: { label: 'Products' },
   };
   const [groupByCategory, setGroupByCategory] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const defaultSections: Array<'stats' | 'category' | 'low' | 'out'> = [
     'stats',
     'category',
@@ -73,7 +76,7 @@ export function ProductsSection({
   ];
   return (
     <>
-      <div className="flex items-end justify-between mb-4">
+      <div className="mb-4">
         <div className='flex flex-col gap-1'>
           <span className="text-sm font-medium">
             Filter products by when they were added
@@ -102,17 +105,6 @@ export function ProductsSection({
             </Button>
           </div>
           </div>
-        <div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setExportOpen(true);
-            }}
-          >
-            Export
-          </Button>
-        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Products" value={data?.total_products ?? 0} />
@@ -203,7 +195,7 @@ export function ProductsSection({
         <ProductsExportDialog
           data={data}
           open={exportOpen}
-          onClose={() => setExportOpen(false)}
+          onClose={onExportClose}
           defaultSections={defaultSections}
           organizationName={organizationName}
           dateRange={dateRange}

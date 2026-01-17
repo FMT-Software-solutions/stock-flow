@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type Table, type Row } from '@tanstack/react-table';
+import { type ColumnFiltersState, type Table, type Row } from '@tanstack/react-table';
 import { useDebounceValue } from '@/hooks/useDebounce';
 import { X } from 'lucide-react';
 
@@ -50,6 +50,9 @@ export function DataTableToolbar<TData>({
   }, [debouncedSearchValue, searchValue, table, searchKey, filterValue]);
 
   const isFiltered = table.getState().columnFilters.length > 0;
+  const defaultFilters: ColumnFiltersState = filterFields
+    .filter((f) => f.defaultValue !== undefined)
+    .map((f) => ({ id: f.id, value: f.defaultValue }));
 
   const exportFields = customExportFields || table.getAllColumns()
     .filter(column => column.getIsVisible() && column.id !== 'select' && column.id !== 'actions')
@@ -86,7 +89,7 @@ export function DataTableToolbar<TData>({
             <Button
               variant="ghost"
               onClick={() => {
-                table.resetColumnFilters();
+                table.setColumnFilters(defaultFilters);
                 if (searchKey) {
                   setSearchValue('');
                   table.getColumn(searchKey)?.setFilterValue('');
@@ -160,6 +163,10 @@ export function DataTableToolbar<TData>({
                   size="sm"
                   className="ml-1 h-auto p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => {
+                    if (field.defaultValue !== undefined) {
+                      table.getColumn(filter.id)?.setFilterValue(field.defaultValue);
+                      return;
+                    }
                     table.getColumn(filter.id)?.setFilterValue(undefined);
                   }}
                 >

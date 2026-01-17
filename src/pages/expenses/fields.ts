@@ -4,6 +4,7 @@ import type { StatsGroup } from '@/types/stats';
 import type { Expense } from '@/types/expenses';
 import { DollarSign, ClipboardList, Clock, Tag } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 
 export const getExpenseFilterFields = (
   categories: { label: string; value: string }[],
@@ -11,12 +12,16 @@ export const getExpenseFilterFields = (
   branches: { label: string; value: string }[],
   creators: { label: string; value: string }[],
   paymentMethods?: { label: string; value: string }[],
-  statuses?: { label: string; value: string }[]
+  statuses?: { label: string; value: string }[],
+  dateConstraints?: { minDate?: Date; maxDate?: Date; defaultValue?: DateRange }
 ): DataTableFilterField[] => [
     {
       id: 'date',
       label: 'Date',
       type: 'date-range',
+      minDate: dateConstraints?.minDate,
+      maxDate: dateConstraints?.maxDate,
+      defaultValue: dateConstraints?.defaultValue,
     },
     {
       id: 'categoryName',

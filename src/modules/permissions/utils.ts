@@ -81,7 +81,8 @@ export function buildUserPermissions(
       if (defaultScope) {
         result[scope] = {
           enabled: defaultScope.enabled,
-          actions: [...defaultScope.actions]
+          actions: [...defaultScope.actions],
+          dataAccess: defaultScope.dataAccess
         };
       }
     });
@@ -107,7 +108,8 @@ export function buildUserPermissions(
 
         result[scope] = {
           enabled: custom.enabled,
-          actions: validActions
+          actions: validActions,
+          dataAccess: custom.dataAccess
         };
       }
     });

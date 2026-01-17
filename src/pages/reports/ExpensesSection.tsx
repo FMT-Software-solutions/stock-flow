@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useExpenses } from '@/hooks/useExpenseQueries';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
@@ -8,8 +7,11 @@ import {
   format,
   formatDistanceToNow,
   startOfDay,
+  startOfWeek,
+  startOfMonth,
   endOfDay,
   isAfter,
+  differenceInDays,
 } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/utils/supabase';
@@ -17,6 +19,25 @@ import { ExpensesSummary } from './expenses/ExpensesSummary';
 import { ExpensesSettingsCard } from './components/ExpensesSettingsCard';
 import { ExpensesExportDialog } from './export/ExpensesExportDialog';
 import { useBranchContext } from '@/contexts/BranchContext';
+import { useCurrency } from '@/hooks/useCurrency';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 type GroupUnit = 'day' | 'week' | 'month' | 'quarter' | 'year';
 type ExpenseStats = {
@@ -45,6 +66,8 @@ interface ExpensesSectionProps {
   template: 'detailed' | 'pivot' | 'summary';
   groupBy: 'category' | 'type';
   setGroupBy?: (v: 'category' | 'type') => void;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }
 
 export function ExpensesSection({
@@ -54,12 +77,14 @@ export function ExpensesSection({
   template,
   groupBy,
   setGroupBy,
+  exportOpen,
+  onExportClose,
 }: ExpensesSectionProps) {
+  const { formatCurrency } = useCurrency();
   const normalizedBranchIds =
     branchIds && branchIds.length > 0 ? branchIds : undefined;
   const { data: expenses = [] } = useExpenses(orgId, normalizedBranchIds);
   const [groupUnit, setGroupUnit] = useState<GroupUnit>('month');
-  const [exportOpen, setExportOpen] = useState(false);
   const { availableBranches } = useBranchContext();
   const exportBranchNames =
     branchIds && branchIds.length
@@ -242,13 +267,86 @@ export function ExpensesSection({
     return rows;
   }, [filteredExpenses, groupBy, groupUnit]);
 
+  const expenseTrendConfig: ChartConfig = {
+    amount: { label: 'Expenditure' },
+  };
+
+  const expenditureColor = '#dc2626';
+
+  const expenseTrendUnit = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return 'month' as const;
+    const days = differenceInDays(dateRange.to, dateRange.from);
+    if (days <= 45) return 'day' as const;
+    if (days <= 180) return 'week' as const;
+    return 'month' as const;
+  }, [dateRange?.from, dateRange?.to]);
+
+  const expenseTrendData = useMemo(() => {
+    const buckets = new Map<number, number>();
+
+    const getBucketStart = (d: Date) => {
+      if (expenseTrendUnit === 'day') return startOfDay(d);
+      if (expenseTrendUnit === 'week')
+        return startOfWeek(d, { weekStartsOn: 1 });
+      return startOfMonth(d);
+    };
+
+    filteredExpenses.forEach((e) => {
+      const d = new Date(e.date || e.createdAt || new Date().toISOString());
+      const bucketStart = getBucketStart(d).getTime();
+      buckets.set(bucketStart, (buckets.get(bucketStart) || 0) + (e.amount || 0));
+    });
+
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, amount]) => ({
+        period: format(new Date(ts), 'MMMM dd, yyyy'),
+        amount,
+      }));
+  }, [filteredExpenses, expenseTrendUnit]);
+
+  const breakdownConfig: ChartConfig = {
+    value: { label: 'Amount' },
+  };
+
+  const breakdownData = useMemo(() => {
+    const sums = new Map<string, number>();
+    filteredExpenses.forEach((e) => {
+      const key =
+        groupBy === 'category'
+          ? e.categoryName || 'Uncategorized'
+          : e.typeName || 'Unknown Type';
+      sums.set(key, (sums.get(key) || 0) + (e.amount || 0));
+    });
+
+    const sorted = Array.from(sums.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const top = sorted.slice(0, 6);
+    const rest = sorted.slice(6);
+    const restTotal = rest.reduce((sum, r) => sum + r.value, 0);
+    return restTotal > 0 ? [...top, { name: 'Other', value: restTotal }] : top;
+  }, [filteredExpenses, groupBy]);
+
+  const topBreakdownData = useMemo(() => {
+    const sums = new Map<string, number>();
+    filteredExpenses.forEach((e) => {
+      const key =
+        groupBy === 'category'
+          ? e.categoryName || 'Uncategorized'
+          : e.typeName || 'Unknown Type';
+      sums.set(key, (sums.get(key) || 0) + (e.amount || 0));
+    });
+
+    return Array.from(sums.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [filteredExpenses, groupBy]);
+
   return (
     <>
-      <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => setExportOpen(true)}>
-          Export
-        </Button>
-      </div>
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Card>
           <CardHeader>
@@ -305,6 +403,182 @@ export function ExpensesSection({
         )}
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Expenditure Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {expenseTrendData.length ? (
+              <ChartContainer config={expenseTrendConfig} className="h-72 w-full">
+                <AreaChart data={expenseTrendData} margin={{ left: 12, right: 12 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCurrency(Number(v))}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        valueFormatter={(value) => formatCurrency(Number(value))}
+                      />
+                    }
+                  />
+                  <Area
+                    dataKey="amount"
+                    type="monotone"
+                    stroke={expenditureColor}
+                    fill={expenditureColor}
+                    fillOpacity={0.15}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No data for the selected filters.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Spending Breakdown ({groupBy === 'category' ? 'Category' : 'Type'})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {breakdownData.length ? (
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-3">
+                  {breakdownData.map((s, i) => (
+                    <div
+                      key={`${s.name}-${i}`}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-block h-3 w-3 rounded-full"
+                          style={{
+                            backgroundColor: `var(--chart-${(i % 5) + 1})`,
+                          }}
+                        />
+                        <div className="font-medium">{s.name}</div>
+                      </div>
+                      <div className="font-bold">
+                        {formatCurrency(Number(s.value))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="w-full">
+                  <ChartContainer
+                    config={breakdownConfig}
+                    className="mx-auto aspect-square max-h-62.5 max-w-62.5"
+                  >
+                    <PieChart>
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            nameKey="name"
+                            formatter={(value) =>
+                              formatCurrency(Number(value ?? 0))
+                            }
+                          />
+                        }
+                      />
+                      <Pie
+                        data={breakdownData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={4}
+                      >
+                        {breakdownData.map((_entry, i) => (
+                          <Cell
+                            key={`e-cell-${i}`}
+                            fill={`var(--chart-${(i % 5) + 1})`}
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No data for the selected filters.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Top 10 Spending ({groupBy === 'category' ? 'Category' : 'Type'})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topBreakdownData.length ? (
+            <ChartContainer config={breakdownConfig} className="h-80 w-full">
+              <BarChart
+                data={topBreakdownData}
+                layout="vertical"
+                margin={{ left: 20, right: 16, top: 8, bottom: 8 }}
+              >
+                <CartesianGrid horizontal={false} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={160}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <XAxis
+                  dataKey="value"
+                  type="number"
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => formatCurrency(Number(v))}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      nameKey="name"
+                      formatter={(value) => formatCurrency(Number(value))}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey="value"
+                  fill="var(--chart-4)"
+                  radius={[4, 4, 4, 4]}
+                />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              No data for the selected filters.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {template === 'summary' && (
         <ExpensesSummary
           expenses={filteredExpenses}
@@ -342,7 +616,7 @@ export function ExpensesSection({
                     return (
                       <tr key={e.id} className="border-t">
                         <td className="p-2">
-                          <div>{format(d, 'MMMM dd, yyyy')}</div>
+                          <div>{format(d, 'MMM dd, yyyy')}</div>
                           <div className="text-[10px] text-muted-foreground">
                             {formatDistanceToNow(d, { addSuffix: true })}
                           </div>
@@ -427,7 +701,7 @@ export function ExpensesSection({
         organizationName={undefined}
         dateRange={dateRange}
         open={exportOpen}
-        onClose={() => setExportOpen(false)}
+        onClose={onExportClose}
         branchNames={exportBranchNames}
       />
     </>

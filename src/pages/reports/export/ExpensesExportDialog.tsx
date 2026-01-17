@@ -43,6 +43,7 @@ export function ExpensesExportDialog({
   const { formatCurrency } = useCurrency();
   const [includeStats, setIncludeStats] = useState(true);
   const [includeData, setIncludeData] = useState(true);
+  const [includeChartData, setIncludeChartData] = useState(true);
 
   const description = useMemo(() => {
     if (!dateRange?.from && !dateRange?.to) return undefined;
@@ -69,6 +70,7 @@ export function ExpensesExportDialog({
       dateRange,
       includeStats,
       includeData,
+      includeChartData,
     });
     XLSX.writeFile(wb, 'expenses-report.xlsx');
     onClose();
@@ -88,6 +90,7 @@ export function ExpensesExportDialog({
       dateRange,
       includeStats,
       includeData,
+      includeChartData,
     });
     doc.save('expenses-report.pdf');
     onClose();
@@ -124,6 +127,16 @@ export function ExpensesExportDialog({
                   : template === 'pivot'
                   ? `Pivot (${groupBy === 'category' ? 'Category' : 'Type'})`
                   : 'Summary Table'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={includeChartData}
+                onCheckedChange={(c) => setIncludeChartData(!!c)}
+                id="exp-inc-charts"
+              />
+              <label htmlFor="exp-inc-charts" className="text-sm">
+                Include Chart Data
               </label>
             </div>
           </div>

@@ -36,6 +36,7 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: TData) => void
   storageKey?: string
   defaultColumnVisibility?: VisibilityState
+  defaultColumnFilters?: ColumnFiltersState
   canExport?: boolean
   onFilteredDataChange?: (rows: TData[]) => void
   orgId?: string
@@ -50,14 +51,13 @@ export function DataTable<TData, TValue>({
   onRowClick,
   storageKey,
   defaultColumnVisibility = {},
+  defaultColumnFilters,
   canExport = true,
   onFilteredDataChange,
   orgId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(() => defaultColumnFilters ?? [])
   const { columnVisibility, setColumnVisibility, pageSize, setPageSize } =
     useOrgTablePreferences(orgId, storageKey, defaultColumnVisibility, 10)
   const [rowSelection, setRowSelection] = React.useState({})

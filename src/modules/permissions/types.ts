@@ -41,9 +41,20 @@ export type PermissionAction =
   | 'manage_notifications';
 
 // 3. Permission Storage Structure
+export type DataLookback =
+  | { unit: 'days'; value: number }
+  | { unit: 'months'; value: number }
+  | { unit: 'years'; value: number }
+  | { unit: 'forever' };
+
+export interface PermissionDataAccess {
+  maxLookback?: DataLookback;
+}
+
 export interface ScopePermission {
   enabled: boolean;
   actions: PermissionAction[];
+  dataAccess?: PermissionDataAccess;
 }
 
 export type UserPermissions = Partial<Record<PermissionScope, ScopePermission>>;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   APP_PERMISSIONS, 
   getAvailablePermissionsForRole,
   type PermissionAction,
   type PermissionScope,
+  type DataLookback,
   type UserPermissions
 } from '@/modules/permissions';
 import type { UserRole } from '@/lib/auth';
@@ -13,6 +14,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface UserPermissionsEditorProps {
   role?: UserRole;
@@ -52,6 +60,30 @@ export function UserPermissionsEditor({
   const parentScopes = scopes.filter((s) => !APP_PERMISSIONS[s]?.parent);
   const childrenFor = (parent: PermissionScope) =>
     scopes.filter((s) => APP_PERMISSIONS[s]?.parent === parent);
+
+  const navScopes = useMemo(() => {
+    const result: PermissionScope[] = [];
+    parentScopes.forEach((parent) => {
+      result.push(parent);
+      childrenFor(parent).forEach((child) => result.push(child));
+    });
+    scopes.forEach((s) => {
+      if (!result.includes(s)) result.push(s);
+    });
+    return result;
+  }, [parentScopes, scopes]);
+
+  const [activeScope, setActiveScope] = useState<PermissionScope | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    setActiveScope((prev) => {
+      if (prev && navScopes.includes(prev)) return prev;
+      if (navScopes.includes('dashboard')) return 'dashboard';
+      return navScopes[0];
+    });
+  }, [navScopes]);
 
   const handleResetScope = (scope: PermissionScope) => {
     if (readOnly) return;
@@ -117,6 +149,28 @@ export function UserPermissionsEditor({
     onChange(JSON.stringify(newPermissions));
   };
 
+  const lookbackOptions: Array<{
+    label: string;
+    value: string;
+    lookback?: DataLookback;
+  }> = [
+    { label: 'Default (Up to 1 Month)', value: 'default' },
+    { label: 'Up to 1 Month', value: 'months:1', lookback: { unit: 'months', value: 1 } },
+    { label: 'Up to 2 Months', value: 'months:2', lookback: { unit: 'months', value: 2 } },
+    { label: 'Up to 3 Months', value: 'months:3', lookback: { unit: 'months', value: 3 } },
+    { label: 'Up to 4 Months', value: 'months:4', lookback: { unit: 'months', value: 4 } },
+    { label: 'Up to 6 Months', value: 'months:6', lookback: { unit: 'months', value: 6 } },
+    { label: 'Up to 1 Year', value: 'years:1', lookback: { unit: 'years', value: 1 } },
+    { label: 'Up to 2 Years', value: 'years:2', lookback: { unit: 'years', value: 2 } },
+    { label: 'Forever', value: 'forever', lookback: { unit: 'forever' } },
+  ];
+
+  const serializeLookback = (lookback: DataLookback | undefined) => {
+    if (!lookback) return 'default';
+    if (lookback.unit === 'forever') return 'forever';
+    return `${lookback.unit}:${lookback.value}`;
+  };
+
   if (scopes.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -124,6 +178,49 @@ export function UserPermissionsEditor({
       </div>
     );
   }
+
+  if (!activeScope) {
+    return null;
+  }
+
+  const getScopeEnabled = (scope: PermissionScope) => {
+    const userScope = permissions[scope];
+    return userScope
+      ? (userScope.enabled || false)
+      : (rolePermissions?.[scope]?.enabled || false);
+  };
+
+  const getScopeActions = (scope: PermissionScope) => {
+    const userScope = permissions[scope];
+    return userScope
+      ? (userScope.actions || [])
+      : (rolePermissions?.[scope]?.actions || []);
+  };
+
+  const getScopeLookback = (scope: PermissionScope) => {
+    const userScope = permissions[scope];
+    return userScope?.dataAccess?.maxLookback ?? rolePermissions?.[scope]?.dataAccess?.maxLookback;
+  };
+
+  const activeConfig = APP_PERMISSIONS[activeScope]!;
+  const activeParent = activeConfig.parent;
+  const parentEnabled = activeParent ? getScopeEnabled(activeParent) : true;
+
+  const activeIsEnabledRaw = getScopeEnabled(activeScope);
+  const activeIsEnabled = activeParent ? activeIsEnabledRaw && parentEnabled : activeIsEnabledRaw;
+
+  const activeAvailableActions = availablePermissions[activeScope]?.actions || [];
+  const activeEffectiveActions = getScopeActions(activeScope);
+
+  const activeLookback =
+    activeScope === 'dashboard' ||
+    activeScope === 'orders' ||
+    activeScope === 'expenses'
+      ? getScopeLookback(activeScope)
+      : undefined;
+
+  const isSwitchDisabled = readOnly || (activeParent ? !parentEnabled : false);
+  const isResetDisabled = readOnly || (activeParent ? !parentEnabled : false);
 
   return (
     <div className="space-y-4">
@@ -137,171 +234,189 @@ export function UserPermissionsEditor({
         {readOnly && <Badge variant="secondary">Read Only</Badge>}
       </div>
 
-      <div className="grid gap-4">
-        {parentScopes.map((scope) => {
-          const config = APP_PERMISSIONS[scope]!;
-          
-          const userScope = permissions[scope];
-          
-          // Determine effective actions for display
-          // If userScope is undefined (no override), use role actions
-          const effectiveActions = userScope 
-            ? (userScope.actions || []) 
-            : (rolePermissions?.[scope]?.actions || []);
+      <div className="grid gap-4 md:grid-cols-[15rem_1fr]">
+        <Card className="h-fit">
+          <CardHeader className="px-3">
+            <div className="text-sm font-medium text-primary">Pages</div>
+          </CardHeader>
+          <CardContent className="px-2">
+            <div className="space-y-1 max-h-87.5 overflow-y-auto">
+              {navScopes.map((scope) => {
+                const config = APP_PERMISSIONS[scope]!;
+                const isChild = !!config.parent;
+                const isActive = scope === activeScope;
 
-          const availableActions = availablePermissions[scope]?.actions || [];
-          
-          // If userScope is present (override), use it. Otherwise fall back to rolePermissions.
-          const isEnabled = userScope
-            ? (userScope.enabled || false)
-            : (rolePermissions?.[scope]?.enabled || false);
-
-          // Switch is only disabled if readOnly is true
-          const isSwitchDisabled = readOnly;
-
-          return (
-            <Card key={scope} className={isEnabled ? 'border-primary/20' : 'opacity-75'}>
-              <CardHeader className="px-4 py-2 ">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id={`scope-${scope}`}
-                      checked={isEnabled}
-                      onCheckedChange={(checked) => handleScopeToggle(scope, checked)}
-                      disabled={isSwitchDisabled}
-                    />
-                    <div className="flex flex-col">
-                      <Label htmlFor={`scope-${scope}`} className="text-base font-semibold cursor-pointer">
-                        {config.label}
-                      </Label>
-                      <span className="text-xs text-muted-foreground">{config.description}</span>
-                    </div>
-                  </div>
-                  {!readOnly && showResetButtons && <Button
-                    variant="link"
-                    size="sm"
-                    onClick={() => handleResetScope(scope)}
-                    disabled={readOnly}
-                    title='Reset scope to organization default'
+                return (
+                  <Button
+                    key={scope}
+                    type="button"
+                    variant={isActive ? 'secondary' : 'ghost'}
+                    className={`w-full justify-start ${isChild ? 'pl-8' : ''}`}
+                    onClick={() => setActiveScope(scope)}
                   >
-                    Reset
-                  </Button> }
+                    {config.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={activeIsEnabled ? 'border-primary/20' : 'opacity-90'}>
+          <CardHeader className="px-4 py-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={`scope-${activeScope}`}
+                    checked={activeIsEnabled}
+                    onCheckedChange={(checked) =>
+                      handleScopeToggle(activeScope, checked)
+                    }
+                    disabled={isSwitchDisabled}
+                  />
+                  <Label
+                    htmlFor={`scope-${activeScope}`}
+                    className="text-base font-semibold cursor-pointer"
+                  >
+                    {activeConfig.label}
+                  </Label>
                 </div>
-              </CardHeader>
-              
-              {isEnabled && availableActions.length > 0 && (
-                <CardContent className="p-4 pt-2 pl-14">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {availableActions.map((action) => {
-                      const actionLabel = config.actions[action] || action;
-                      const hasAction = effectiveActions.includes(action);
-
-                      return (
-                        <div key={`${scope}-${action}`} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${scope}-${action}`}
-                            checked={hasAction}
-                            onCheckedChange={(checked) => 
-                              handleActionToggle(scope, action, checked === true)
-                            }
-                            disabled={readOnly}
-                          />
-                          <Label 
-                            htmlFor={`${scope}-${action}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {actionLabel}
-                          </Label>
-                        </div>
-                      );
-                    })}
+                <div className="text-xs text-muted-foreground mt-1">
+                  {activeConfig.description}
+                </div>
+                {activeParent && !parentEnabled && (
+                  <div className="text-xs text-muted-foreground mt-2">
+                    Enable {APP_PERMISSIONS[activeParent]?.label ?? activeParent}{' '}
+                    to manage this page.
                   </div>
-                </CardContent>
-              )}
-              {childrenFor(scope).length > 0 && (
-                <CardContent className="p-4 pt-2 pl-14">
-                  <div className="grid gap-3">
-                    {childrenFor(scope).map((child) => {
-                      const childConfig = APP_PERMISSIONS[child]!;
-                      const childUserScope = permissions[child];
-                      const childEffectiveActions = childUserScope 
-                        ? (childUserScope.actions || []) 
-                        : (rolePermissions?.[child]?.actions || []);
-                      const childAvailableActions = availablePermissions[child]?.actions || [];
-                      
-                      const childEnabled = childUserScope
-                        ? (childUserScope.enabled || false)
-                        : (rolePermissions?.[child]?.enabled || false);
+                )}
+              </div>
 
-                      const childSwitchDisabled = readOnly || !isEnabled;
-
-                      return (
-                        <Card key={child} className={childEnabled && isEnabled ? 'border-primary/20' : 'opacity-75'}>
-                          <CardHeader className="px-4 py-2 ">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <Switch
-                                  id={`scope-${child}`}
-                                  checked={childEnabled && isEnabled}
-                                  onCheckedChange={(checked) => handleScopeToggle(child, checked)}
-                                  disabled={childSwitchDisabled}
-                                />
-                                <div className="flex flex-col">
-                                  <Label htmlFor={`scope-${child}`} className="text-sm font-semibold cursor-pointer">
-                                    {childConfig.label}
-                                  </Label>
-                                  <span className="text-xs text-muted-foreground">{childConfig.description}</span>
-                                </div>
-                              </div>
-                              {showResetButtons && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  onClick={() => handleResetScope(child)}
-                                  disabled={readOnly || !isEnabled}
-                                >
-                                  Reset
-                                </Button>
-                              )}
-                            </div>
-                          </CardHeader>
-                          {childEnabled && isEnabled && childAvailableActions.length > 0 && (
-                            <CardContent className="p-4 pt-2 pl-14">
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {childAvailableActions.map((action) => {
-                                  const actionLabel = childConfig.actions[action] || action;
-                                  const hasAction = childEffectiveActions.includes(action);
-                                  return (
-                                    <div key={`${child}-${action}`} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`${child}-${action}`}
-                                        checked={hasAction}
-                                        onCheckedChange={(checked) => 
-                                          handleActionToggle(child, action, checked === true)
-                                        }
-                                        disabled={readOnly || !isEnabled}
-                                      />
-                                      <Label 
-                                        htmlFor={`${child}-${action}`}
-                                        className="text-sm font-normal cursor-pointer"
-                                      >
-                                        {actionLabel}
-                                      </Label>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </CardContent>
-                          )}
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </CardContent>
+              {!readOnly && showResetButtons && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => handleResetScope(activeScope)}
+                  disabled={isResetDisabled}
+                  title="Reset scope to organization default"
+                >
+                  Reset
+                </Button>
               )}
-            </Card>
-          );
-        })}
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-4 space-y-5">
+            {(activeScope === 'dashboard' ||
+              activeScope === 'orders' ||
+              activeScope === 'expenses') &&
+              activeIsEnabled && (
+                <div className="grid gap-2 max-w-sm">
+                  <Label className="text-sm font-medium">
+                    {activeScope === 'dashboard'
+                      ? 'Dashboard Data Duration'
+                      : activeScope === 'orders'
+                        ? 'Sales & Orders Data Duration'
+                        : 'Expenses Data Duration'}
+                  </Label>
+                  <Select
+                    value={serializeLookback(activeLookback)}
+                    onValueChange={(value) => {
+                      if (readOnly) return;
+                      const scopeKey = activeScope;
+                      const currentScope = permissions[scopeKey] || {
+                        enabled: true,
+                        actions: activeEffectiveActions,
+                      };
+
+                      if (value === 'default') {
+                        const next: UserPermissions = { ...permissions };
+                        const existing = next[scopeKey];
+                        if (existing) {
+                          const { dataAccess, ...rest } = existing;
+                          next[scopeKey] = rest;
+                        }
+                        updatePermissions(next);
+                        return;
+                      }
+
+                      const selected = lookbackOptions.find(
+                        (o) => o.value === value
+                      )?.lookback;
+
+                      if (!selected) return;
+                      updatePermissions({
+                        ...permissions,
+                        [scopeKey]: {
+                          ...currentScope,
+                          enabled: true,
+                          actions: currentScope.actions || [],
+                          dataAccess: { maxLookback: selected },
+                        },
+                      });
+                    }}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lookbackOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+            {activeIsEnabled && activeAvailableActions.length > 0 && (
+              <div className="space-y-3">
+                <div className="text-sm font-medium">Actions</div>
+                <div className="space-y-2">
+                  {activeAvailableActions.map((action) => {
+                    const actionLabel = activeConfig.actions[action] || action;
+                    const hasAction = activeEffectiveActions.includes(action);
+
+                    return (
+                      <div
+                        key={`${activeScope}-${action}`}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={`${activeScope}-${action}`}
+                          checked={hasAction}
+                          onCheckedChange={(checked) =>
+                            handleActionToggle(
+                              activeScope,
+                              action,
+                              checked === true
+                            )
+                          }
+                          disabled={readOnly}
+                        />
+                        <Label
+                          htmlFor={`${activeScope}-${action}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {actionLabel}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!activeIsEnabled && (
+              <div className="text-sm text-muted-foreground">
+                Enable this page to configure actions.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -160,7 +160,7 @@ export default function CustomerDetails() {
         <DataTableColumnHeader column={column} title="Order Date" />
       ),
       cell: ({ row }) =>
-        format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mm a'),
+        format(new Date(row.getValue('date')), 'MMM dd, yyyy h:mm a'),
       filterFn: (row, id, value) => {
         return isDateInRange(row.getValue(id), value);
       },
@@ -460,7 +460,7 @@ export default function CustomerDetails() {
                           <TableCell>
                             {format(
                               new Date(order.date),
-                              'MMMM dd, yyyy h:mm a'
+                              'MMM dd, yyyy h:mm a'
                             )}
                           </TableCell>
                           <TableCell>

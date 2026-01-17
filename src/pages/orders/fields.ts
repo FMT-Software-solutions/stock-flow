@@ -6,11 +6,13 @@ import { orderStatuses } from '@/constants/order-statuses';
 import { paymentStatuses } from '@/constants/payment-statuses';
 import { ShoppingCart, DollarSign, Clock } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 
 export const getOrderFilterFields = (
   branches: { label: string; value: string }[],
   customers: { label: string; value: string }[],
-  paymentMethods: { label: string; value: string }[]
+  paymentMethods: { label: string; value: string }[],
+  dateConstraints?: { minDate?: Date; maxDate?: Date; defaultValue?: DateRange }
 ): DataTableFilterField[] => [
     {
       id: 'totalAmount',
@@ -51,16 +53,23 @@ export const getOrderFilterFields = (
       id: 'date',
       label: 'Order Date',
       type: 'date-range',
+      minDate: dateConstraints?.minDate,
+      maxDate: dateConstraints?.maxDate,
+      defaultValue: dateConstraints?.defaultValue,
     },
     {
       id: 'createdAt',
       label: 'Created Date',
       type: 'date-range',
+      minDate: dateConstraints?.minDate,
+      maxDate: dateConstraints?.maxDate,
     },
     {
       id: 'updatedAt',
       label: 'Updated Date',
       type: 'date-range',
+      minDate: dateConstraints?.minDate,
+      maxDate: dateConstraints?.maxDate,
     },
   ];
 

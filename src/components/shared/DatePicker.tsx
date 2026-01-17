@@ -22,6 +22,8 @@ export interface DatePickerProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
 }
 
 export function DatePicker({
@@ -31,10 +33,13 @@ export function DatePicker({
   placeholder = 'Pick a date',
   className,
   disabled,
+  minDate,
+  maxDate,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
   const [month, setMonth] = React.useState<Date | undefined>(date);
   const [inputValue, setInputValue] = React.useState('');
+  const inputId = React.useId();
 
   // Update input value when date prop changes
   React.useEffect(() => {
@@ -50,6 +55,8 @@ export function DatePicker({
     setInputValue(e.target.value);
     const parsedDate = new Date(e.target.value);
     if (!isNaN(parsedDate.getTime())) {
+      if (minDate && parsedDate < minDate) return;
+      if (maxDate && parsedDate > maxDate) return;
       setDate?.(parsedDate);
       setMonth(parsedDate);
     }
@@ -58,13 +65,13 @@ export function DatePicker({
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {label && (
-        <Label htmlFor="date-picker" className="px-1">
+        <Label htmlFor={inputId} className="px-1">
           {label}
         </Label>
       )}
       <div className="relative flex gap-2">
         <Input
-          id="date-picker"
+          id={inputId}
           value={inputValue}
           placeholder={placeholder}
           className="bg-background pr-10"
@@ -106,6 +113,10 @@ export function DatePicker({
               }}
               startMonth={new Date(1900, 0, 1)}
               endMonth={new Date(new Date().getFullYear() + 10, 11, 31)}
+              disabled={[
+                ...(minDate ? [{ before: minDate }] : []),
+                ...(maxDate ? [{ after: maxDate }] : []),
+              ]}
             />
           </PopoverContent>
         </Popover>

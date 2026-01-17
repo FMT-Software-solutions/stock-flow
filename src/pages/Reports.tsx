@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -75,13 +76,27 @@ type InventoryReport = {
 
 type CustomersReport = {
   total_customers: number;
-  new_this_period: number;
-  top_customers: { name: string; total_spent: number; orders_count: number }[];
+  new_this_month: number;
+  top_customers: {
+    customer_id: string;
+    name: string;
+    total_spent: number;
+    orders_count: number;
+  }[];
+  customers_owing: {
+    customer_id: string;
+    name: string;
+    total_owing: number;
+    open_orders: number;
+    last_owing_date: string | null;
+  }[];
 };
 
 type SuppliersReport = {
   total_suppliers: number;
-  top_suppliers: { name: string; product_count: number }[];
+  new_this_month: number;
+  new_suppliers: { id: string; name: string; created_at: string }[];
+  top_suppliers: { supplier_id: string; name: string; product_count: number }[];
 };
 
 const chartColors = [
@@ -120,6 +135,12 @@ export function Reports() {
   const [inventoryDateApplied, setInventoryDateApplied] = useState<
     DateRange | undefined
   >(undefined);
+  const [customersDateDraft, setCustomersDateDraft] = useState<
+    DateRange | undefined
+  >(undefined);
+  const [customersDateApplied, setCustomersDateApplied] = useState<
+    DateRange | undefined
+  >(undefined);
   const [branchIds, setBranchIds] = useState<string[]>(globalBranchIds);
   const [template, setTemplate] = useState<'detailed' | 'pivot' | 'summary'>(
     'detailed'
@@ -127,6 +148,7 @@ export function Reports() {
   const [expensesGroupBy, setExpensesGroupBy] = useState<'category' | 'type'>(
     'category'
   );
+  const [exportOpen, setExportOpen] = useState(false);
 
   const orgId = currentOrganization?.id;
 
@@ -134,12 +156,6 @@ export function Reports() {
     return branchIds && branchIds.length > 0 ? branchIds : null;
   }, [branchIds]);
 
-  const startIso = generalDateRange?.from
-    ? new Date(generalDateRange.from).toISOString()
-    : null;
-  const endIso = generalDateRange?.to
-    ? new Date(generalDateRange.to).toISOString()
-    : null;
   const productsStartIso = productsDateApplied?.from
     ? new Date(productsDateApplied.from).toISOString()
     : null;
@@ -152,9 +168,19 @@ export function Reports() {
   const inventoryEndIso = inventoryDateApplied?.to
     ? new Date(inventoryDateApplied.to).toISOString()
     : null;
+  const customersStartIso = customersDateApplied?.from
+    ? new Date(customersDateApplied.from).toISOString()
+    : null;
+  const customersEndIso = customersDateApplied?.to
+    ? new Date(customersDateApplied.to).toISOString()
+    : null;
 
   const isBranchScoped = (tab: typeof activeTab) => {
     return tab === 'inventory' || tab === 'sales_orders' || tab === 'expenses';
+  };
+
+  const hasGeneralFilters = (tab: typeof activeTab) => {
+    return tab === 'sales_orders' || tab === 'expenses';
   };
 
   const productsReport = useQuery({
@@ -216,12 +242,18 @@ export function Reports() {
   });
 
   const customersReport = useQuery({
-    queryKey: ['reports', 'customers', orgId, startIso, endIso],
+    queryKey: [
+      'reports',
+      'customers',
+      orgId,
+      customersStartIso,
+      customersEndIso,
+    ],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_customers_report', {
         p_organization_id: orgId,
-        p_start_date: startIso,
-        p_end_date: endIso,
+        p_start_date: customersStartIso,
+        p_end_date: customersEndIso,
       });
       if (error) throw error;
       return data as CustomersReport;
@@ -230,8 +262,9 @@ export function Reports() {
     placeholderData: (prev) =>
       prev ?? {
         total_customers: 0,
-        new_this_period: 0,
+        new_this_month: 0,
         top_customers: [],
+        customers_owing: [],
       },
   });
 
@@ -248,6 +281,8 @@ export function Reports() {
     placeholderData: (prev) =>
       prev ?? {
         total_suppliers: 0,
+        new_this_month: 0,
+        new_suppliers: [],
         top_suppliers: [],
       },
   });
@@ -258,12 +293,20 @@ export function Reports() {
         ? productsDateApplied
         : activeTab === 'inventory'
         ? inventoryDateApplied
+        : activeTab === 'customers'
+        ? customersDateApplied
         : generalDateRange;
     if (!range?.from && !range?.to) return 'All Time';
     const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
     const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
     return `${from} — ${to}`;
-  }, [activeTab, productsDateApplied, inventoryDateApplied, generalDateRange]);
+  }, [
+    activeTab,
+    productsDateApplied,
+    inventoryDateApplied,
+    customersDateApplied,
+    generalDateRange,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -287,20 +330,32 @@ export function Reports() {
 
       <Tabs
         value={activeTab}
-        onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+        onValueChange={(v) => {
+          setActiveTab(v as typeof activeTab);
+          setExportOpen(false);
+        }}
         className="space-y-4"
       >
-        <TabsList>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="sales_orders">Sales & Orders</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-2">
+          <TabsList>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="sales_orders">Sales & Orders</TabsTrigger>
+            <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            <TabsTrigger value="customers">Customers</TabsTrigger>
+            <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          </TabsList>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setExportOpen(true)}
+          >
+            Export
+          </Button>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-2">
-            {activeTab !== 'products' && activeTab !== 'inventory' && (
+            {hasGeneralFilters(activeTab) && (
               <DatePickerWithRange
                 date={generalDateRange}
                 setDate={setGeneralDateRange}
@@ -309,7 +364,7 @@ export function Reports() {
               />
             )}
           </div>
-          {activeTab !== 'products' && activeTab !== 'inventory' && (
+          {hasGeneralFilters(activeTab) && (
             <div className="flex items-center gap-2">
               <Select
                 value={template}
@@ -348,6 +403,8 @@ export function Reports() {
             productsDateDraft={productsDateDraft}
             setProductsDateDraft={setProductsDateDraft}
             setProductsDateApplied={setProductsDateApplied}
+            exportOpen={exportOpen && activeTab === 'products'}
+            onExportClose={() => setExportOpen(false)}
           />
         </TabsContent>
 
@@ -361,6 +418,8 @@ export function Reports() {
             inventoryDateApplied={inventoryDateApplied}
             setInventoryDateApplied={setInventoryDateApplied}
             organizationName={currentOrganization?.name}
+            exportOpen={exportOpen && activeTab === 'inventory'}
+            onExportClose={() => setExportOpen(false)}
           />
         </TabsContent>
 
@@ -370,6 +429,8 @@ export function Reports() {
             branchIds={branchIds}
             dateRange={generalDateRange}
             template={template}
+            exportOpen={exportOpen && activeTab === 'sales_orders'}
+            onExportClose={() => setExportOpen(false)}
           />
         </TabsContent>
 
@@ -381,6 +442,8 @@ export function Reports() {
             template={template}
             groupBy={expensesGroupBy}
             setGroupBy={setExpensesGroupBy}
+            exportOpen={exportOpen && activeTab === 'expenses'}
+            onExportClose={() => setExportOpen(false)}
           />
         </TabsContent>
 
@@ -388,11 +451,23 @@ export function Reports() {
           <CustomersSection
             data={customersReport.data}
             formatCurrency={formatCurrency}
+            organizationName={currentOrganization?.name}
+            dateRange={customersDateApplied}
+            customersDateDraft={customersDateDraft}
+            setCustomersDateDraft={setCustomersDateDraft}
+            setCustomersDateApplied={setCustomersDateApplied}
+            exportOpen={exportOpen && activeTab === 'customers'}
+            onExportClose={() => setExportOpen(false)}
           />
         </TabsContent>
 
         <TabsContent value="suppliers" className="space-y-4">
-          <SuppliersSection data={suppliersReport.data} />
+          <SuppliersSection
+            data={suppliersReport.data}
+            organizationName={currentOrganization?.name}
+            exportOpen={exportOpen && activeTab === 'suppliers'}
+            onExportClose={() => setExportOpen(false)}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -62,7 +62,7 @@ export function InventoryItemDetails() {
           <DataTableColumnHeader column={column} title="Order Date" />
         ),
         cell: ({ row }) =>
-          format(new Date(row.getValue('date')), 'MMMM dd, yyyy h:mma'),
+          format(new Date(row.getValue('date')), 'MMM dd, yyyy h:mma'),
       },
       {
         id: 'unitPrice',
@@ -451,13 +451,13 @@ export function InventoryItemDetails() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {itemDiscounts.map((d) => {
               const start = d.startAt
-                ? `${format(new Date(d.startAt), 'MMMM dd, yyyy')} ${format(
+                ? `${format(new Date(d.startAt), 'MMM dd, yyyy')} ${format(
                     new Date(d.startAt),
                     'h:mm a'
                   )}`
                 : 'Any';
               const end = d.expiresAt
-                ? `${format(new Date(d.expiresAt), 'MMMM dd, yyyy')} ${format(
+                ? `${format(new Date(d.expiresAt), 'MMM dd, yyyy')} ${format(
                     new Date(d.expiresAt),
                     'h:mm a'
                   )}`

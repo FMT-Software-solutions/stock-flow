@@ -3,8 +3,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Order } from '@/types/orders';
 import type { DateRange } from 'react-day-picker';
-import { dateToBucketKey, startOfUnit, nextBucket, type GroupUnit, type RowGroup } from '../../sales/utils';
-import { format } from 'date-fns';
+import { dateToBucketKey, startOfUnit, nextBucket, paymentStatusDisplay, type GroupUnit, type RowGroup } from '../../sales/utils';
+import { differenceInDays, format, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 
 type Template = 'detailed' | 'pivot' | 'summary';
 
@@ -31,6 +31,7 @@ interface CommonParams {
   dateRange?: DateRange;
   includeStats?: boolean;
   includeData?: boolean;
+  includeChartData?: boolean;
 }
 
 export function buildSalesWorkbook({
@@ -45,6 +46,7 @@ export function buildSalesWorkbook({
   dateRange,
   includeStats = true,
   includeData = true,
+  includeChartData = true,
 }: CommonParams) {
   const wb = XLSX.utils.book_new();
 
@@ -445,6 +447,108 @@ export function buildSalesWorkbook({
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Summary');
   }
 
+  if (includeChartData) {
+    const trendUnit: GroupUnit = (() => {
+      if (!dateRange?.from || !dateRange?.to) return 'month';
+      const days = differenceInDays(dateRange.to, dateRange.from);
+      if (days <= 45) return 'day';
+      if (days <= 180) return 'week';
+      return 'month';
+    })();
+
+    const trendBuckets = new Map<number, { revenue: number; owings: number; orders: number }>();
+    const getTrendBucketStart = (d: Date) => {
+      if (trendUnit === 'day') return startOfDay(d);
+      if (trendUnit === 'week') return startOfWeek(d, { weekStartsOn: 1 });
+      return startOfMonth(d);
+    };
+
+    orders.forEach((o) => {
+      const d = new Date(o.date || o.created_at || new Date().toISOString());
+      const bucketStart = getTrendBucketStart(d).getTime();
+      const cur = trendBuckets.get(bucketStart) || { revenue: 0, owings: 0, orders: 0 };
+      const paid = Number(o.paid_amount ?? 0);
+      const owing = Math.max(0, Number(o.total_amount ?? 0) - paid);
+      cur.revenue += paid;
+      cur.owings += owing;
+      cur.orders += 1;
+      trendBuckets.set(bucketStart, cur);
+    });
+
+    const trendData = Array.from(trendBuckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, agg]) => ({
+        period: format(new Date(ts), 'MMMM d, yyyy'),
+        revenue: agg.revenue,
+        owings: agg.owings,
+        orders: agg.orders,
+      }));
+
+    if (trendData.length) {
+      const meta: (string | number)[][] = [];
+      if (organizationName) meta.push([organizationName]);
+      meta.push(['Sales & Orders Report']);
+      if (description) meta.push([description]);
+      meta.push([
+        branches && branches.length
+          ? `Branches: ${branches.join(', ')}`
+          : 'Branches: All Branches',
+      ]);
+      meta.push([]);
+      meta.push([]);
+
+      const header = ['Period', 'Revenue', 'Owings', 'Orders'];
+      const body: (string | number)[][] = trendData.map((d) => [
+        d.period,
+        formatCurrency ? formatCurrency(d.revenue) : d.revenue,
+        formatCurrency ? formatCurrency(d.owings) : d.owings,
+        d.orders,
+      ]);
+
+      const aoa = [...meta, header, ...body];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const headerRowIndex = meta.length;
+      setColumnWidths(ws, [26, 16, 16, 10]);
+      styleHeaderRowAt(ws, header, headerRowIndex);
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales Trend');
+    }
+
+    const paymentCounts = new Map<string, number>();
+    orders.forEach((o) => {
+      const k = paymentStatusDisplay(o.payment_status || 'Unknown');
+      paymentCounts.set(k, (paymentCounts.get(k) || 0) + 1);
+    });
+    const paymentRows = Array.from(paymentCounts.entries())
+      .map(([status, count]) => [status, count] as const)
+      .sort((a, b) => b[1] - a[1]);
+
+    if (paymentRows.length) {
+      const meta: (string | number)[][] = [];
+      if (organizationName) meta.push([organizationName]);
+      meta.push(['Sales & Orders Report']);
+      if (description) meta.push([description]);
+      meta.push([
+        branches && branches.length
+          ? `Branches: ${branches.join(', ')}`
+          : 'Branches: All Branches',
+      ]);
+      meta.push([]);
+      meta.push([]);
+
+      const header = ['Payment Status', 'Orders'];
+      const body: (string | number)[][] = paymentRows.map(([status, count]) => [
+        status,
+        count,
+      ]);
+      const aoa = [...meta, header, ...body];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const headerRowIndex = meta.length;
+      setColumnWidths(ws, [26, 12]);
+      styleHeaderRowAt(ws, header, headerRowIndex);
+      XLSX.utils.book_append_sheet(wb, ws, 'Payment Breakdown');
+    }
+  }
+
   return wb;
 }
 
@@ -461,6 +565,7 @@ export function buildSalesPdfDoc({
   dateRange,
   includeStats = true,
   includeData = true,
+  includeChartData = true,
 }: CommonParams & { title?: string }) {
   const doc = new jsPDF({ orientation: (template === 'detailed' || template === 'pivot') ? 'landscape' : 'portrait' });
   doc.setFontSize(14);
@@ -834,6 +939,94 @@ export function buildSalesPdfDoc({
       formatCurrency ? formatCurrency(agg[b]?.due || 0) : agg[b]?.due || 0,
     ]);
     y = drawTable(head, rows, y);
+  }
+
+  if (includeChartData) {
+    const trendUnit: GroupUnit = (() => {
+      if (!dateRange?.from || !dateRange?.to) return 'month';
+      const days = differenceInDays(dateRange.to, dateRange.from);
+      if (days <= 45) return 'day';
+      if (days <= 180) return 'week';
+      return 'month';
+    })();
+
+    const trendBuckets = new Map<number, { revenue: number; owings: number; orders: number }>();
+    const getTrendBucketStart = (d: Date) => {
+      if (trendUnit === 'day') return startOfDay(d);
+      if (trendUnit === 'week') return startOfWeek(d, { weekStartsOn: 1 });
+      return startOfMonth(d);
+    };
+
+    orders.forEach((o) => {
+      const d = new Date(o.date || o.created_at || new Date().toISOString());
+      const bucketStart = getTrendBucketStart(d).getTime();
+      const cur = trendBuckets.get(bucketStart) || { revenue: 0, owings: 0, orders: 0 };
+      const paid = Number(o.paid_amount ?? 0);
+      const owing = Math.max(0, Number(o.total_amount ?? 0) - paid);
+      cur.revenue += paid;
+      cur.owings += owing;
+      cur.orders += 1;
+      trendBuckets.set(bucketStart, cur);
+    });
+
+    const trendData = Array.from(trendBuckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, agg]) => ({
+        period: format(new Date(ts), 'MMMM d, yyyy'),
+        revenue: agg.revenue,
+        owings: agg.owings,
+        orders: agg.orders,
+      }));
+
+    const paymentCounts = new Map<string, number>();
+    orders.forEach((o) => {
+      const k = paymentStatusDisplay(o.payment_status || 'Unknown');
+      paymentCounts.set(k, (paymentCounts.get(k) || 0) + 1);
+    });
+    const paymentRows = Array.from(paymentCounts.entries())
+      .map(([status, count]) => [status, count] as const)
+      .sort((a, b) => b[1] - a[1]);
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const ensureSpace = (h: number) => {
+      if (y + h <= pageHeight - 14) return;
+      doc.addPage();
+      doc.setFontSize(10);
+      y = 20;
+    };
+
+    if (trendData.length) {
+      ensureSpace(14);
+      doc.setFontSize(12);
+      doc.text('Revenue & Owings Trend', 14, y);
+      doc.setFontSize(10);
+      y += 6;
+
+      const head = ['Period', 'Revenue', 'Owings', 'Orders'];
+      const rows: (string | number)[][] = trendData.map((d) => [
+        d.period,
+        formatCurrency ? formatCurrency(d.revenue) : d.revenue,
+        formatCurrency ? formatCurrency(d.owings) : d.owings,
+        d.orders,
+      ]);
+      y = drawTable(head, rows, y);
+      y += 6;
+    }
+
+    if (paymentRows.length) {
+      ensureSpace(14);
+      doc.setFontSize(12);
+      doc.text('Payment Status Breakdown', 14, y);
+      doc.setFontSize(10);
+      y += 6;
+
+      const head = ['Payment Status', 'Orders'];
+      const rows: (string | number)[][] = paymentRows.map(([status, count]) => [
+        status,
+        count,
+      ]);
+      y = drawTable(head, rows, y);
+    }
   }
 
   return doc;

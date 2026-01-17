@@ -18,6 +18,9 @@ import {
 } from './orders/fields';
 import type { Order } from '@/types/orders';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
+import type { DataLookback, UserPermissions } from '@/modules/permissions';
+import type { DateRange } from 'react-day-picker';
 
 export function Orders() {
   const navigate = useNavigate();
@@ -32,6 +35,54 @@ export function Orders() {
   const { checkPermission } = useRoleCheck();
   const canCreateOrders = checkPermission('orders', 'create');
   const canExportOrders = checkPermission('orders', 'export');
+
+  const userPermissions = useMemo<UserPermissions | undefined>(() => {
+    if (!currentOrganization?.permissions) return undefined;
+    try {
+      return JSON.parse(currentOrganization.permissions) as UserPermissions;
+    } catch {
+      return undefined;
+    }
+  }, [currentOrganization?.permissions]);
+
+  const maxLookback = useMemo<DataLookback>(() => {
+    if (currentOrganization?.user_role === 'owner') {
+      return { unit: 'forever' };
+    }
+    return (
+      userPermissions?.orders?.dataAccess?.maxLookback ?? {
+        unit: 'months',
+        value: 1,
+      }
+    );
+  }, [currentOrganization?.user_role, userPermissions]);
+
+  const { minDate, maxDate } = useMemo(() => {
+    const now = new Date();
+    const max = endOfDay(now);
+
+    if (maxLookback.unit === 'forever') {
+      return { minDate: undefined, maxDate: max };
+    }
+
+    const value = maxLookback.value;
+    const rawMin =
+      maxLookback.unit === 'days'
+        ? subDays(now, value)
+        : maxLookback.unit === 'months'
+        ? subMonths(now, value)
+        : subYears(now, value);
+
+    return { minDate: startOfDay(rawMin), maxDate: max };
+  }, [maxLookback]);
+
+  const defaultDateRange = useMemo<DateRange>(() => {
+    const now = new Date();
+    const baseFrom = startOfDay(subMonths(now, 1));
+    const baseTo = endOfDay(now);
+    const clampedFrom = minDate && baseFrom < minDate ? minDate : baseFrom;
+    return { from: clampedFrom, to: baseTo };
+  }, [minDate]);
 
   const filterFields = useMemo(() => {
     const branches = Array.from(
@@ -75,8 +126,12 @@ export function Orders() {
       return { label, value: v };
     });
 
-    return getOrderFilterFields(branches, customers, paymentMethods);
-  }, [orders]);
+    return getOrderFilterFields(branches, customers, paymentMethods, {
+      minDate,
+      maxDate,
+      defaultValue: minDate ? defaultDateRange : undefined,
+    });
+  }, [defaultDateRange, maxDate, minDate, orders]);
 
   const orderStatsGroups = useMemo(() => getOrderStatsGroups(formatCurrency), [
     formatCurrency,
@@ -88,7 +143,11 @@ export function Orders() {
     'orders.summaryMode',
     'filtered'
   );
-  const summaryData = summaryMode === 'filtered' ? filteredOrders : orders;
+  const summaryData = minDate
+    ? filteredOrders
+    : summaryMode === 'filtered'
+    ? filteredOrders
+    : orders;
 
   return (
     <div className="space-y-6">
@@ -115,12 +174,15 @@ export function Orders() {
         storageKey="stockflow-orders-stats-container-is-open"
         summaryLabel="Order Summary"
         orgId={currentOrganization?.id}
-        summaryMode={summaryMode}
-        onSummaryModeChange={setSummaryMode}
+        summaryMode={minDate ? undefined : summaryMode}
+        onSummaryModeChange={minDate ? undefined : setSummaryMode}
       />
 
       <div className={cn(isLoading && 'opacity-50')}>
         <DataTable
+          key={`${currentOrganization?.id ?? 'no-org'}-${
+            minDate?.toISOString() ?? 'no-min'
+          }`}
           columns={columns}
           data={orders}
           searchKey="orderNumber"
@@ -129,6 +191,7 @@ export function Orders() {
           storageKey="stockflow-orders-table"
           canExport={canExportOrders}
           orgId={currentOrganization?.id}
+          defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
         />
       </div>

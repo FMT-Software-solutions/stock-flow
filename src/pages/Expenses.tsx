@@ -15,6 +15,9 @@ import { useMemo } from 'react';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Expense } from '@/types/expenses';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
+import type { DataLookback, UserPermissions } from '@/modules/permissions';
+import type { DateRange } from 'react-day-picker';
 
 export function Expenses() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -34,13 +37,62 @@ export function Expenses() {
   const canManageCategories = checkPermission('expense_categories');
   const canManageTypes = checkPermission('expense_types');
 
+  const userPermissions = useMemo<UserPermissions | undefined>(() => {
+    if (!currentOrganization?.permissions) return undefined;
+    try {
+      return JSON.parse(currentOrganization.permissions) as UserPermissions;
+    } catch {
+      return undefined;
+    }
+  }, [currentOrganization?.permissions]);
+
+  const maxLookback = useMemo<DataLookback>(() => {
+    if (currentOrganization?.user_role === 'owner') {
+      return { unit: 'forever' };
+    }
+    return (
+      userPermissions?.expenses?.dataAccess?.maxLookback ?? {
+        unit: 'months',
+        value: 1,
+      }
+    );
+  }, [currentOrganization?.user_role, userPermissions]);
+
+  const { minDate, maxDate } = useMemo(() => {
+    const now = new Date();
+    const max = endOfDay(now);
+
+    if (maxLookback.unit === 'forever') {
+      return { minDate: undefined, maxDate: max };
+    }
+
+    const value = maxLookback.value;
+    const rawMin =
+      maxLookback.unit === 'days'
+        ? subDays(now, value)
+        : maxLookback.unit === 'months'
+          ? subMonths(now, value)
+          : subYears(now, value);
+
+    return { minDate: startOfDay(rawMin), maxDate: max };
+  }, [maxLookback]);
+
+  const defaultDateRange = useMemo<DateRange>(() => {
+    const now = new Date();
+    const baseFrom = startOfDay(subMonths(now, 1));
+    const baseTo = endOfDay(now);
+    const clampedFrom = minDate && baseFrom < minDate ? minDate : baseFrom;
+    return { from: clampedFrom, to: baseTo };
+  }, [minDate]);
+
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [summaryMode, setSummaryMode] = useOrgPreference<'filtered' | 'all'>(
     currentOrganization?.id,
     'expenses.summaryMode',
     'filtered'
   );
-  const summaryData = summaryMode === 'filtered' ? filteredExpenses : expenses;
+  const summaryData =
+    minDate ? filteredExpenses : summaryMode === 'filtered' ? filteredExpenses : expenses;
 
   return (
     <div className="space-y-6">
@@ -71,8 +123,8 @@ export function Expenses() {
         storageKey="expenses-stats-is-open"
         summaryLabel="Expenses Summary"
         orgId={currentOrganization?.id}
-        summaryMode={summaryMode}
-        onSummaryModeChange={setSummaryMode}
+        summaryMode={minDate ? undefined : summaryMode}
+        onSummaryModeChange={minDate ? undefined : setSummaryMode}
       />
 
       <Tabs defaultValue="list" className="space-y-4">
@@ -85,6 +137,12 @@ export function Expenses() {
 
         <TabsContent value="list" className="space-y-4">
           <ExpensesList
+            dateConstraints={{
+              minDate,
+              maxDate,
+              defaultValue: minDate ? defaultDateRange : undefined,
+            }}
+            defaultDateRange={defaultDateRange}
             onFilteredDataChange={(rows) =>
               setFilteredExpenses(rows as Expense[])
             }

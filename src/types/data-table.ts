@@ -12,4 +12,7 @@ export interface DataTableFilterField {
   type: FilterType
   options?: DataTableFilterOption[]
   placeholder?: string
+  minDate?: Date
+  maxDate?: Date
+  defaultValue?: unknown
 }

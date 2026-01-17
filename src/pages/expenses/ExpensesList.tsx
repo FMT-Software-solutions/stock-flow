@@ -12,11 +12,16 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Expense } from '@/types/expenses';
+import type { DateRange } from 'react-day-picker';
 
 export function ExpensesList({
   onFilteredDataChange,
+  dateConstraints,
+  defaultDateRange,
 }: {
   onFilteredDataChange?: (rows: Expense[]) => void;
+  dateConstraints?: { minDate?: Date; maxDate?: Date; defaultValue?: DateRange };
+  defaultDateRange: DateRange;
 }) {
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds } = useBranchContext();
@@ -153,22 +158,29 @@ export function ExpensesList({
     availableBranches.map((b) => ({ label: b.name, value: b.name })),
     creators,
     paymentMethodOptions,
-    statusOptions
+    statusOptions,
+    dateConstraints
   );
 
   return (
     <div className={cn(isLoading ? 'opacity-50' : '')}>
       <DataTable
+        key={`${currentOrganization?.id ?? 'no-org'}-${
+          dateConstraints?.minDate?.toISOString() ?? 'no-min'
+        }`}
         columns={columns}
         data={expenses}
         searchKey="search"
         filterFields={filterFields}
         exportFields={expenseExportFields}
         defaultColumnVisibility={{ search: false }}
+        defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
         canExport={checkPermission('expenses', 'export')}
         onFilteredDataChange={
           onFilteredDataChange as ((rows: Expense[]) => void) | undefined
         }
+        orgId={currentOrganization?.id}
+        storageKey="stockflow-expenses-table"
       />
     </div>
   );

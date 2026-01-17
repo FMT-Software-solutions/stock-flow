@@ -41,6 +41,7 @@ export function SalesExportDialog({
   const { formatCurrency } = useCurrency();
   const [includeStats, setIncludeStats] = useState(true);
   const [includeData, setIncludeData] = useState(true);
+  const [includeChartData, setIncludeChartData] = useState(true);
 
   const description = useMemo(() => {
     if (!dateRange?.from && !dateRange?.to) return undefined;
@@ -67,6 +68,7 @@ export function SalesExportDialog({
       dateRange,
       includeStats,
       includeData,
+      includeChartData,
     });
     XLSX.writeFile(wb, 'sales-report.xlsx');
     onClose();
@@ -86,6 +88,7 @@ export function SalesExportDialog({
       dateRange,
       includeStats,
       includeData,
+      includeChartData,
     });
     doc.save('sales-report.pdf');
     onClose();
@@ -122,6 +125,16 @@ export function SalesExportDialog({
                   : template === 'pivot'
                   ? 'Pivot Tables'
                   : 'Summary Table'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={includeChartData}
+                onCheckedChange={(c) => setIncludeChartData(!!c)}
+                id="sales-inc-charts"
+              />
+              <label htmlFor="sales-inc-charts" className="text-sm">
+                Include Chart Data
               </label>
             </div>
           </div>

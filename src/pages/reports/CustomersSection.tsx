@@ -144,7 +144,7 @@ export function CustomersSection({
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-75 overflow-auto px-4">
               {topCustomers.map((c, i) => (
                 <div
                   key={c.customer_id || `${c.name}-${i}`}

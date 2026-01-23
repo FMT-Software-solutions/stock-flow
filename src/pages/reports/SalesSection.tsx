@@ -179,7 +179,7 @@ export function SalesSection({
     return Array.from(buckets.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([ts, agg]) => ({
-        period: format(new Date(ts), 'MMMM dd, yyyy'),
+        period: format(new Date(ts), 'MMM dd'),
         revenue: agg.revenue,
         owings: agg.owings,
         orders: agg.orders,
@@ -461,7 +461,7 @@ export function SalesSection({
                     dataKey="period"
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={28}
+                    tickMargin={8}
                   />
                   <YAxis
                     tickLine={false}
@@ -513,7 +513,7 @@ export function SalesSection({
                     dataKey="period"
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={28}
+                    tickMargin={8}
                   />
                   <YAxis tickLine={false} axisLine={false} />
                   <ChartTooltip

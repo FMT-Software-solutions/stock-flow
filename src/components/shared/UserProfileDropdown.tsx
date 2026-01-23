@@ -186,7 +186,7 @@ export function UserProfileDropdown() {
 
           {/* Layout Submenu */}
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="cursor-pointer">
+            <DropdownMenuSubTrigger className="cursor-pointer hidden md:flex">
               <Layout className="mr-3 h-4 w-4" />
               <span className="ml-2">Layout</span>
             </DropdownMenuSubTrigger>

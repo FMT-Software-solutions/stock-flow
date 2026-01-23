@@ -490,7 +490,7 @@ function OrderFormInner({
           <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Order Items</CardTitle>
+                <CardTitle>Sales/Order Items</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {fields.map((field, index) => {
@@ -516,9 +516,9 @@ function OrderFormInner({
                   return (
                     <div
                       key={field.id}
-                      className="flex gap-4 items-end border-b pb-4 last:border-0 last:pb-0"
+                      className="flex flex-wrap sm:flex-nowrap gap-4 items-end border-b pb-4 last:border-0 last:pb-0"
                     >
-                      <div className="flex-1 min-w-50">
+                      <div className="w-full sm:w-auto sm:flex-1 min-w-50">
                         <Controller
                           control={form.control}
                           name={`items.${index}.inventoryId`}

@@ -84,24 +84,22 @@ export function ProductsSection({
           <div className="flex items-center gap-2">
             <DatePickerWithRange
               date={productsDateDraft}
-              setDate={setProductsDateDraft}
-              placeholder="Select product added date range"
+              setDate={(val) => {
+                setProductsDateDraft?.(val);
+                setProductsDateApplied?.(val);
+              }}
+              placeholder="Select date range"
               className="w-full"
             />
-            <Button
-              onClick={() => setProductsDateApplied?.(productsDateDraft)}
-              disabled={!productsDateDraft?.from && !productsDateDraft?.to}
-            >
-              Apply
-            </Button>
             <Button
               variant="outline"
               onClick={() => {
                 setProductsDateDraft?.(undefined);
                 setProductsDateApplied?.(undefined);
               }}
+              className='px-2 md:px-4'
             >
-              Clear
+            Reset
             </Button>
           </div>
           </div>

@@ -346,7 +346,7 @@ function DatePickerWithRangeInner({
             variant={'outline'}
             disabled={!!disabled}
             className={cn(
-              'min-w-75 justify-start text-left font-normal relative',
+              'md:min-w-75 justify-start text-left font-normal relative',
               !date && 'text-muted-foreground'
             )}
           >

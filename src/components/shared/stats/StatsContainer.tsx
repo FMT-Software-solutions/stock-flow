@@ -39,7 +39,11 @@ export function StatsContainer<TData>({
   onSummaryModeChange,
   orgId,
 }: StatsContainerProps<TData>) {
-  const [isOpen, setIsOpen] = useOrgPreference<boolean>(orgId, `stats.${storageKey}.isOpen`, true);
+  const [isOpen, setIsOpen] = useOrgPreference<boolean>(
+    orgId,
+    `stats.${storageKey}.isOpen`,
+    true
+  );
   const glassCardClassName =
     'relative overflow-hidden border-primary/20 bg-card/40 bg-linear-to-br from-primary/15 via-primary/10 to-background/25 shadow-md backdrop-blur-sm';
 
@@ -52,9 +56,7 @@ export function StatsContainer<TData>({
             key={group.id}
             group={group}
             data={data}
-            className={cn(
-              group.cardVariant === 'glass' && glassCardClassName
-            )}
+            className={cn(group.cardVariant === 'glass' && glassCardClassName)}
           />
         ))}
     </div>
@@ -63,27 +65,33 @@ export function StatsContainer<TData>({
   if (!collapsible) {
     return (
       <div className="mb-6">
-        {summaryLabel && (
-          <div className="flex items-center gap-3 mb-2 px-1">
-            <span className="text-sm font-medium">{summaryLabel}</span>
-            {summaryMode && onSummaryModeChange && (
-              <Select
-                value={summaryMode}
-                onValueChange={(v) =>
-                  onSummaryModeChange(v as 'filtered' | 'all')
-                }
-              >
-                <SelectTrigger className="h-8 w-44">
-                  <SelectValue placeholder="Summary Mode" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="filtered">Filtered Items</SelectItem>
-                  <SelectItem value="all">All Items</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-3 mb-2 px-1">
+          {summaryLabel && (
+            <>
+              <span className="text-sm font-medium hidden md:inline">
+                {summaryLabel}
+              </span>
+              <span className="text-sm font-medium md:hidden">Summary</span>
+            </>
+          )}
+          {summaryMode && onSummaryModeChange && (
+            <Select
+              value={summaryMode}
+              onValueChange={(v) =>
+                onSummaryModeChange(v as 'filtered' | 'all')
+              }
+            >
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue placeholder="Summary Mode" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="filtered">Filtered Items</SelectItem>
+                <SelectItem value="all">All Items</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
         {content}
       </div>
     );
@@ -93,7 +101,10 @@ export function StatsContainer<TData>({
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="w-full bg-muted/70 px-4 py-2 mb-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium">{summaryLabel}</span>
+          <span className="text-sm font-medium hidden md:inline">
+            {summaryLabel}
+          </span>
+          <span className="text-sm font-medium md:hidden">Summary</span>
           {summaryMode && onSummaryModeChange && (
             <Select
               value={summaryMode}
@@ -113,7 +124,7 @@ export function StatsContainer<TData>({
         </div>
         <CollapsibleTrigger asChild>
           <div className="flex items-center gap-2 cursor-pointer select-none">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium hidden sm:inline">
               Click to {isOpen ? 'Hide' : 'Show'}
             </span>
             <ChevronsUpDown className="ml-auto h-4 w-4" />

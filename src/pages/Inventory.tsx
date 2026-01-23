@@ -1,40 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { DataTable } from '@/components/shared/data-table/data-table';
-import { columns, inventoryColumns } from './inventory/columns';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
+import { StatsContainer } from '@/components/shared/stats/StatsContainer';
 import { Button } from '@/components/ui/button';
-import { Plus, Check } from 'lucide-react';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { useCurrency } from '@/hooks/useCurrency';
+import {
+  useCategories,
+  useInventoryEntries,
+  useProducts,
+} from '@/hooks/useInventoryQueries';
+import type { Category, InventoryEntry, Product } from '@/types/inventory';
+import { Check, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Categories } from './inventory/Categories';
-import { Variations } from './inventory/Variations';
 import { CategoryDialog } from './inventory/CategoryDialog';
 import { VariationTypeDialog } from './inventory/VariationTypeDialog';
-import {
-  useProducts,
-  useInventoryEntries,
-  useCategories,
-} from '@/hooks/useInventoryQueries';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useBranchContext } from '@/contexts/BranchContext';
-import type { Category } from '@/types/inventory';
-import { ExportDialog } from '@/components/shared/export/ExportDialog';
-import {
-  getProductFilterFields,
-  productExportFields,
-} from './inventory/fields/productFields';
+import { Variations } from './inventory/Variations';
+import { columns, inventoryColumns } from './inventory/columns';
+import { CreateDiscountSheet } from './inventory/components/CreateDiscountSheet';
+import { getCategoryExportFields } from './inventory/fields/categoryFields';
 import {
   getInventoryFilterFields,
   inventoryExportFields,
 } from './inventory/fields/inventoryFields';
-import { getCategoryExportFields } from './inventory/fields/categoryFields';
-import { StatsContainer } from '@/components/shared/stats/StatsContainer';
-import { getProductStatsGroups } from './inventory/fields/productStats';
 import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
-import { useCurrency } from '@/hooks/useCurrency';
-import { useRoleCheck } from '@/components/auth/RoleGuard';
-import type { Product, InventoryEntry } from '@/types/inventory';
-import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
-import { CreateDiscountSheet } from './inventory/components/CreateDiscountSheet';
+import {
+  getProductFilterFields,
+  productExportFields,
+} from './inventory/fields/productFields';
+import { getProductStatsGroups } from './inventory/fields/productStats';
 
 import {
   Command,
@@ -52,6 +51,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { DiscountManager } from './inventory/DiscountManager';
+import { InventoryTabs } from './inventory/components/InventoryTabs';
 
 export function Inventory() {
   const navigate = useNavigate();
@@ -91,13 +91,15 @@ export function Inventory() {
   const canEditCategory = checkPermission('product_categories', 'edit');
   const canExportCategory = checkPermission('product_categories', 'export');
 
-  const availableTabs = [
-    canViewInventory ? 'inventory' : null,
-    canViewProducts ? 'products' : null,
-    canViewCategories ? 'categories' : null,
-    canViewVariations ? 'variations' : null,
-    canViewDiscounts ? 'discounts' : null,
-  ].filter(Boolean) as string[];
+  const tabs = [
+    { value: 'inventory', label: 'Inventory', show: canViewInventory },
+    { value: 'products', label: 'Products', show: canViewProducts },
+    { value: 'categories', label: 'Categories', show: canViewCategories },
+    { value: 'variations', label: 'Variations', show: canViewVariations },
+    { value: 'discounts', label: 'Discounts', show: canViewDiscounts },
+  ].filter((t) => t.show);
+
+  const availableTabs = tabs.map((t) => t.value);
 
   const [activeTab, setActiveTab] = useState<string>(
     availableTabs[0] ?? 'inventory'
@@ -208,7 +210,7 @@ export function Inventory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground">
@@ -216,39 +218,12 @@ export function Inventory() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="space-y-0"
-          >
-            <TabsList>
-              {canViewInventory && (
-                <TabsTrigger value="inventory" disabled={isLoading}>
-                  Inventory
-                </TabsTrigger>
-              )}
-              {canViewProducts && (
-                <TabsTrigger value="products" disabled={isLoading}>
-                  Products
-                </TabsTrigger>
-              )}
-              {canViewCategories && (
-                <TabsTrigger value="categories" disabled={isLoading}>
-                  Categories
-                </TabsTrigger>
-              )}
-              {canViewVariations && (
-                <TabsTrigger value="variations" disabled={isLoading}>
-                  Variations
-                </TabsTrigger>
-              )}
-              {canViewDiscounts && (
-                <TabsTrigger value="discounts" disabled={isLoading}>
-                  Discounts
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </Tabs>
+          <InventoryTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            isLoading={isLoading}
+            tabs={tabs}
+          />
           {activeTab === 'discounts' && canCreateDiscount && (
             <Button
               onClick={() => setCreateDiscountOpen(true)}

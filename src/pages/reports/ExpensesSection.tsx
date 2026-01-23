@@ -417,7 +417,7 @@ export function ExpensesSection({
                     dataKey="period"
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={28}
+                    tickMargin={8}
                   />
                   <YAxis
                     tickLine={false}
@@ -543,9 +543,10 @@ export function ExpensesSection({
                 <YAxis
                   dataKey="name"
                   type="category"
-                  width={160}
+                  width={90}
                   tickLine={false}
                   axisLine={false}
+                  tickFormatter={(v) => v.length > 10 ? `${v.substring(0, 10)}...` : v}
                 />
                 <XAxis
                   dataKey="value"

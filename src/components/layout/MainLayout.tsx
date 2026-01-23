@@ -4,9 +4,15 @@ import { ModernLayout } from './ModernLayout';
 import { ClassicLayout } from './ClassicLayout';
 import { TopNavLayout } from './TopNavLayout';
 import { GridLayout } from './GridLayout';
+import { useMediaQuery } from '../../hooks/use-media-query';
 
 function MainLayoutContent() {
   const { layoutMode } = useLayoutStore();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
+  if (isMobile) {
+    return <TopNavLayout />;
+  }
 
   switch (layoutMode) {
     case 'grid':

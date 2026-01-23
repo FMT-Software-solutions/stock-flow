@@ -101,16 +101,13 @@ export function CustomersSection({
           <div className="flex items-center gap-2">
             <DatePickerWithRange
               date={customersDateDraft}
-              setDate={setCustomersDateDraft}
+              setDate={(d) => {
+                setCustomersDateDraft?.(d);
+                setCustomersDateApplied?.(d);
+              }}
               placeholder="Select order date range"
               className="w-full"
             />
-            <Button
-              onClick={() => setCustomersDateApplied?.(customersDateDraft)}
-              disabled={!customersDateDraft?.from && !customersDateDraft?.to}
-            >
-              Apply
-            </Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -118,7 +115,7 @@ export function CustomersSection({
                 setCustomersDateApplied?.(undefined);
               }}
             >
-              Clear
+              Reset
             </Button>
           </div>
         </div>
@@ -174,9 +171,10 @@ export function CustomersSection({
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={140}
+                    width={90}
                     tickLine={false}
                     axisLine={false}
+                    tickFormatter={(v) => v.length > 10 ? `${v.substring(0, 10)}...` : v}
                   />
                   <XAxis
                     dataKey="value"
@@ -251,9 +249,10 @@ export function CustomersSection({
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={140}
+                    width={90}
                     tickLine={false}
                     axisLine={false}
+                    tickFormatter={(v) => v.length > 10 ? `${v.substring(0, 10)}...` : v}
                   />
                   <XAxis
                     dataKey="value"

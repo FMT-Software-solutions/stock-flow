@@ -133,9 +133,10 @@ export function SuppliersSection({
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={140}
+                    width={90}
                     tickLine={false}
                     axisLine={false}
+                    tickFormatter={(v) => v.length > 10 ? `${v.substring(0, 10)}...` : v}
                   />
                   <XAxis
                     dataKey="value"

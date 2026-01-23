@@ -289,7 +289,9 @@ export function AppRouter() {
           <AiUsageProvider>
             <BranchProvider>
               <PaletteProvider>
-                <AppRoutes />
+                <div>
+                  <AppRoutes />
+                </div>
               </PaletteProvider>
             </BranchProvider>
           </AiUsageProvider>

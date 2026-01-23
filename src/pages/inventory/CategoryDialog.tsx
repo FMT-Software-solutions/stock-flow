@@ -101,8 +101,12 @@ export function CategoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-137.5">
         <DialogHeader>
-          <DialogTitle>Add Category</DialogTitle>
-          <DialogDescription>Create a new product category.</DialogDescription>
+          <DialogTitle>{category ? 'Edit' : 'Add'} Category</DialogTitle>
+          <DialogDescription>
+            {category
+              ? 'Update category details'
+              : 'Create a new product category'}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">

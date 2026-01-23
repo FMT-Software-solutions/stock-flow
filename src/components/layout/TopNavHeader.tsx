@@ -53,8 +53,8 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
         className
       )}
     >
-      <div className="flex items-center justify-between h-full px-6">
-        <div className="flex items-center space-x-4 md:space-x-8">
+      <div className="flex items-center justify-between h-full px-2">
+        <div className="flex items-center md:space-x-8">
           {/* Mobile Menu Trigger */}
           <div className="md:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -95,7 +95,7 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
             </Sheet>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
             <OrganizationSelector />
             <div className="h-6 w-px bg-border hidden md:block" />
             <BranchSelector />
@@ -173,8 +173,12 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4">
-          <AiUsageIndicator />
-          <RestartToUpdateButton />
+          <div className="hidden md:inline-block">
+            <AiUsageIndicator />
+          </div>
+          <div className="hidden md:inline-block">
+            <RestartToUpdateButton />
+          </div>
           <UserProfileDropdown />
         </div>
       </div>

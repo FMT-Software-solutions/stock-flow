@@ -529,7 +529,7 @@ function ProductFormInner({
                 render={({ field }) => (
                   <div className="space-y-2">
                     <FieldLabel>Additional Images</FieldLabel>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {field.value?.map((url, index) => (
                         <div
                           key={index}

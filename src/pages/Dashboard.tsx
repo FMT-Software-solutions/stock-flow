@@ -197,7 +197,7 @@ function DashboardMetricCard<TData>({
   loading?: boolean;
 }) {
   return (
-    <Card className={cn('flex flex-col', loading && 'opacity-60', className)}>
+    <Card className={cn('w-full flex flex-col', loading && 'opacity-60', className)}>
       <CardHeader className="flex flex-column md:flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base font-medium">{title}</CardTitle>
       </CardHeader>
@@ -217,7 +217,7 @@ function DashboardMetricCard<TData>({
                              {field.label}
                            </span>
                            <div className="flex items-baseline gap-2">
-                             <span className={cn("text-xl font-bold", field.className)}>
+                             <span className={cn("text-sm sm:text-base md:text-xl font-bold", field.className)}>
                                {result.value}
                              </span>
                              {result.subValue && (
@@ -610,7 +610,7 @@ export function Dashboard() {
     stats.sales.isFetching || stats.expenses.isFetching || stats.customers.isFetching;
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6">
       {/* Header Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
@@ -626,11 +626,11 @@ export function Dashboard() {
             minDate={minDate}
             maxDate={maxDate}
             onClear={() => setDateRange(defaultDateRange)}
-            className="w-auto [&>button]:w-64 [&>button]:h-8 [&>button]:text-xs"
+            className="w-auto [&>button]:w-60 md:[&>button]:w-64 [&>button]:h-8 [&>button]:text-xs"
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" title="Customize Dashboard">
+              <Button variant="outline" size="icon" title="Customize Dashboard" className='h-8'>
                 <Settings2 className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -652,7 +652,7 @@ export function Dashboard() {
       </div>
 
       {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         
         {/* Row 1: Sales & Expenses */}
         {visibleSections.includes('sales') && (

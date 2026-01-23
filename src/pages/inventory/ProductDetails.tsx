@@ -90,7 +90,7 @@ export function ProductDetails() {
   const projectedProfit = product.sellingPrice - product.costPrice;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button
@@ -100,9 +100,9 @@ export function ProductDetails() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
-            <p className="text-muted-foreground">{product.sku}</p>
+          <div className="flex-1">
+            <h1 className="md:text-3xl font-bold tracking-tight">{product.name}</h1>
+            <p className="text-xs md:text-base text-muted-foreground">{product.sku}</p>
           </div>
         </div>
         {canEditProducts && (
@@ -110,12 +110,12 @@ export function ProductDetails() {
             variant="outline"
             onClick={() => navigate(`/inventory/${product.id}/edit`)}
           >
-            <Edit className="mr-2 h-4 w-4" /> Edit Product
+            <Edit className="md:mr-2 h-4 w-4" /> <span className="hidden md:inline-block">Edit Product</span>
           </Button>
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 w-full">
         {/* Left Column: Product Details */}
         <div className="space-y-6 md:col-span-1">
           <Card>

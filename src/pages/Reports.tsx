@@ -308,6 +308,15 @@ export function Reports() {
     generalDateRange,
   ]);
 
+  const tabOptions = [
+    { value: 'products', label: 'Products' },
+    { value: 'inventory', label: 'Inventory' },
+    { value: 'sales_orders', label: 'Sales & Orders' },
+    { value: 'expenses', label: 'Expenses' },
+    { value: 'customers', label: 'Customers' },
+    { value: 'suppliers', label: 'Suppliers' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -336,15 +345,42 @@ export function Reports() {
         }}
         className="space-y-4"
       >
-        <div className="flex items-center justify-between gap-2">
-          <TabsList>
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="sales_orders">Sales & Orders</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
-            <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          </TabsList>
+        <div className="flex items-center justify-between gap-4">
+          {/* Mobile View - Select */}
+          <div className="md:hidden w-full">
+            <Select
+              value={activeTab}
+              onValueChange={(v) => {
+                setActiveTab(v as typeof activeTab);
+                setExportOpen(false);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select report">
+                  {tabOptions.find((t) => t.value === activeTab)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tabOptions.map((tab) => (
+                  <SelectItem key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop View - TabsList */}
+          <div className="hidden md:block">
+            <TabsList>
+              {tabOptions.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+
           <Button
             size="sm"
             variant="outline"

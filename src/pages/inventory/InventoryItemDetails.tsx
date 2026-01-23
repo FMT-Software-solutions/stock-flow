@@ -160,14 +160,18 @@ export function InventoryItemDetails() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-base md:text-2xl font-bold tracking-tight">
               {inventory.productName}
             </h1>
             <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
               {inventory.inventoryNumber && (
                 <div className="flex items-center gap-1">
-                  <span className="font-semibold text-foreground">Inv #:</span>
-                  <span className="font-mono">{inventory.inventoryNumber}</span>
+                  <span className="text-xs md:text-base font-semibold text-foreground">
+                    Inv #:
+                  </span>
+                  <span className="text-xs md:text-base font-mono">
+                    {inventory.inventoryNumber}
+                  </span>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -184,14 +188,18 @@ export function InventoryItemDetails() {
                 </div>
               )}
               <div className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">SKU:</span>
-                <span className="font-mono">{inventory.sku}</span>
+                <span className="text-xs md:text-base font-semibold text-foreground">
+                  SKU:
+                </span>
+                <span className="text-xs md:text-base font-mono">
+                  {inventory.sku}
+                </span>
               </div>
             </div>
           </div>
         </div>
         {canEditProduct && (
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             <Button
               onClick={() => navigate(`/inventory/${inventory.productId}/edit`)}
               disabled={!canEditProduct}
@@ -228,7 +236,7 @@ export function InventoryItemDetails() {
                 <div className="flex items-center gap-2">
                   {!isEditingPrice ? (
                     <>
-                      <div className="text-xl font-bold">
+                      <div className="md:text-xl font-bold">
                         <CurrencyDisplay
                           amount={
                             inventory.priceOverride ??
@@ -318,7 +326,7 @@ export function InventoryItemDetails() {
                 <div className="flex items-center gap-2">
                   {!isEditingStock ? (
                     <>
-                      <div className="text-xl font-bold">
+                      <div className="md:text-xl font-bold">
                         {inventory.quantity} {inventory.unit}
                       </div>
                       {canEditInventory && (
@@ -393,7 +401,7 @@ export function InventoryItemDetails() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Category
                 </p>
-                <div className="text-lg font-medium">
+                <div className="md:text-lg font-medium">
                   {inventory.categoryName || '-'}
                 </div>
               </div>
@@ -401,14 +409,16 @@ export function InventoryItemDetails() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Branch
                 </p>
-                <div className="text-lg font-medium">{branch?.name || '-'}</div>
+                <div className="md:text-lg font-medium">
+                  {branch?.name || '-'}
+                </div>
               </div>
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Sold
                 </p>
-                <div className="text-xl font-bold">
+                <div className="md:text-xl font-bold">
                   {orders.reduce((sum, order) => {
                     const item = (order.items || []).find(
                       (i: any) => i.inventory_id === id
@@ -421,7 +431,7 @@ export function InventoryItemDetails() {
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Revenue
                 </p>
-                <div className="text-xl font-bold">
+                <div className="md:text-xl font-bold">
                   <CurrencyDisplay
                     amount={orders.reduce((sum, order) => {
                       const item = (order.items || []).find(

@@ -78,7 +78,7 @@ export function DataTableToolbar<TData>({
               placeholder="Search..."
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
-              className="h-8 w-37.5 lg:w-62.5"
+              className="h-8 w-full lg:w-62.5"
             />
           )}
           {filterFields.length > 0 && (

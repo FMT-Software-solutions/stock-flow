@@ -98,18 +98,15 @@ export function InventorySection({
           <div className="flex items-center gap-2">
             <DatePickerWithRange
               date={inventoryDateDraft}
-              setDate={setInventoryDateDraft}
+              setDate={(val) => {
+                setInventoryDateDraft?.(val);
+                setInventoryDateApplied?.(val);
+              }}
               placeholder="Filter by last updated inventories"
               className="w-full"
             />
 
              <div className="flex items-center gap-2 flex-none">
-            <Button
-              onClick={() => setInventoryDateApplied?.(inventoryDateDraft)}
-              disabled={!inventoryDateDraft?.from && !inventoryDateDraft?.to}
-            >
-              Apply
-            </Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -117,7 +114,7 @@ export function InventorySection({
                 setInventoryDateApplied?.(undefined);
               }}
             >
-              Clear
+              Reset
           </Button>
           </div>
           </div>

@@ -1,10 +1,10 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface IssueSubmission {
@@ -24,12 +24,12 @@ async function generateCloudinarySignature(params: Record<string, string>, apiSe
     .sort()
     .map(key => `${key}=${params[key]}`)
     .join('&')
-  
+
   // Cloudinary signature format: sorted_params + api_secret (no separator)
   const stringToSign = sortedParams + apiSecret
   const encoder = new TextEncoder()
   const data = encoder.encode(stringToSign)
-  
+
   const hashBuffer = await crypto.subtle.digest('SHA-1', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
@@ -66,7 +66,7 @@ async function uploadToCloudinary(imageFile: File): Promise<string> {
   const timestamp = Math.round(Date.now() / 1000).toString()
   const folder = 'issues/screenshots'
   const publicId = `issue_${timestamp}_${Math.random().toString(36).substring(2, 15)}`
-  
+
   // Parameters for signature generation (exclude: file, cloud_name, resource_type, api_key per Cloudinary docs)
   const params = {
     folder,
@@ -117,11 +117,11 @@ async function uploadToCloudinary(imageFile: File): Promise<string> {
   if (!result.secure_url) {
     throw new Error('Image upload completed but no URL was returned')
   }
-  
+
   return result.secure_url
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -131,7 +131,7 @@ serve(async (req) => {
     // Validate environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
+
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
         JSON.stringify({ error: 'Server configuration error' }),
@@ -179,7 +179,7 @@ serve(async (req) => {
 
     const anonClient = createClient(supabaseUrl, anonKey)
     const { data: { user }, error: authError } = await anonClient.auth.getUser(token)
-    
+
     if (authError || !user) {
       console.error('Authentication error:', authError)
       return new Response(
@@ -206,19 +206,19 @@ serve(async (req) => {
     let platform: string | undefined
 
     const contentType = req.headers.get('content-type') || ''
-    
+
     if (contentType.includes('multipart/form-data')) {
       // Handle multipart form data (with potential file upload)
       try {
         const formData = await req.formData()
-        
+
         issueType = formData.get('issueType') as string
         description = formData.get('description') as string
         email = formData.get('email') as string
         userAgent = formData.get('userAgent') as string || undefined
         appVersion = formData.get('appVersion') as string || undefined
         platform = formData.get('platform') as string || undefined
-        
+
         // Handle screenshot upload if present
         const screenshotFile = formData.get('screenshot') as File
         if (screenshotFile && screenshotFile.size > 0) {
@@ -306,9 +306,9 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('Database insert error:', insertError)
-      
+
       let errorMessage = 'Failed to submit issue. Please try again.'
-      
+
       // Provide more specific error messages based on the error type
       if (insertError.code === '23505') {
         errorMessage = 'A duplicate issue was detected. Please check if you have already submitted this issue.'
@@ -319,7 +319,7 @@ serve(async (req) => {
       } else if (insertError.message?.includes('permission')) {
         errorMessage = 'Permission denied. Please contact support if this issue persists.'
       }
-      
+
       return new Response(
         JSON.stringify({ error: errorMessage }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -328,14 +328,14 @@ serve(async (req) => {
 
     // Return success response
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: 'Issue submitted successfully',
         issueId: issue.id
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
 
@@ -347,13 +347,13 @@ serve(async (req) => {
       timestamp: new Date().toISOString(),
       requestId: crypto.randomUUID()
     })
-    
+
     // Return user-friendly error message
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Internal server error',
         // Include error details in development/debugging
-        ...(Deno.env.get('ENVIRONMENT') === 'development' && { 
+        ...(Deno.env.get('ENVIRONMENT') === 'development' && {
           debug: {
             message: error.message,
             timestamp: new Date().toISOString()

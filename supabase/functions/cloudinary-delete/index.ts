@@ -1,11 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 
 const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME")
 const apiKey = Deno.env.get("CLOUDINARY_API_KEY")
 const apiSecret = Deno.env.get("CLOUDINARY_API_SECRET")
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const origin = req.headers.get("origin") ?? "*"
   const corsHeaders: Record<string, string> = {
     "Access-Control-Allow-Origin": origin,

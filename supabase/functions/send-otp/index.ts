@@ -1,10 +1,10 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { Resend } from 'https://esm.sh/resend@2.0.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface OtpRequest {
@@ -24,9 +24,9 @@ function getEmailTemplate(otp: string, userName: string) {
     textPrimary: '#FFFFFF',
     warning: '#F59E0B'
   };
-  
+
   const organizationName = 'FMT Software';
-  
+
   return {
     subject: 'Your verification code',
     html: `
@@ -107,7 +107,7 @@ function getEmailTemplate(otp: string, userName: string) {
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -116,7 +116,7 @@ serve(async (req) => {
   try {
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
-    
+
     if (!authHeader) {
       return new Response(
         JSON.stringify({ success: false, message: 'Authorization header required' }),
@@ -129,12 +129,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    
+
     // Check if this is an authenticated request or anon key request
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const isAnonRequest = authHeader === `Bearer ${anonKey}`
-    
-    
+
+
     if (!isAnonRequest) {
       // For authenticated requests, verify the user's session
       const supabaseClient = createClient(
@@ -148,16 +148,16 @@ serve(async (req) => {
           },
         }
       )
-      
+
       const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-      
+
       if (authError || !user) {
         return new Response(
           JSON.stringify({ success: false, message: 'Invalid or expired token' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      
+
       authenticatedUser = user
     }
     // For anon requests, we allow the request to proceed without user verification
@@ -172,31 +172,31 @@ serve(async (req) => {
     }
 
     const { data: authUser } = await supabaseAdmin
-        .from('auth_users')
-        .select('id, email, is_active, otp_requests_count, last_otp_request')
-        .eq('email', email)
-        .single();
+      .from('auth_users')
+      .select('id, email, is_active, otp_requests_count, last_otp_request')
+      .eq('email', email)
+      .single();
 
-      if (!authUser) {
-        return {
-          success: false,
-          message: 'No active user with this email address found in our system',
-        };
-      }
+    if (!authUser) {
+      return {
+        success: false,
+        message: 'No active user with this email address found in our system',
+      };
+    }
 
-      if (authUser && authUser.is_active === false) {
-        return {
-          success: false,
-          message: 'User account is not active. Contact your administrator',
-        };
-      }
+    if (authUser && authUser.is_active === false) {
+      return {
+        success: false,
+        message: 'User account is not active. Contact your administrator',
+      };
+    }
 
     // Check if user has exceeded request limit
     if (authUser.otp_requests_count >= 4) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Maximum OTP requests exceeded. Please contact your administrator for assistance.' 
+        JSON.stringify({
+          success: false,
+          message: 'Maximum OTP requests exceeded. Please contact your administrator for assistance.'
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -220,13 +220,13 @@ serve(async (req) => {
       const timeDiff = now.getTime() - lastRequest.getTime()
       const minutesDiff = timeDiff / (1000 * 60)
       const requiredCooldown = getCooldownMinutes(requestCount)
-      
+
       if (minutesDiff < requiredCooldown) {
         const cooldownMinutes = Math.ceil(requiredCooldown - minutesDiff)
         const remainingRequests = 4 - requestCount
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             message: `Please wait ${cooldownMinutes} minute${cooldownMinutes > 1 ? 's' : ''} before requesting another code. You have ${remainingRequests} request${remainingRequests !== 1 ? 's' : ''} remaining.`,
             cooldownMinutes,
             remainingRequests
@@ -242,7 +242,7 @@ serve(async (req) => {
       .select('first_name, last_name')
       .eq('id', authUser.id)
       .single();
-      
+
     // Prepare user name for email
     const userName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || email : email;
 
@@ -251,11 +251,11 @@ serve(async (req) => {
       type: 'recovery',
       email,
     });
-    
+
     if (!data?.properties?.email_otp) {
       throw new Error('Failed to generate OTP');
     }
-    
+
     const otp = data.properties.email_otp;
 
     if (updateAuthError) {
@@ -291,7 +291,7 @@ serve(async (req) => {
     }
 
     const emailTemplate = getEmailTemplate(otp, userName)
-    
+
     const resend = new Resend(resendApiKey);
     const { error: emailError } = await resend.emails.send({
       from: 'FMT Software <auth@fmtsoftware.com>',
@@ -310,10 +310,10 @@ serve(async (req) => {
     }
 
     const remainingRequests = 4 - (requestCount + 1)
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: 'OTP sent successfully',
         remainingRequests
       }),

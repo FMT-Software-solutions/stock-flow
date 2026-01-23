@@ -77,7 +77,7 @@ export function OrganizationSelection() {
               Select Organization
             </h1>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 hidden">
             <OrganizationCreateForm
               trigger={
                 <Button variant="outline">

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
@@ -49,6 +50,15 @@ export default defineConfig({
         }
       }
     ]),
+    nodePolyfills({
+      include: ['stream', 'util', 'buffer', 'events', 'string_decoder', 'process'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      protocolImports: true,
+    }),
     // Use Node.js API in the Renderer-process
     renderer()
   ],

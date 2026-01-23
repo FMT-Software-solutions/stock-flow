@@ -102,6 +102,7 @@
     "typescript-eslint": "^8.39.1",
     "vite": "^7.2.7",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vite-plugin-node-polyfills": "^0.25.0"
   }
 }

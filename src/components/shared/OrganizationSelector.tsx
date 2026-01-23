@@ -4,7 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
+  // DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { ChevronDown, Plus, Building2, Check } from 'lucide-react';
@@ -104,7 +104,7 @@ export function OrganizationSelector() {
               )}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
+          {/* <DropdownMenuSeparator />
           <OrganizationCreateForm
             trigger={
               <DropdownMenuItem
@@ -116,7 +116,7 @@ export function OrganizationSelector() {
               </DropdownMenuItem>
             }
             onSuccess={handleCreateSuccess}
-          />
+          />*/}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

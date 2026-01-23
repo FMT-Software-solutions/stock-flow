@@ -42,7 +42,6 @@ function getEmailTemplate(otp: string, userName: string) {
     <!-- Header -->
     <div style="padding: 32px 24px 24px; border-bottom: 1px solid #f0f0f0;">
       <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 48px; height: 48px; background-color: ${colors.primary}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold;">${organizationName.charAt(0)}</div>
         <h1 style="margin: 0; font-size: 24px; color: ${colors.foreground};">${organizationName}</h1>
       </div>
       <h2 style="margin: 16px 0 0 0; font-size: 20px; color: ${colors.foreground};">Verification Code</h2>

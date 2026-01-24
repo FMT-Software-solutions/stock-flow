@@ -12,9 +12,9 @@ import type {
 // Query Keys
 export const branchKeys = {
   all: ['branches'] as const,
-  userBranches: (userId: string, organizationId: string) => 
+  userBranches: (userId: string, organizationId: string) =>
     [...branchKeys.all, 'user', userId, 'org', organizationId] as const,
-  organizationBranches: (organizationId: string) => 
+  organizationBranches: (organizationId: string) =>
     [...branchKeys.all, 'organization', organizationId] as const,
   branch: (id: string) => [...branchKeys.all, 'detail', id] as const,
 };
@@ -30,6 +30,7 @@ export function useBranches(organizationId: string | undefined) {
         .from('branches')
         .select('*')
         .eq('organization_id', organizationId)
+        .eq('is_deleted', false)
         .order('name');
 
       if (error) throw error;
@@ -53,6 +54,8 @@ export function useUserBranches(userId: string | undefined, organizationId: stri
           branch:branches!inner(*)
         `)
         .eq('user_id', userId)
+        .eq('branch.is_active', true)
+        .eq('branch.is_deleted', false)
         .eq('branch.organization_id', organizationId);
 
       if (error) throw error;

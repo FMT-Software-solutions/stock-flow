@@ -42,9 +42,12 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   // Fetch all branches for the organization
   const {
-    data: allBranches = [],
+    data: allBranchesData = [],
     isLoading: isLoadingAllBranches,
   } = useBranches(organizationId);
+
+  // Filter out inactive branches to ensure they are not selectable in the context
+  const allBranches = allBranchesData.filter((b) => b.is_active);
 
   const {
     data: assignedUserBranchesData = [],
@@ -55,7 +58,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
   const assignedBranches =
     orgBranchIds.length > 0
       ? allBranches.filter((b) => orgBranchIds.includes(b.id))
-      : assignedUserBranchesData.map((ub) => ub.branch).filter((b): b is Branch => !!b);
+      : assignedUserBranchesData
+          .map((ub) => ub.branch)
+          .filter((b): b is Branch => !!b);
 
   // Determine if user is owner (checking role in current organization)
   const isOwner = currentOrganization?.user_role === 'owner';

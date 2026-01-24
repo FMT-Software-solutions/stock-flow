@@ -267,7 +267,7 @@ export function InventoryGenerator({
                     </div>
                     <div className="col-span-4 flex items-center space-x-2">
                       <div
-                        className="h-8 w-8 rounded-md bg-muted shrink-0 cursor-pointer overflow-hidden border relative group"
+                        className="h-8 w-8 rounded-md shrink-0 cursor-pointer overflow-hidden border relative group"
                         onClick={() =>
                           isSelected &&
                           canCreateInventory &&
@@ -376,7 +376,7 @@ export function InventoryGenerator({
                 .map((entry) => (
                   <div
                     key={entry.variantId}
-                    className="grid grid-cols-12 gap-4 p-3 text-sm items-center border-b last:border-0 bg-blue-50/50"
+                    className="grid grid-cols-12 gap-4 p-3 text-sm items-center border-b last:border-0 bg-muted/30"
                   >
                     <div className="col-span-1 flex justify-center">
                       <Button

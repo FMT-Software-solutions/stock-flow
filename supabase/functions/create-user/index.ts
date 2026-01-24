@@ -306,16 +306,17 @@ Deno.serve(async (req) => {
     }
 
     // Validate role
-    if (!['owner', 'admin', 'branch_admin', 'write', 'read'].includes(role)) {
+    // Custom roles are now allowed, so we skip strict enum validation
+    if (!role || typeof role !== 'string' || role.trim() === '') {
       return new Response(
-        JSON.stringify({ error: 'Invalid role. Must be one of: owner, admin, branch_admin, write, read' }),
+        JSON.stringify({ error: 'Invalid role. Role is required.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Check if user already exists in auth.users
     const { data: existingUsers, error: existingUserError } = await supabaseAdmin.auth.admin.listUsers()
-    const existingUser = existingUsers?.users?.find(user => user.email === email)
+    const existingUser = existingUsers?.users?.find((user: any) => user.email === email)
 
     let userId: string
     let profileId: string

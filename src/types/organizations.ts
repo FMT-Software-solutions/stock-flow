@@ -49,6 +49,8 @@ export interface Organization {
   theme_name?: string | null;
   is_active: boolean;
   ai_daily_limit: number;
+  has_purchased: boolean;
+  trial_end_date: string | null;
 }
 
 export interface OrganizationRoleEntity {

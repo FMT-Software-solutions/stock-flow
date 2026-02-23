@@ -7,7 +7,8 @@ import { OrganizationProvider } from '../contexts/OrganizationContext';
 import { BranchProvider } from '../contexts/BranchContext';
 import { PaletteProvider } from '../contexts/PaletteContext';
 import { AiUsageProvider } from '../contexts/AiUsageContext';
-
+import { TrialNotification } from '../components/shared/TrialNotification';
+import { TrialExpiredGuard } from '../components/shared/TrialExpiredGuard';
 // Auth pages
 import { Login } from '../pages/auth/Login';
 import { NewPassword } from '../pages/auth/NewPassword';
@@ -39,6 +40,7 @@ import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { OrganizationSelectionProtectedRoute } from '@/components/auth/OrganizationSelectionProtectedRoute';
 import UserManagement from '@/pages/UserManagement';
 import UserDetails from '@/pages/UserDetails';
+import AdminCreateOwner from '@/pages/admin/AdminCreateOwner';
 
 function AppRoutes() {
   return (
@@ -79,13 +81,25 @@ function AppRoutes() {
         }
       />
 
+      {/* Admin route - Protected but outside organization context */}
+      <Route
+        path="/admin/create-owner"
+        element={
+          <ProtectedRoute>
+            <AdminCreateOwner />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected routes with layout - requires organization */}
       <Route
         path="/"
         element={
           <ProtectedRoute>
             <OrganizationSelectionProtectedRoute>
-              <MainLayout />
+              <TrialExpiredGuard>
+                <MainLayout />
+              </TrialExpiredGuard>
             </OrganizationSelectionProtectedRoute>
           </ProtectedRoute>
         }
@@ -291,6 +305,7 @@ export function AppRouter() {
               <PaletteProvider>
                 <div>
                   <AppRoutes />
+                  <TrialNotification />
                 </div>
               </PaletteProvider>
             </BranchProvider>

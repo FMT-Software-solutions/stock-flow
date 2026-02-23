@@ -3,6 +3,7 @@ import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import {
@@ -12,6 +13,8 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { navItems } from '@/config/navigation';
+
+import { TrialStatus } from '../shared/TrialStatus';
 
 interface SidebarProps {
   className?: string;
@@ -35,6 +38,7 @@ export function Sidebar({ className, fullHeight = false }: SidebarProps) {
   });
 
   const { signOut } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const location = useLocation();
   const { isCollapsed, toggleCollapse } = useSidebar();
@@ -141,6 +145,14 @@ export function Sidebar({ className, fullHeight = false }: SidebarProps) {
           </ul>
         </nav>
         <div className="p-2 border-t border-border">
+          {!isCollapsed && currentOrganization && (
+            <div className="mb-2 flex justify-center">
+              <TrialStatus
+                trialEndDate={currentOrganization.trial_end_date}
+                hasPurchased={currentOrganization.has_purchased}
+              />
+            </div>
+          )}
           {isCollapsed ? (
             <TooltipProvider>
               <Tooltip>

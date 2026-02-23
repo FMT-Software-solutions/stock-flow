@@ -19,7 +19,7 @@ export function UserDisplayControls({
 }: UserDisplayControlsProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-[2px] border rounded-md p-[2px]">
+      <div className="flex items-center gap-0.5 border rounded-md p-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

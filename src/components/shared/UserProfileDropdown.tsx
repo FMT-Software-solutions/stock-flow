@@ -20,6 +20,7 @@ import { useTheme } from 'next-themes';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 import { useUpdateStore } from '../../modules/auto-update/stores/updateStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { UpdateDrawer } from '../../modules/auto-update/UpdateDrawer';
@@ -38,9 +39,11 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { HelpDrawer } from './HelpDrawer';
+import { TrialStatus } from './TrialStatus';
 
 export function UserProfileDropdown() {
   const { user, signOut } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { hasUpdate } = useUpdateStore();
@@ -129,6 +132,13 @@ export function UserProfileDropdown() {
                 <p className="text-xs leading-none text-muted-foreground mt-1 truncate">
                   {profile.email}
                 </p>
+                {currentOrganization && (
+                  <TrialStatus
+                    trialEndDate={currentOrganization.trial_end_date}
+                    hasPurchased={currentOrganization.has_purchased}
+                    className="mt-1"
+                  />
+                )}
               </div>
             </div>
           </div>

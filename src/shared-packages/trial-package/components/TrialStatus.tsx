@@ -23,7 +23,7 @@ export function TrialStatus({ trialEndDate, hasPurchased, className }: TrialStat
   const end = parseISO(trialEndDate);
   const daysLeft = differenceInDays(end, today);
 
-  let colorClass = 'text-zinc-500 dark:text-zinc-400'; // Default (> 7 days)
+  let colorClass = 'text-gray-500 dark:text-gray-400'; // Default (> 7 days)
 
   if (daysLeft <= 3) {
     colorClass = 'text-red-600 font-bold dark:text-red-400';

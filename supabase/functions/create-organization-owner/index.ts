@@ -152,10 +152,7 @@ Deno.serve(async (req) => {
     // Handle existing organization logic
     if (existingOrg) {
       if (isPurchase) {
-        // If it's a purchase request and org exists:
-        // 1. If already purchased, do nothing (idempotent)
-        // 2. If not purchased (trial), upgrade to purchased and remove trial
-
+       
         if (existingOrg.has_purchased) {
           // Already purchased, nothing to do
           return new Response(JSON.stringify({ success: true, message: 'Organization already purchased' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -174,13 +171,12 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: true, message: 'Organization upgraded to purchased status' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
       } else {
-        // If it's a trial request and org exists:
-        // Return error or success (idempotent) - User says "nothing happens" implies we shouldn't error but maybe just return success? 
-        // "If the organization has already requested trial and is trying to request again. nothing happens."
-        // "If organization has purchased and is trying to request a trial. nothing happens."
+        
         return new Response(JSON.stringify({ success: true, message: 'Organization already exists' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
+
+    const trialEndDate = isPurchase ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
     // New Organization Logic
     const orgInsert = {
@@ -193,11 +189,7 @@ Deno.serve(async (req) => {
       theme_name: 'purple',
       is_active: true,
       has_purchased: !!isPurchase,
-      // If purchased, trial_end_date is null. If trial, it defaults to 30 days via database default or trigger.
-      // The database trigger `handle_org_trial_logic` handles trial_end_date logic:
-      // - If has_purchased = true, sets trial_end_date = NULL
-      // - If has_purchased = false AND trial_end_date IS NULL, sets trial_end_date = now() + 30 days
-      // So we just need to set has_purchased.
+      trial_end_date: trialEndDate,
     }
 
     const { data: org, error: orgError } = await supabaseAdmin

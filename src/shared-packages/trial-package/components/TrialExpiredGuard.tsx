@@ -69,7 +69,7 @@ export function TrialExpiredGuard({
               onClick={onSwitchOrganization}
               variant="outline"
               size="lg"
-              className="flex-1"
+              className="flex-1 bg-gray-50 text-gray-900"
             >
               Switch Organization
             </Button>

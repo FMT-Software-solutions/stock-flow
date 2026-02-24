@@ -50,8 +50,8 @@ export function TrialNotification({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center p-4 animate-in fade-in-0">
-      <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg">
+    <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center bg-black/50 p-4 animate-in fade-in-0">
+      <div className="fixed left-[50%] top-[50%] z-50 bg-card grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg">
         <div className="flex flex-col space-y-1.5 text-center sm:text-left">
           <h2 className="text-lg font-semibold leading-none tracking-tight text-gray-950 dark:text-gray-50">
             Trial Ending Soon

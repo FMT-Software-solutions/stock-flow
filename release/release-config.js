@@ -12,7 +12,7 @@ module.exports = {
   
   // Release notes in markdown format
   releaseNotes: `### Added
-- Background update downloads
+- Initial release of Stock Flow
 
 ### Improved / Changed
 

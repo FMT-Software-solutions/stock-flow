@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -55,11 +55,28 @@ import {
   YAxis,
 } from 'recharts';
 import { cn } from '@/lib/utils';
-import { endOfDay, startOfDay, startOfMonth, subDays, subMonths, subYears } from 'date-fns';
+import {
+  endOfDay,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subYears,
+} from 'date-fns';
 import type { DataLookback, UserPermissions } from '@/modules/permissions';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // --- Types ---
-type SectionId = 
+type SectionId =
   | 'inventory'
   | 'products'
   | 'sales'
@@ -74,6 +91,15 @@ interface DashboardSection {
   id: SectionId;
   label: string;
 }
+
+type DashboardDatePreset =
+  | 'today'
+  | 'this_week'
+  | 'this_month'
+  | 'this_year'
+  | 'last_7_days'
+  | 'last_30_days'
+  | 'all_time';
 
 const ALL_SECTIONS: DashboardSection[] = [
   { id: 'inventory', label: 'Inventory Stats' },
@@ -126,20 +152,20 @@ function ChartSection({
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis 
-              dataKey="date" 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fontSize: 12 }} 
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12 }}
               minTickGap={30}
             />
-            <YAxis 
-              tickLine={false} 
-              axisLine={false} 
+            <YAxis
+              tickLine={false}
+              axisLine={false}
               tick={{ fontSize: 12 }}
               tickFormatter={(val) => formatTick(val)}
             />
-            <Tooltip 
+            <Tooltip
               formatter={(val) => formatValue(val) as string | number}
               labelStyle={{ color: 'black' }}
             />
@@ -154,23 +180,23 @@ function ChartSection({
         ) : (
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis 
-              dataKey="date" 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fontSize: 12 }} 
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12 }}
               minTickGap={30}
             />
-            <YAxis 
-              tickLine={false} 
-              axisLine={false} 
+            <YAxis
+              tickLine={false}
+              axisLine={false}
               tick={{ fontSize: 12 }}
               tickFormatter={(val) => formatTick(val)}
             />
-            <Tooltip 
-               formatter={(val) => formatValue(val) as string | number}
-               cursor={{ fill: 'transparent' }}
-               labelStyle={{ color: 'black' }}
+            <Tooltip
+              formatter={(val) => formatValue(val) as string | number}
+              cursor={{ fill: 'transparent' }}
+              labelStyle={{ color: 'black' }}
             />
             <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
           </BarChart>
@@ -205,41 +231,41 @@ function DashboardMetricCard<TData>({
         <div className={cn('grid gap-4', loading && 'pointer-events-none')}>
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 gap-4">
-             {groups.map((group) => (
-                <div key={group.id} className="grid grid-cols-2 gap-4">
-                   {group.fields.map(field => {
-                      const result = field.calculate(data);
-                      const Icon = field.icon;
-                      return (
-                        <div key={field.id} className="flex flex-col space-y-1">
-                           <span className="text-xs text-muted-foreground flex items-center gap-1">
-                             {Icon && <Icon className="h-3 w-3" />}
-                             {field.label}
-                           </span>
-                           <div className="flex items-baseline gap-2">
-                             <span className={cn("text-sm sm:text-base md:text-xl font-bold", field.className)}>
-                               {result.value}
-                             </span>
-                             {result.subValue && (
-                               <span className="text-xs text-muted-foreground">
-                                 {result.subValue}
-                               </span>
-                             )}
-                           </div>
-                           {result.trendValue && (
-                             <span className={cn(
-                               "text-xs font-medium",
-                               result.trend === 'up' ? "text-green-600" : 
-                               result.trend === 'down' ? "text-red-600" : "text-muted-foreground"
-                             )}>
-                               {result.trendValue}
-                             </span>
-                           )}
-                        </div>
-                      )
-                   })}
-                </div>
-             ))}
+            {groups.map((group) => (
+              <div key={group.id} className="grid grid-cols-2 gap-4">
+                {group.fields.map(field => {
+                  const result = field.calculate(data);
+                  const Icon = field.icon;
+                  return (
+                    <div key={field.id} className="flex flex-col space-y-1">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        {Icon && <Icon className="h-3 w-3" />}
+                        {field.label}
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className={cn("text-sm sm:text-base md:text-xl font-bold", field.className)}>
+                          {result.value}
+                        </span>
+                        {result.subValue && (
+                          <span className="text-xs text-muted-foreground">
+                            {result.subValue}
+                          </span>
+                        )}
+                      </div>
+                      {result.trendValue && (
+                        <span className={cn(
+                          "text-xs font-medium",
+                          result.trend === 'up' ? "text-green-600" :
+                            result.trend === 'down' ? "text-red-600" : "text-muted-foreground"
+                        )}>
+                          {result.trendValue}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
           {/* Chart Section */}
           {chart}
@@ -253,18 +279,17 @@ export function Dashboard() {
   const { currentOrganization } = useOrganization();
   const { formatCurrency } = useCurrency();
   const { selectedBranchIds } = useBranchContext();
-  
-  // --- State ---
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => ({
-    from: startOfMonth(new Date()),
-    to: endOfDay(new Date()),
-  }));
-  
+
   // Visibility State
   const [visibleSections, setVisibleSections] = useOrgArrayPreference<SectionId>(
     currentOrganization?.id,
     'dashboard.visibleSections',
     ALL_SECTIONS.map(s => s.id)
+  );
+  const [defaultDatePreset, setDefaultDatePreset] = useOrgPreference<DashboardDatePreset>(
+    currentOrganization?.id,
+    'dashboard.defaultDatePreset',
+    'this_month'
   );
 
   const userPermissions = useMemo<UserPermissions | undefined>(() => {
@@ -307,18 +332,83 @@ export function Dashboard() {
     return { minDate: startOfDay(rawMin), maxDate: max };
   }, [maxLookback]);
 
-  const defaultDateRange = useMemo<DateRange>(() => {
-    const now = new Date();
-    const baseFrom = startOfMonth(now);
-    const baseTo = endOfDay(now);
-    const clampedFrom = minDate && baseFrom < minDate ? minDate : baseFrom;
-    return { from: clampedFrom, to: baseTo };
-  }, [minDate]);
+  const effectiveDatePreset = useMemo<DashboardDatePreset>(() => {
+    if (defaultDatePreset === 'all_time' && maxLookback.unit !== 'forever') {
+      return 'this_month';
+    }
+    return defaultDatePreset;
+  }, [defaultDatePreset, maxLookback.unit]);
+
+  const datePresetOptions = useMemo(() => {
+    const options: Array<{ value: DashboardDatePreset; label: string }> = [
+      { value: 'today', label: 'Today' },
+      { value: 'this_week', label: 'This Week' },
+      { value: 'this_month', label: 'This Month' },
+      { value: 'this_year', label: 'This Year' },
+      { value: 'last_7_days', label: 'Last 7 Days' },
+      { value: 'last_30_days', label: 'Last 30 Days' },
+    ];
+    if (maxLookback.unit === 'forever') {
+      options.push({ value: 'all_time', label: 'All Time' });
+    }
+    return options;
+  }, [maxLookback.unit]);
+
+  const buildPresetRange = useCallback(
+    (preset: DashboardDatePreset): DateRange | undefined => {
+      if (preset === 'all_time' && maxLookback.unit === 'forever') {
+        return undefined;
+      }
+
+      const now = new Date();
+      const to = endOfDay(now);
+      let from = startOfMonth(now);
+
+      if (preset === 'today') {
+        from = startOfDay(now);
+      } else if (preset === 'this_week') {
+        from = startOfWeek(now);
+      } else if (preset === 'this_year') {
+        from = startOfYear(now);
+      } else if (preset === 'last_7_days') {
+        from = startOfDay(subDays(now, 6));
+      } else if (preset === 'last_30_days') {
+        from = startOfDay(subDays(now, 29));
+      }
+
+      const clampedFrom = minDate && from < minDate ? minDate : from;
+      const clampedTo = maxDate && to > maxDate ? maxDate : to;
+
+      if (clampedTo < clampedFrom) {
+        return { from: clampedFrom, to: clampedFrom };
+      }
+      return { from: clampedFrom, to: clampedTo };
+    },
+    [maxLookback.unit, minDate, maxDate]
+  );
+
+  const defaultDateRange = useMemo<DateRange | undefined>(
+    () => buildPresetRange(effectiveDatePreset),
+    [buildPresetRange, effectiveDatePreset]
+  );
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange);
+
+  useEffect(() => {
+    if (defaultDatePreset !== effectiveDatePreset) {
+      setDefaultDatePreset(effectiveDatePreset);
+    }
+  }, [defaultDatePreset, effectiveDatePreset, setDefaultDatePreset]);
+
+  useEffect(() => {
+    setDateRange(defaultDateRange);
+  }, [defaultDateRange]);
 
   useEffect(() => {
     setDateRange((prev) => {
       if (maxLookback.unit === 'forever' && prev === undefined) return prev;
       if (!prev?.from || !prev?.to) return defaultDateRange;
+      if (!defaultDateRange && maxLookback.unit === 'forever') return prev;
       if (!minDate) return prev;
 
       const nextFrom = prev.from < minDate ? minDate : prev.from;
@@ -330,7 +420,7 @@ export function Dashboard() {
 
   const handleGlobalDateChange = (next: DateRange | undefined) => {
     if (!next) {
-      setDateRange(maxLookback.unit === 'forever' ? undefined : defaultDateRange);
+      setDateRange(defaultDateRange);
       return;
     }
     if (!next.from) {
@@ -361,7 +451,7 @@ export function Dashboard() {
   // Low stock query
   const { data: allProducts = [] } = useProducts(currentOrganization?.id);
   const { data: inventoryEntries = [] } = useInventoryEntries(currentOrganization?.id, selectedBranchIds, true);
-  
+
   const lowStockProducts = useMemo(() => {
     return allProducts
       .filter(p => {
@@ -370,7 +460,7 @@ export function Dashboard() {
       })
       .sort((a, b) => a.quantity - b.quantity);
   }, [allProducts]);
-  
+
   const lowStockInventories = useMemo(() => {
     return inventoryEntries
       .filter(i => {
@@ -395,7 +485,7 @@ export function Dashboard() {
         {
           id: 'low_stock',
           label: 'Low Stock',
-          calculate: (data) => ({ 
+          calculate: (data) => ({
             value: data[0]?.low_stock_items ?? 0,
             trend: (data[0]?.low_stock_items ?? 0) > 0 ? 'down' : 'neutral',
             trendValue: (data[0]?.low_stock_items ?? 0) > 0 ? 'Action needed' : undefined
@@ -405,7 +495,7 @@ export function Dashboard() {
         {
           id: 'out_of_stock',
           label: 'Out of Stock',
-          calculate: (data) => ({ 
+          calculate: (data) => ({
             value: data[0]?.out_of_stock_items ?? 0,
             trend: (data[0]?.out_of_stock_items ?? 0) > 0 ? 'down' : 'neutral',
             trendValue: (data[0]?.out_of_stock_items ?? 0) > 0 ? 'Critical' : undefined
@@ -434,7 +524,7 @@ export function Dashboard() {
         {
           id: 'top_cat',
           label: 'Top Category',
-          calculate: (data) => ({ 
+          calculate: (data) => ({
             value: data[0]?.top_categories?.[0]?.category ?? '-',
             subValue: data[0]?.top_categories?.[0] ? `${data[0].top_categories[0].count} items` : undefined
           }),
@@ -505,7 +595,7 @@ export function Dashboard() {
         {
           id: 'top_cat',
           label: 'Top Category',
-          calculate: (data) => ({ 
+          calculate: (data) => ({
             value: data[0]?.top_category?.category ?? '-',
             subValue: data[0]?.top_category ? formatCurrency(data[0].top_category.amount) : undefined
           }),
@@ -600,7 +690,7 @@ export function Dashboard() {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       const orgId = currentOrganization?.id;
       if (orgId) {
-        setOrgKV<SectionId[]>(orgId, 'dashboard.visibleSections', next).catch(() => {});
+        setOrgKV<SectionId[]>(orgId, 'dashboard.visibleSections', next).catch(() => { });
       }
       return next;
     });
@@ -617,7 +707,7 @@ export function Dashboard() {
           <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Overview of your organization's performance.</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <DatePickerWithRange
             date={dateRange}
@@ -626,7 +716,7 @@ export function Dashboard() {
             minDate={minDate}
             maxDate={maxDate}
             onClear={() => setDateRange(defaultDateRange)}
-            className="w-auto [&>button]:w-60 md:[&>button]:w-64 [&>button]:h-8 [&>button]:text-xs"
+            className="md:min-w-75 [&>button]:h-8 [&>button]:text-xs overflow-hidden"
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -635,6 +725,27 @@ export function Dashboard() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Default Date Preset</DropdownMenuLabel>
+              <div className="px-2 pb-2">
+                <Select
+                  value={effectiveDatePreset}
+                  onValueChange={(value) =>
+                    setDefaultDatePreset(value as DashboardDatePreset)
+                  }
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue placeholder="Select default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {datePresetOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DropdownMenuSeparator />
               <DropdownMenuLabel>Visible Sections</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {ALL_SECTIONS.map((section) => (
@@ -653,63 +764,63 @@ export function Dashboard() {
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        
+
         {/* Row 1: Sales & Expenses */}
         {visibleSections.includes('sales') && (
-           <DashboardMetricCard 
-             title="Sales"
-             className="lg:col-span-2"
-             groups={salesGroups}
-             data={stats.sales.data ? [stats.sales.data] : ([] as SalesStats[])}
-             loading={stats.sales.isFetching}
-             chart={
-               <ChartSection
-                  data={(stats.sales.data?.trend ?? []) as TrendData[]}
-                  dataKey="value"
-                  color="#16a34a"
-                  currency
-                  formatCurrency={formatCurrency}
-               />
-             }
-           />
+          <DashboardMetricCard
+            title="Sales"
+            className="lg:col-span-2"
+            groups={salesGroups}
+            data={stats.sales.data ? [stats.sales.data] : ([] as SalesStats[])}
+            loading={stats.sales.isFetching}
+            chart={
+              <ChartSection
+                data={(stats.sales.data?.trend ?? []) as TrendData[]}
+                dataKey="value"
+                color="#16a34a"
+                currency
+                formatCurrency={formatCurrency}
+              />
+            }
+          />
         )}
 
         {visibleSections.includes('expenses') && (
-           <DashboardMetricCard 
-             title="Expenses"
-             className="lg:col-span-2"
-             groups={expenseGroups}
-             data={stats.expenses.data ? [stats.expenses.data] : ([] as ExpenseStats[])}
-             loading={stats.expenses.isFetching}
-             chart={
-               <ChartSection
-                  data={(stats.expenses.data?.trend ?? []) as TrendData[]}
-                  dataKey="value"
-                  color="#dc2626"
-                  currency
-                  formatCurrency={formatCurrency}
-               />
-             }
-           />
+          <DashboardMetricCard
+            title="Expenses"
+            className="lg:col-span-2"
+            groups={expenseGroups}
+            data={stats.expenses.data ? [stats.expenses.data] : ([] as ExpenseStats[])}
+            loading={stats.expenses.isFetching}
+            chart={
+              <ChartSection
+                data={(stats.expenses.data?.trend ?? []) as TrendData[]}
+                dataKey="value"
+                color="#dc2626"
+                currency
+                formatCurrency={formatCurrency}
+              />
+            }
+          />
         )}
 
         {/* Row 2: Customers & Low Stock */}
         {visibleSections.includes('customers') && (
-           <DashboardMetricCard 
-             title="Customers"
-             className="lg:col-span-2"
-             groups={customerGroups}
-             data={stats.customers.data ? [stats.customers.data] : ([] as CustomerStats[])}
-             loading={stats.customers.isFetching}
-             chart={
-               <ChartSection
-                  data={(stats.customers.data?.trend ?? []) as TrendData[]}
-                  dataKey="value"
-                  color="#3b82f6"
-                  type="bar"
-               />
-             }
-           />
+          <DashboardMetricCard
+            title="Customers"
+            className="lg:col-span-2"
+            groups={customerGroups}
+            data={stats.customers.data ? [stats.customers.data] : ([] as CustomerStats[])}
+            loading={stats.customers.isFetching}
+            chart={
+              <ChartSection
+                data={(stats.customers.data?.trend ?? []) as TrendData[]}
+                dataKey="value"
+                color="#3b82f6"
+                type="bar"
+              />
+            }
+          />
         )}
 
         {visibleSections.includes('low_stock') && (
@@ -729,7 +840,7 @@ export function Dashboard() {
                   <TabsTrigger value="inventory">Inventory ({lowStockInventories.length})</TabsTrigger>
                   <TabsTrigger value="products">Products ({lowStockProducts.length})</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="products">
                   {lowStockProducts.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
@@ -745,15 +856,15 @@ export function Dashboard() {
                           >
                             <div className="flex items-start gap-3">
                               {item.imageUrl ? (
-                                 <img 
-                                   src={item.imageUrl} 
-                                   alt={item.name} 
-                                   className="h-10 w-10 rounded-md object-cover"
-                                 />
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="h-10 w-10 rounded-md object-cover"
+                                />
                               ) : (
-                                 <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                                   <Box className="h-5 w-5 text-muted-foreground" />
-                                 </div>
+                                <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                                  <Box className="h-5 w-5 text-muted-foreground" />
+                                </div>
                               )}
                               <div>
                                 <div className="font-medium text-sm">{item.name}</div>
@@ -762,7 +873,7 @@ export function Dashboard() {
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-4">
                               <div className="text-left md:text-right">
                                 <div className="text-xs text-muted-foreground">Available</div>
@@ -771,7 +882,7 @@ export function Dashboard() {
                                 </div>
                               </div>
                               <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                 <Link to={`/inventory/${item.id}`}>Restock</Link>
+                                <Link to={`/inventory/${item.id}`}>Restock</Link>
                               </Button>
                             </div>
                           </div>
@@ -780,7 +891,7 @@ export function Dashboard() {
                     </ScrollArea>
                   )}
                 </TabsContent>
-                
+
                 <TabsContent value="inventory">
                   {lowStockInventories.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
@@ -796,15 +907,15 @@ export function Dashboard() {
                           >
                             <div className="flex items-start gap-3">
                               {inv.imageUrl || inv.productImage ? (
-                                 <img 
-                                   src={inv.imageUrl || inv.productImage!} 
-                                   alt={inv.productName} 
-                                   className="h-10 w-10 rounded-md object-cover"
-                                 />
+                                <img
+                                  src={inv.imageUrl || inv.productImage!}
+                                  alt={inv.productName}
+                                  className="h-10 w-10 rounded-md object-cover"
+                                />
                               ) : (
-                                 <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                                   <Box className="h-5 w-5 text-muted-foreground" />
-                                 </div>
+                                <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                                  <Box className="h-5 w-5 text-muted-foreground" />
+                                </div>
                               )}
                               <div>
                                 <div className="font-medium text-sm">{inv.productName}</div>
@@ -813,7 +924,7 @@ export function Dashboard() {
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-4">
                               <div className="text-left md:text-right">
                                 <div className="text-xs text-muted-foreground">Available</div>
@@ -822,7 +933,7 @@ export function Dashboard() {
                                 </div>
                               </div>
                               <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                 <Link to={`/inventory/entry/${inv.id}`}>Restock</Link>
+                                <Link to={`/inventory/entry/${inv.id}`}>Restock</Link>
                               </Button>
                             </div>
                           </div>
@@ -838,50 +949,50 @@ export function Dashboard() {
 
         {/* Row 3: Small Stats */}
         {visibleSections.includes('inventory') && (
-           <DashboardMetricCard 
-             title="Inventory"
-             groups={inventoryGroups}
-             data={stats.inventory.data ? [stats.inventory.data] : ([] as InventoryStats[])}
-             loading={stats.inventory.isFetching}
-           />
+          <DashboardMetricCard
+            title="Inventory"
+            groups={inventoryGroups}
+            data={stats.inventory.data ? [stats.inventory.data] : ([] as InventoryStats[])}
+            loading={stats.inventory.isFetching}
+          />
         )}
 
         {visibleSections.includes('products') && (
-           <DashboardMetricCard 
-             title="Products"
-             groups={productGroups}
-             data={stats.products.data ? [stats.products.data] : ([] as ProductStats[])}
-             loading={stats.products.isFetching}
-           />
+          <DashboardMetricCard
+            title="Products"
+            groups={productGroups}
+            data={stats.products.data ? [stats.products.data] : ([] as ProductStats[])}
+            loading={stats.products.isFetching}
+          />
         )}
 
         {visibleSections.includes('users') && (
-           <DashboardMetricCard 
-             title="Users"
-             groups={userGroups}
-             data={stats.users.data ? [stats.users.data] : ([] as UserStats[])}
-             loading={stats.users.isFetching}
-           />
+          <DashboardMetricCard
+            title="Users"
+            groups={userGroups}
+            data={stats.users.data ? [stats.users.data] : ([] as UserStats[])}
+            loading={stats.users.isFetching}
+          />
         )}
 
         {/* Stacked Small Cards */}
         <div className="flex flex-col gap-6">
-           {visibleSections.includes('branches') && (
-              <DashboardMetricCard 
-                title="Branches"
-                groups={branchGroups}
-                data={stats.branches.data ? [stats.branches.data] : ([] as BranchStats[])}
-                loading={stats.branches.isFetching}
-              />
-           )}
-           {visibleSections.includes('suppliers') && (
-              <DashboardMetricCard 
-                title="Suppliers"
-                groups={supplierGroups}
-                data={stats.suppliers.data ? [stats.suppliers.data] : ([] as SupplierStats[])}
-                loading={stats.suppliers.isFetching}
-              />
-           )}
+          {visibleSections.includes('branches') && (
+            <DashboardMetricCard
+              title="Branches"
+              groups={branchGroups}
+              data={stats.branches.data ? [stats.branches.data] : ([] as BranchStats[])}
+              loading={stats.branches.isFetching}
+            />
+          )}
+          {visibleSections.includes('suppliers') && (
+            <DashboardMetricCard
+              title="Suppliers"
+              groups={supplierGroups}
+              data={stats.suppliers.data ? [stats.suppliers.data] : ([] as SupplierStats[])}
+              loading={stats.suppliers.isFetching}
+            />
+          )}
         </div>
 
       </div>

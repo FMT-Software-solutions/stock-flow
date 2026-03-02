@@ -18,6 +18,7 @@ import {
 import { useInventoryEntries } from '@/hooks/useInventoryQueries';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Badge } from '@/components/ui/badge';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface InventorySelectorProps {
   value?: string;
@@ -38,6 +39,7 @@ export function InventorySelector({
 }: InventorySelectorProps) {
   const [open, setOpen] = useState(false);
   const { currentOrganization } = useOrganization();
+  const { formatCurrency } = useCurrency();
 
   // Fetch inventory for the specific branch if selected, otherwise all (but usually we want branch specific for orders)
   const branchIds = branchId ? [branchId] : undefined;
@@ -54,6 +56,11 @@ export function InventorySelector({
 
   const displayQuantity = quantityOverride ?? selectedItem?.quantity ?? 0;
   const selectedImage = selectedItem?.imageUrl || selectedItem?.productImage;
+  const selectedPrice =
+    selectedItem?.priceOverride ??
+    selectedItem?.variantPrice ??
+    selectedItem?.productPrice ??
+    0;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,7 +69,7 @@ export function InventorySelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-auto min-h-10 px-3 py-2"
+          className="w-full justify-between h-auto min-h-10 px-3 py-2 hover:bg-muted/50"
           disabled={disabled || isLoading}
         >
           {selectedItem ? (
@@ -88,7 +95,8 @@ export function InventorySelector({
                   {selectedItem.sku}{' '}
                   {selectedItem.inventoryNumber
                     ? `• ${selectedItem.inventoryNumber}`
-                    : ''}
+                    : ''}{' '}
+                  • {formatCurrency(selectedPrice)}
                 </span>
               </div>
               <Badge
@@ -104,7 +112,7 @@ export function InventorySelector({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-100 p-0" align="start">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder="Search by name, SKU, or inventory #..." />
           <CommandList>
@@ -115,21 +123,21 @@ export function InventorySelector({
                 .map((item) => {
                   const image = item.imageUrl || item.productImage;
                   const isOutOfStock = (item.quantity ?? 0) <= 0;
+                  const itemPrice =
+                    item.priceOverride ??
+                    item.variantPrice ??
+                    item.productPrice ??
+                    0;
+
                   return (
                     <CommandItem
                       key={item.id}
-                      value={`${item.productName} ${item.sku} ${
-                        item.inventoryNumber || ''
-                      }`}
+                      value={`${item.productName} ${item.sku} ${item.inventoryNumber || ''
+                        }`}
                       disabled={isOutOfStock}
                       onSelect={() => {
                         if (isOutOfStock) return;
-                        const price =
-                          item.priceOverride ??
-                          item.variantPrice ??
-                          item.productPrice ??
-                          0;
-                        onChange(item.id, price);
+                        onChange(item.id, itemPrice);
                         setOpen(false);
                       }}
                     >
@@ -165,6 +173,9 @@ export function InventorySelector({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {formatCurrency(itemPrice)}
+                          </span>
                           <span
                             className={cn(
                               'text-xs font-medium',
@@ -175,7 +186,7 @@ export function InventorySelector({
                           >
                             {item.quantity} in stock
                           </span>
-                          {/* We could show price here too */}
+
                         </div>
                       </div>
                     </CommandItem>

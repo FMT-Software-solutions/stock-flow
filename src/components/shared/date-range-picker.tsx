@@ -242,6 +242,21 @@ function DatePickerWithRangeInner({
     return true;
   };
 
+  const checkEquality = (r1: DateRange | undefined, r2: DateRange | undefined) => {
+    if (!r1 && !r2) return true;
+    if (!r1 || !r2) return false;
+
+    const r1From = r1.from ? startOfDay(r1.from).getTime() : 0;
+    const r2From = r2.from ? startOfDay(r2.from).getTime() : 0;
+    const r1To = r1.to ? endOfDay(r1.to).getTime() : 0;
+    const r2To = r2.to ? endOfDay(r2.to).getTime() : 0;
+
+    return r1From === r2From && r1To === r2To;
+  };
+
+  const matchingPreset = presets.find((p) => checkEquality(p.getRange(), date));
+  const displayLabel = matchingPreset?.label;
+
   const handlePresetChange = (value: string) => {
     setSelectedPreset(value);
     const preset = presets.find((p) => p.value === value);
@@ -350,7 +365,12 @@ function DatePickerWithRangeInner({
               !date && 'text-muted-foreground'
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
+            {displayLabel && (
+              <span className="bg-primary/10 text-primary px-1 py-0.5 rounded text-xs font-semibold">
+                {displayLabel}
+              </span>
+            )}
             {date?.from ? (
               date.to ? (
                 <>
@@ -365,11 +385,11 @@ function DatePickerWithRangeInner({
             )}
             {date && (
               <div
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 bg-background hover:bg-muted/90 rounded-full cursor-pointer"
                 onClick={handleClear}
                 title="Clear date range"
               >
-                <X className="h-3 w-3 text-muted-foreground" />
+                <X className="h-2 w-2 text-muted-foreground" />
               </div>
             )}
           </Button>
@@ -401,7 +421,7 @@ function DatePickerWithRangeInner({
                         disabled={!!disabled || !allowed}
                         className={cn(
                           'w-full justify-start text-left font-normal',
-                          selectedPreset === preset.value && 'bg-accent'
+                          (selectedPreset === preset.value || matchingPreset?.value === preset.value) && 'bg-accent'
                         )}
                         onClick={() => handlePresetChange(preset.value)}
                       >

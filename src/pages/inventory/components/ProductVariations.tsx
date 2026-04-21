@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -221,25 +222,35 @@ export function ProductVariations({
           <CardTitle className="text-lg">Variation Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Select onValueChange={addVariationType}>
-              <SelectTrigger className="w-50" disabled={!canEditProducts}>
-                <SelectValue placeholder="Add Variation Type" />
-              </SelectTrigger>
-              <SelectContent>
-                {variationTypes?.map((type) => (
-                  <SelectItem
-                    key={type.id}
-                    value={type.id}
-                    disabled={configs.some(
-                      (c) => c.variationTypeId === type.id
-                    )}
-                  >
-                    {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Select onValueChange={addVariationType}>
+                <SelectTrigger className="w-50" disabled={!canEditProducts}>
+                  <SelectValue placeholder="Add Variation Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {variationTypes?.map((type) => (
+                    <SelectItem
+                      key={type.id}
+                      value={type.id}
+                      disabled={configs.some(
+                        (c) => c.variationTypeId === type.id
+                      )}
+                    >
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {canEditProducts && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/products?tab=variations">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Manage Options
+                </Link>
+              </Button>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -389,7 +400,7 @@ function VariationTypeRow({
     <div className="flex items-center gap-4 px-4 py-2 border rounded-md">
       <div className="w-37.5 font-medium">{config.variationTypeName}</div>
       <div className="flex-1">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           {allOptions.map((option) => {
             const isSelected = config.selectedOptions.some(
               (o) => o.id === option.id || o.value === option.value
@@ -405,9 +416,22 @@ function VariationTypeRow({
               </Badge>
             );
           })}
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px] rounded-full border-dashed"
+              asChild
+            >
+              <Link to="/products?tab=variations">
+                <Plus className="h-3 w-3 mr-1" />
+                Add New
+              </Link>
+            </Button>
+          )}
         </div>
         {allOptions.length === 0 && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground mt-2">
             No options available. Add them in Settings.
           </div>
         )}

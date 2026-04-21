@@ -62,6 +62,16 @@ export interface CustomerDebtSummary {
   total_owing: number;
   open_orders: number;
   last_owing_date: string | null;
+  unpaid_orders: Array<{
+    id: string;
+    order_number: string;
+    date: string;
+    total_amount: number;
+    paid_amount: number;
+    owing_amount: number;
+    branch_name: string | null;
+    creator_name: string | null;
+  }>;
 }
 
 export function useCustomerDebtSummary(params: {
@@ -101,7 +111,45 @@ export function useCustomerDebtSummary(params: {
         total_owing: 0,
         open_orders: 0,
         last_owing_date: null,
+        unpaid_orders: [],
       },
+  });
+}
+
+export function useCustomerUnpaidOrders(params: {
+  organizationId?: string;
+  customerId?: string;
+}) {
+  const { organizationId, customerId } = params;
+
+  return useQuery({
+    queryKey: ['customers', 'unpaid_orders', organizationId, customerId],
+    queryFn: async () => {
+      if (!organizationId || !customerId) return [];
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          date,
+          total_amount,
+          paid_amount,
+          branch:branches(name),
+          creator:profiles!orders_created_by_fkey1(first_name, last_name)
+        `)
+        .eq('organization_id', organizationId)
+        .eq('customer_id', customerId)
+        .eq('is_deleted', false)
+        .in('payment_status', ['unpaid', 'partial'])
+        .not('status', 'in', '("cancelled","refunded")')
+        .order('date', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!organizationId && !!customerId,
   });
 }
 

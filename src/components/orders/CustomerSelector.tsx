@@ -171,80 +171,92 @@ export function CustomerSelector({
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between"
-            disabled={disabled || isLoading}
-          >
-            {selectedCustomer ? (
-              <div className="flex items-center gap-2 truncate">
-                <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span>
-                  {selectedCustomer.firstName} {selectedCustomer.lastName}
-                </span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">Select customer...</span>
-            )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-75 p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search customer..." />
-            <CommandList>
-              <CommandEmpty>
-                <div className="p-2 text-center text-sm text-muted-foreground">
-                  No customer found.
+      <div className="flex items-center gap-2 w-full">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between flex-1"
+              disabled={disabled || isLoading}
+            >
+              {selectedCustomer ? (
+                <div className="flex items-center gap-2 truncate">
+                  <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">
+                    {selectedCustomer.firstName} {selectedCustomer.lastName}
+                  </span>
                 </div>
-              </CommandEmpty>
-              <CommandGroup heading="Customers">
-                {customers.map((customer) => (
+              ) : (
+                <span className="text-muted-foreground">Select customer...</span>
+              )}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search customer..." />
+              <CommandList>
+                <CommandEmpty>
+                  <div className="p-2 text-center text-sm text-muted-foreground">
+                    No customer found.
+                  </div>
+                </CommandEmpty>
+                <CommandGroup heading="Customers">
+                  {customers.map((customer) => (
+                    <CommandItem
+                      key={customer.id}
+                      value={`${customer.firstName} ${customer.lastName} ${customer.email} ${customer.phone}`}
+                      onSelect={() => {
+                        onChange(customer.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          value === customer.id ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                      <div className="flex flex-col">
+                        <span>
+                          {customer.firstName} {customer.lastName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {customer.phone || customer.email}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                <CommandSeparator />
+                <CommandGroup>
                   <CommandItem
-                    key={customer.id}
-                    value={`${customer.firstName} ${customer.lastName} ${customer.email} ${customer.phone}`}
                     onSelect={() => {
-                      onChange(customer.id);
                       setOpen(false);
+                      setShowCreateDialog(true);
                     }}
                   >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        value === customer.id ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                    <div className="flex flex-col">
-                      <span>
-                        {customer.firstName} {customer.lastName}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {customer.email || customer.phone}
-                      </span>
-                    </div>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create new customer
                   </CommandItem>
-                ))}
-              </CommandGroup>
-              <CommandSeparator />
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => {
-                    setOpen(false);
-                    setShowCreateDialog(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create new customer
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          title="Create new customer"
+          onClick={() => setShowCreateDialog(true)}
+          disabled={disabled}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>

@@ -471,10 +471,11 @@ export function useUpdateProduct() {
         const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
         if (idsToDelete.length > 0) {
           await supabase.from('product_variants').delete().in('id', idsToDelete);
+          await supabase.from('inventory').update({ is_deleted: true }).in('variant_id', idsToDelete);
         }
 
         // Cleanup any "simple product" inventory row (where variant_id is null) to prevent double counting
-        await supabase.from('inventory').delete().eq('product_id', id).is('variant_id', null);
+        await supabase.from('inventory').update({ is_deleted: true }).eq('product_id', id).is('variant_id', null);
 
         // 3. Upsert variants
         for (const variant of updates.variants) {
@@ -537,6 +538,7 @@ export function useUpdateProduct() {
         // If explicitly switched to no variations, clean up any leftovers
         if (updates.hasVariations === false) {
           await supabase.from('product_variants').delete().eq('product_id', id);
+          await supabase.from('inventory').update({ is_deleted: true }).eq('product_id', id).not('variant_id', 'is', null);
         }
 
         const inventoryData: any = {};
@@ -559,6 +561,8 @@ export function useUpdateProduct() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product'] });
+      queryClient.invalidateQueries({ queryKey: ['product_inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
     },
   });
 }

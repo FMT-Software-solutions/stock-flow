@@ -125,7 +125,7 @@ function ProductFormInner({
         });
         toast.success('Product created successfully');
       }
-      navigate('/inventory');
+      navigate('/products');
     } catch (error) {
       console.error('Failed to save product:', error);
       toast.error('Failed to save product');
@@ -240,7 +240,7 @@ function ProductFormInner({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate('/inventory')}
+          onClick={() => navigate('/products')}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>

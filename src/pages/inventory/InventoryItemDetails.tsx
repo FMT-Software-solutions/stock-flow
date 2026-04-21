@@ -201,10 +201,10 @@ export function InventoryItemDetails() {
         {canEditProduct && (
           <div className="hidden md:flex gap-2">
             <Button
-              onClick={() => navigate(`/inventory/${inventory.productId}/edit`)}
+              onClick={() => navigate(`/products/${inventory.productId}`)}
               disabled={!canEditProduct}
             >
-              <Edit className="mr-2 h-4 w-4" /> Edit Product
+              <Edit className="mr-1 h-4 w-4" /> Edit Inventory
             </Button>
           </div>
         )}
@@ -462,15 +462,15 @@ export function InventoryItemDetails() {
             {itemDiscounts.map((d) => {
               const start = d.startAt
                 ? `${format(new Date(d.startAt), 'MMM dd, yyyy')} ${format(
-                    new Date(d.startAt),
-                    'h:mm a'
-                  )}`
+                  new Date(d.startAt),
+                  'h:mm a'
+                )}`
                 : 'Any';
               const end = d.expiresAt
                 ? `${format(new Date(d.expiresAt), 'MMM dd, yyyy')} ${format(
-                    new Date(d.expiresAt),
-                    'h:mm a'
-                  )}`
+                  new Date(d.expiresAt),
+                  'h:mm a'
+                )}`
                 : 'Forever';
               return (
                 <Card key={d.id} className="border-muted">

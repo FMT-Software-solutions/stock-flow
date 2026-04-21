@@ -48,8 +48,8 @@ export const useOrderForm = ({ id }: UseOrderFormProps) => {
     return {
       branchId: branch || '',
       customerId: '',
-      status: (status as any) || 'pending',
-      paymentStatus: (paymentStatus as any) || 'unpaid',
+      status: (status as any) || 'completed',
+      paymentStatus: (paymentStatus as any) || 'paid',
       paymentMethod: (paymentMethod as any) || 'cash',
       notes: '',
       items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],

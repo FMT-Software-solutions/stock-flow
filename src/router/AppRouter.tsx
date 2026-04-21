@@ -1,3 +1,5 @@
+import { Products } from '@/pages/Products';
+import { Discounts } from '@/pages/Discounts';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthRoute } from '../components/auth/AuthRoute';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -116,7 +118,23 @@ function AppRoutes() {
           }
         />
         <Route
-          path="inventory/new"
+          path="products"
+          element={
+            <PermissionGuard scope="products">
+              <Products />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="discounts"
+          element={
+            <PermissionGuard scope="discounts">
+              <Discounts />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="products/new"
           element={
             <PermissionGuard scope="products" action="create">
               <ProductForm />
@@ -132,7 +150,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="inventory/:id"
+          path="products/:id"
           element={
             <PermissionGuard scope="products">
               <ProductDetails />
@@ -140,7 +158,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="inventory/:id/edit"
+          path="products/:id/edit"
           element={
             <PermissionGuard scope="products" action="edit">
               <ProductForm />

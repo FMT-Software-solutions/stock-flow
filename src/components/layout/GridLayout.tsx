@@ -6,24 +6,13 @@ import { UserProfileDropdown } from '../shared/UserProfileDropdown';
 import { RestartToUpdateButton } from '../../modules/auto-update/RestartToUpdateButton';
 import { AiUsageIndicator } from '../shared/AiUsageIndicator';
 import { Button } from '@/components/ui/button';
-import { Grid, ArrowLeft } from 'lucide-react';
+import { Grid, ArrowLeft, Search } from 'lucide-react';
 import { GridLauncher } from './GridLauncher';
+import { useSearchStore } from '@/stores/searchStore';
 
 export function GridLayout() {
-  // If we are at the root or a "home" state, we show the launcher.
-  // However, since we are inside MainLayout which is rendered by AppRouter,
-  // we need to handle the state manually.
-
-  // We use a local state to toggle between "Launcher" and "Content".
-  // Default to false (Content) if we are deep linking, true (Launcher) if we just switched layouts?
-  // Better: If user clicks "Back", we set this to true.
-  // If user clicks a link in Launcher, we set this to false.
-
   const [showLauncher, setShowLauncher] = useState(false);
-
-  // Effect to automatically show launcher if we are at root (though usually redirected)
-  // or if we want to enforce a "Home" behavior.
-  // For now, we trust the user navigation.
+  const { setIsOpen: setSearchOpen } = useSearchStore();
 
   const handleBackToMenu = () => {
     setShowLauncher(true);
@@ -57,6 +46,14 @@ export function GridLayout() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
             <div className="hidden md:flex items-center space-x-4">
               <OrganizationSelector />
               <div className="h-6 w-px bg-border" />

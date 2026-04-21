@@ -1,5 +1,6 @@
 import { Bell, Building2, Download, Palette, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import {
   Card,
@@ -50,6 +51,7 @@ import { Shield } from 'lucide-react';
 export function Settings() {
   const { currentOrganization, updateOrganization } = useOrganization();
   const { checkPermission, isOwner } = useRoleCheck();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const canManageOrgDetails = checkPermission('settings', 'manage_org_details');
   const canViewAppearance = checkPermission(
@@ -128,7 +130,7 @@ export function Settings() {
     return (
       notificationSettings.roleChanges !== (current.roleChanges ?? true) ||
       notificationSettings.securityAlerts !==
-        (current.securityAlerts ?? true) ||
+      (current.securityAlerts ?? true) ||
       notificationSettings.appUpdates !== (current.appUpdates ?? true) ||
       notificationSettings.newUserAdded !== (current.newUserAdded ?? true)
     );
@@ -319,6 +321,25 @@ export function Settings() {
       5: 'grid-cols-5',
     }[visibleTabsCount] || 'grid-cols-4';
 
+  const tabFromUrl = searchParams.get('tab');
+  const defaultTab = canManageOrgDetails
+    ? 'organization'
+    : canViewAppearance
+      ? 'appearance'
+      : canManageRoles
+        ? 'roles'
+        : canManageNotifications
+          ? 'notifications'
+          : isElectron()
+            ? 'updates'
+            : 'organization';
+
+  const activeTab = tabFromUrl || defaultTab;
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value }, { replace: true });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -331,15 +352,8 @@ export function Settings() {
       </div>
 
       <Tabs
-        defaultValue={
-          canManageOrgDetails
-            ? 'organization'
-            : canViewAppearance
-            ? 'appearance'
-            : canManageNotifications
-            ? 'notifications'
-            : 'organization'
-        }
+        value={activeTab}
+        onValueChange={handleTabChange}
         className="space-y-6"
       >
         <TabsList className={`grid w-full ${gridColsClass}`}>

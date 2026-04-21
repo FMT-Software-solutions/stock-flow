@@ -67,6 +67,7 @@ import {
 } from 'date-fns';
 import type { DataLookback, UserPermissions } from '@/modules/permissions';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
 import {
   Select,
   SelectContent,
@@ -279,6 +280,10 @@ export function Dashboard() {
   const { currentOrganization } = useOrganization();
   const { formatCurrency } = useCurrency();
   const { selectedBranchIds } = useBranchContext();
+  const { checkPermission } = useRoleCheck();
+
+  const canEditInventory = checkPermission('inventory', 'edit');
+  const canEditProducts = checkPermission('products', 'edit');
 
   // Visibility State
   const [visibleSections, setVisibleSections] = useOrgArrayPreference<SectionId>(
@@ -881,9 +886,11 @@ export function Dashboard() {
                                   {item.quantity} <span className="text-[10px] font-normal text-muted-foreground">{item.unit}</span>
                                 </div>
                               </div>
-                              <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                <Link to={`/inventory/${item.id}`}>Restock</Link>
-                              </Button>
+                              {canEditProducts && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                                  <Link to={`/inventory/${item.id}`}>Restock</Link>
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -932,9 +939,11 @@ export function Dashboard() {
                                   {inv.quantity} <span className="text-[10px] font-normal text-muted-foreground">{inv.unit || ''}</span>
                                 </div>
                               </div>
-                              <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                <Link to={`/inventory/entry/${inv.id}`}>Restock</Link>
-                              </Button>
+                              {canEditInventory && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                                  <Link to={`/inventory/entry/${inv.id}`}>Restock</Link>
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}

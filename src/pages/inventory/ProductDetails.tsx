@@ -52,7 +52,7 @@ export function ProductDetails() {
   const handleSaveVariations = async () => {
     if (!canEditProducts) return;
     if (!product || !currentOrganization) return;
-    
+
     if (hasVariations && variants.length === 0) {
       toast.error('Please configure at least one variation or disable variations');
       return;
@@ -68,6 +68,11 @@ export function ProductDetails() {
           organizationId: currentOrganization.id,
         },
       });
+
+      if (!hasVariations) {
+        setVariants([]);
+      }
+
       toast.success('Variations updated successfully');
     } catch (error) {
       console.error('Failed to update variations:', error);
@@ -96,7 +101,7 @@ export function ProductDetails() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/inventory')}
+            onClick={() => navigate('/products')}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -108,7 +113,7 @@ export function ProductDetails() {
         {canEditProducts && (
           <Button
             variant="outline"
-            onClick={() => navigate(`/inventory/${product.id}/edit`)}
+            onClick={() => navigate(`/products/${product.id}/edit`)}
           >
             <Edit className="md:mr-2 h-4 w-4" /> <span className="hidden md:inline-block">Edit Product</span>
           </Button>
@@ -121,10 +126,10 @@ export function ProductDetails() {
           <Card>
             <CardHeader >
               <div className='flex justify-between items-center'>
-              <CardTitle>Details</CardTitle>
-              <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
-                {product.status}
-              </Badge>
+                <CardTitle>Details</CardTitle>
+                <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
+                  {product.status}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -167,15 +172,15 @@ export function ProductDetails() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="font-medium text-muted-foreground">Price</div>
                 <div className='font-bold'><CurrencyDisplay amount={product.sellingPrice} /></div>
-                
+
                 <div className="font-medium text-muted-foreground">Cost</div>
                 <div className='font-bold'><CurrencyDisplay amount={product.costPrice} /></div>
 
                 <div className="font-medium text-muted-foreground">Projected Profit</div>
-                <div className='font-bold'><CurrencyDisplay className={cn( projectedProfit > 0 ? 'text-primary' : 'text-red-500')} amount={projectedProfit} /></div>
+                <div className='font-bold'><CurrencyDisplay className={cn(projectedProfit > 0 ? 'text-primary' : 'text-red-500')} amount={projectedProfit} /></div>
               </div>
-              
-                <Separator />
+
+              <Separator />
 
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="font-medium text-muted-foreground">Category</div>
@@ -184,7 +189,7 @@ export function ProductDetails() {
                 <div className="font-medium text-muted-foreground">Supplier</div>
                 <div>{product.supplier?.name || '-'}</div>
               </div>
-             
+
 
               {product.description && (
                 <div className="pt-4 border-t">
@@ -224,32 +229,31 @@ export function ProductDetails() {
                     </div>
 
                     {hasVariations ? (
-                      <>
-                        <ProductVariations
-                          basePrice={product.sellingPrice}
-                          baseSku={product.sku}
-                          onChange={setVariants}
-                          initialVariants={variants}
-                        />
-                        <div className="flex justify-end">
-                          <Button 
-                            onClick={handleSaveVariations} 
-                            disabled={!canEditProducts || isSaving || updateProduct.isPending}
-                          >
-                            {(isSaving || updateProduct.isPending) && (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            Save Variations
-                          </Button>
-                        </div>
-                      </>
+                      <ProductVariations
+                        basePrice={product.sellingPrice}
+                        baseSku={product.sku}
+                        onChange={setVariants}
+                        initialVariants={variants}
+                      />
                     ) : (
                       <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
-                        Variations are disabled for this product. 
+                        Variations are disabled for this product.
                         <br />
                         Enable them to configure attributes like Color, Size, etc.
                       </div>
                     )}
+
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        onClick={handleSaveVariations}
+                        disabled={!canEditProducts || isSaving || updateProduct.isPending}
+                      >
+                        {(isSaving || updateProduct.isPending) && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {hasVariations ? 'Save Variations' : 'Update Status (No Variations)'}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -263,11 +267,11 @@ export function ProductDetails() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                     <ProductInventoryManager 
-                        product={product}
-                        variants={variants} 
-                        currentOrganizationId={currentOrganization?.id || ''}
-                     />
+                    <ProductInventoryManager
+                      product={product}
+                      variants={hasVariations ? variants : []}
+                      currentOrganizationId={currentOrganization?.id || ''}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -281,11 +285,11 @@ export function ProductDetails() {
                 <div className="text-center space-y-2">
                   <h3 className="text-lg font-semibold">Inventory Management Unavailable</h3>
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    This product is currently in <strong>{product.status}</strong> status. 
+                    This product is currently in <strong>{product.status}</strong> status.
                     You must publish this product to manage its inventory and variations.
                   </p>
                 </div>
-                <Button variant="outline" onClick={() => navigate(`/inventory/${product.id}/edit`)}>
+                <Button variant="outline" onClick={() => navigate(`/products/${product.id}/edit`)}>
                   Edit Product Status
                 </Button>
               </CardContent>

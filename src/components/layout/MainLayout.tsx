@@ -5,6 +5,7 @@ import { ClassicLayout } from './ClassicLayout';
 import { TopNavLayout } from './TopNavLayout';
 import { GridLayout } from './GridLayout';
 import { useMediaQuery } from '../../hooks/use-media-query';
+import { GlobalSearch } from '../shared/GlobalSearch';
 
 function MainLayoutContent() {
   const { layoutMode } = useLayoutStore();
@@ -31,6 +32,7 @@ export function MainLayout() {
   return (
     <SidebarProvider>
       <MainLayoutContent />
+      <GlobalSearch />
     </SidebarProvider>
   );
 }

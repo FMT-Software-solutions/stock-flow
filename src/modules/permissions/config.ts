@@ -28,14 +28,13 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
   },
   inventory: {
     label: 'Inventory',
-    description: 'Manage products, categories and stock',
+    description: 'Manage inventory stock entries',
     actions: {
       create: 'Create',
       edit: 'Edit',
       delete: 'Delete',
       export: 'Export',
     },
-    children: ['products', 'product_categories', 'variations'],
   },
   discounts: {
     label: 'Discounts',
@@ -47,7 +46,6 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
       export: 'Export Discounts',
       view_code: 'View Discount Codes',
     },
-    parent: 'inventory',
   },
   products: {
     label: 'Products',
@@ -58,7 +56,7 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
       delete: 'Delete Products',
       export: 'Export Products',
     },
-    parent: 'inventory',
+    children: ['product_categories', 'variations'],
   },
   product_categories: {
     label: 'Product Categories',
@@ -69,7 +67,7 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
       delete: 'Delete Categories',
       export: 'Export Categories',
     },
-    parent: 'inventory',
+    parent: 'products',
   },
   variations: {
     label: 'Variations',
@@ -79,7 +77,7 @@ export const APP_PERMISSIONS: AppPermissionsConfig = {
       edit: 'Edit Variations',
       delete: 'Delete Variations',
     },
-    parent: 'inventory',
+    parent: 'products',
   },
   orders: {
     label: 'Sales & Orders',

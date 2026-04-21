@@ -70,8 +70,8 @@ export function Orders() {
       maxLookback.unit === 'days'
         ? subDays(now, value)
         : maxLookback.unit === 'months'
-        ? subMonths(now, value)
-        : subYears(now, value);
+          ? subMonths(now, value)
+          : subYears(now, value);
 
     return { minDate: startOfDay(rawMin), maxDate: max };
   }, [maxLookback]);
@@ -146,8 +146,8 @@ export function Orders() {
   const summaryData = minDate
     ? filteredOrders
     : summaryMode === 'filtered'
-    ? filteredOrders
-    : orders;
+      ? filteredOrders
+      : orders;
 
   return (
     <div className="space-y-6">
@@ -163,7 +163,7 @@ export function Orders() {
             onClick={() => navigate('/orders/new')}
             className={cn(isLoading && 'opacity-50 cursor-not-allowed')}
           >
-            <Plus className="mr-2 h-4 w-4" /> Create Order
+            <Plus className="mr-2 h-4 w-4" /> Record Sales
           </Button>
         )}
       </div>
@@ -180,9 +180,8 @@ export function Orders() {
 
       <div className={cn(isLoading && 'opacity-50')}>
         <DataTable
-          key={`${currentOrganization?.id ?? 'no-org'}-${
-            minDate?.toISOString() ?? 'no-min'
-          }`}
+          key={`${currentOrganization?.id ?? 'no-org'}-${minDate?.toISOString() ?? 'no-min'
+            }`}
           columns={columns}
           data={orders}
           searchKey="orderNumber"

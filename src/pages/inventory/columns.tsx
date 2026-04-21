@@ -81,19 +81,19 @@ export const columns: ColumnDef<Product>[] = [
       <DataTableColumnHeader column={column} title="Product Name" />
     ),
     cell: ({ row }) => {
-        return (
-            <div className="flex items-center space-x-2">
-                {row.original.imageUrl && (
-                    <ImagePreview src={row.original.imageUrl} alt={row.getValue("name")} className="h-8 w-8 rounded-md object-cover" />
-                )}
-                <div className="flex flex-col">
-                    <Link to={`/inventory/${row.original.id}`} className="font-medium hover:underline">
-                        {row.getValue("name")}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">{row.original.sku}</span>
-                </div>
-            </div>
-        )
+      return (
+        <div className="flex items-center space-x-2">
+          {row.original.imageUrl && (
+            <ImagePreview src={row.original.imageUrl} alt={row.getValue("name")} className="h-8 w-8 rounded-md object-cover" />
+          )}
+          <div className="flex flex-col">
+            <Link to={`/products/${row.original.id}`} className="font-medium hover:underline max-w-[300px] truncate" title={row.getValue("name")}>
+              {row.getValue("name")}
+            </Link>
+            <span className="text-xs text-muted-foreground">{row.original.sku}</span>
+          </div>
+        </div>
+      )
     }
   },
   {
@@ -133,11 +133,11 @@ export const columns: ColumnDef<Product>[] = [
       return <div className="font-medium"><CurrencyDisplay amount={price} /></div>
     },
     filterFn: (row, id, value) => {
-        const val = row.getValue(id) as number
-        const [min, max] = value as [number, number]
-        if (min !== undefined && val < min) return false
-        if (max !== undefined && val > max) return false
-        return true
+      const val = row.getValue(id) as number
+      const [min, max] = value as [number, number]
+      if (min !== undefined && val < min) return false
+      if (max !== undefined && val > max) return false
+      return true
     },
   },
   {
@@ -146,28 +146,28 @@ export const columns: ColumnDef<Product>[] = [
       <DataTableColumnHeader column={column} title="Stock" />
     ),
     cell: ({ row }) => {
-        const quantity = row.getValue("quantity") as number
-        const minStock = row.original.minStockLevel
-        
-        let color = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-        if (quantity <= 0) {
-            color = "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-        } else if (quantity <= minStock) {
-            color = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-        }
+      const quantity = row.getValue("quantity") as number
+      const minStock = row.original.minStockLevel
 
-        return (
-            <Badge variant="outline" className={color}>
-                {quantity} {row.original.unit}
-            </Badge>
-        )
+      let color = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+      if (quantity <= 0) {
+        color = "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+      } else if (quantity <= minStock) {
+        color = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+      }
+
+      return (
+        <Badge variant="outline" className={color}>
+          {quantity} {row.original.unit}
+        </Badge>
+      )
     },
     filterFn: (row, id, value) => {
-        const val = row.getValue(id) as number
-        const [min, max] = value as [number, number]
-        if (min !== undefined && val < min) return false
-        if (max !== undefined && val > max) return false
-        return true
+      const val = row.getValue(id) as number
+      const [min, max] = value as [number, number]
+      if (min !== undefined && val < min) return false
+      if (max !== undefined && val > max) return false
+      return true
     },
   },
   {
@@ -179,7 +179,7 @@ export const columns: ColumnDef<Product>[] = [
       return <div className="text-muted-foreground">{row.getValue("createdByName") || "Unknown"}</div>
     },
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
+      return value.includes(row.getValue(id))
     },
   },
   {
@@ -224,13 +224,13 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
       <DataTableColumnHeader column={column} title="Inv #" />
     ),
     cell: ({ row }) => (
-      <div 
+      <div
         className="font-mono text-xs text-muted-foreground flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors group/copy w-fit"
         onClick={() => {
-            if (row.original.inventoryNumber) {
-                navigator.clipboard.writeText(row.original.inventoryNumber)
-                toast.success("Copied to clipboard")
-            }
+          if (row.original.inventoryNumber) {
+            navigator.clipboard.writeText(row.original.inventoryNumber)
+            toast.success("Copied to clipboard")
+          }
         }}
         title="Click to copy"
       >
@@ -245,25 +245,25 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
       <DataTableColumnHeader column={column} title="Product" />
     ),
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
+      return value.includes(row.getValue(id))
     },
     cell: ({ row }) => {
       const sku = row.original.sku
       const branchName = row.original.branchName
       const imageUrl = row.original.imageUrl || row.original.productImage
-      
+
       return (
         <div className="flex items-center space-x-2">
           {imageUrl && (
-            <ImagePreview 
-              src={imageUrl} 
-              alt={row.original.productName} 
-              className="h-8 w-8 rounded-md object-cover" 
+            <ImagePreview
+              src={imageUrl}
+              alt={row.original.productName}
+              className="h-8 w-8 rounded-md object-cover"
             />
           )}
           <div className="flex flex-col">
             <Link to={`/inventory/entry/${row.original.id}`} className="font-medium hover:underline">
-                {row.original.productName}
+              {row.original.productName}
             </Link>
             <span className="text-xs text-muted-foreground">
               {sku}
@@ -303,7 +303,7 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
     cell: ({ row }) => {
       const priceOverride = row.original.priceOverride
       const displayPrice = priceOverride ?? row.original.productPrice
-      
+
       return (
         <div className="font-medium">
           {displayPrice !== undefined ? (
@@ -315,11 +315,11 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
       )
     },
     filterFn: (row, id, value) => {
-        const val = row.getValue(id) as number
-        const [min, max] = value as [number, number]
-        if (min !== undefined && val < min) return false
-        if (max !== undefined && val > max) return false
-        return true
+      const val = row.getValue(id) as number
+      const [min, max] = value as [number, number]
+      if (min !== undefined && val < min) return false
+      if (max !== undefined && val > max) return false
+      return true
     },
   },
   {

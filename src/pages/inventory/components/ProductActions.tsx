@@ -53,7 +53,7 @@ export function ProductActions({ product }: ProductActionsProps) {
         <DropdownMenuSeparator />
         {canViewProducts && (
           <DropdownMenuItem asChild>
-            <Link to={`/inventory/${product.id}`} className="flex items-center">
+            <Link to={`/products/${product.id}`} className="flex items-center">
               <Eye className="mr-2 h-4 w-4" /> View Details
             </Link>
           </DropdownMenuItem>
@@ -61,7 +61,7 @@ export function ProductActions({ product }: ProductActionsProps) {
         {canEditProducts && (
           <DropdownMenuItem asChild>
             <Link
-              to={`/inventory/${product.id}/edit`}
+              to={`/products/${product.id}/edit`}
               className="flex items-center"
             >
               <Edit className="mr-2 h-4 w-4" /> Edit

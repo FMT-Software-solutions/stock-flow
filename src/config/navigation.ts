@@ -8,10 +8,9 @@ import {
   Truck,
   BarChart3,
   Receipt,
+  Tags,
+  Percent,
 } from 'lucide-react';
-
-
-
 
 import type { PermissionScope, PermissionAction } from '@/modules/permissions/types';
 
@@ -36,6 +35,13 @@ export const navItems: NavItem[] = [
     iconClassName: 'text-blue-500',
   },
   {
+    to: '/products',
+    icon: Tags,
+    label: 'Products',
+    permission: { scope: 'products' },
+    iconClassName: 'text-violet-500',
+  },
+  {
     to: '/inventory',
     icon: Package,
     label: 'Inventory',
@@ -48,6 +54,13 @@ export const navItems: NavItem[] = [
     label: 'Sales & Orders',
     permission: { scope: 'orders' },
     iconClassName: 'text-pink-500',
+  },
+  {
+    to: '/discounts',
+    icon: Percent,
+    label: 'Discounts',
+    permission: { scope: 'discounts' },
+    iconClassName: 'text-fuchsia-500',
   },
   {
     to: '/customers',
@@ -63,7 +76,7 @@ export const navItems: NavItem[] = [
     permission: { scope: 'suppliers' },
     iconClassName: 'text-amber-500',
   },
-  
+
   {
     to: '/expenses',
     icon: Receipt,

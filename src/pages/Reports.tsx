@@ -15,7 +15,8 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/utils/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { DateRange } from 'react-day-picker';
 import { CustomersSection } from './reports/CustomersSection';
 import { ExpensesSection } from './reports/ExpensesSection';
@@ -111,15 +112,33 @@ export function Reports() {
   const { formatCurrency } = useCurrency();
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds: globalBranchIds } = useBranchContext();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<
-    | 'products'
-    | 'inventory'
-    | 'sales_orders'
-    | 'expenses'
-    | 'customers'
-    | 'suppliers'
-  >('products');
+  type TabType = 'products' | 'inventory' | 'sales_orders' | 'expenses' | 'customers' | 'suppliers';
+  const availableTabs: TabType[] = ['products', 'inventory', 'sales_orders', 'expenses', 'customers', 'suppliers'];
+
+  const tabFromUrl = searchParams.get('tab') as TabType | null;
+
+  const [activeTab, setActiveTab] = useState<TabType>(
+    tabFromUrl && availableTabs.includes(tabFromUrl) ? tabFromUrl : 'products'
+  );
+
+  useEffect(() => {
+    if (tabFromUrl && availableTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    } else if (!availableTabs.includes(activeTab)) {
+      setActiveTab('products');
+      if (tabFromUrl) {
+        setSearchParams({ tab: 'products' }, { replace: true });
+      }
+    }
+  }, [tabFromUrl, activeTab, availableTabs, setSearchParams]);
+
+  const handleTabChange = (value: string) => {
+    const newTab = value as TabType;
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
   const [generalDateRange, setGeneralDateRange] = useState<
     DateRange | undefined
   >(undefined);
@@ -292,10 +311,10 @@ export function Reports() {
       activeTab === 'products'
         ? productsDateApplied
         : activeTab === 'inventory'
-        ? inventoryDateApplied
-        : activeTab === 'customers'
-        ? customersDateApplied
-        : generalDateRange;
+          ? inventoryDateApplied
+          : activeTab === 'customers'
+            ? customersDateApplied
+            : generalDateRange;
     if (!range?.from && !range?.to) return 'All Time';
     const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
     const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
@@ -340,7 +359,7 @@ export function Reports() {
       <Tabs
         value={activeTab}
         onValueChange={(v) => {
-          setActiveTab(v as typeof activeTab);
+          handleTabChange(v);
           setExportOpen(false);
         }}
         className="space-y-4"

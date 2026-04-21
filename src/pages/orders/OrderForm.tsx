@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
@@ -42,6 +42,7 @@ import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hook
 import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
 import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
 import { useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -139,7 +140,7 @@ function OrderFormInner({
             sessionStorage.removeItem(PERSIST_KEYS.BRANCH);
             setSelectedBranchId('');
           }
-        } 
+        }
         if (name === 'status' && value.status)
           sessionStorage.setItem(PERSIST_KEYS.STATUS, value.status);
         if (name === 'paymentStatus' && value.paymentStatus)
@@ -160,12 +161,12 @@ function OrderFormInner({
         if (name === 'branchId') {
           const val = value.branchId || '';
           setSelectedBranchId(val);
-        } 
+        }
       });
       return () => subscription.unsubscribe();
     }
   }, [form, isEditing]);
-  
+
   useEffect(() => {
     if (isEditing) return;
     const validIds = availableBranches.map((b) => b.id);
@@ -196,10 +197,9 @@ function OrderFormInner({
   const paidAmount = form.watch('paidAmount');
   const customerId = form.watch('customerId');
   const [customerDebtRequestId, setCustomerDebtRequestId] = useState(0);
-  const { data: customerDebtSummary } = useCustomerDebtSummary({
+  const { data: customerDebtSummary, isFetching: isDebtSummaryFetching } = useCustomerDebtSummary({
     organizationId: currentOrganization?.id,
     customerId: customerId || undefined,
-    branchIds: selectedBranchId ? [selectedBranchId] : undefined,
     requestId: customerDebtRequestId,
   });
   const orderItems: DiscountOrderItem[] = useMemo(() => {
@@ -252,19 +252,14 @@ function OrderFormInner({
 
   // Auto-fill paid amount based on status logic
   useEffect(() => {
-    // "If the payment status is selected as unpaid or partial but paid amount entered is same as total amount, we should save the status is paid automatically."
-    // "same for when paid status is selected but amount entered is not full total amount. we should automatically save status as partial."
-    // "If status changed to unpaid or refunded, it should set paid amount to zero automatically."
-    // "Change to 'paid' -> update paid_amount to total_amount."
-
     // Let's handle status changes first
     if (paymentStatus === 'paid') {
-        form.setValue('paidAmount', effectiveTotal);
+      form.setValue('paidAmount', effectiveTotal);
     } else if (paymentStatus === 'unpaid' || paymentStatus === 'refunded') {
-        form.setValue('paidAmount', 0);
-    } 
+      form.setValue('paidAmount', 0);
+    }
     if (paymentStatus === 'refunded') {
-        form.setValue('status', 'refunded');
+      form.setValue('status', 'refunded');
     }
     // partial -> do nothing, let user enter
   }, [paymentStatus, effectiveTotal, form]);
@@ -280,11 +275,11 @@ function OrderFormInner({
       // Calculate discount distribution if any
       let discountDistribution: Record<string, number> = {};
       if (appliedDiscount) {
-         discountDistribution = distributeDiscount(
-             appliedDiscount.discount, 
-             orderItems, 
-             discountEligibleMap
-         );
+        discountDistribution = distributeDiscount(
+          appliedDiscount.discount,
+          orderItems,
+          discountEligibleMap
+        );
       }
 
       // Enrich items with product details (snapshot)
@@ -324,21 +319,21 @@ function OrderFormInner({
 
       // Final check for status consistency before submitting
       if (orderData.payment_status === 'refunded') {
-         orderData.status = 'refunded';
-         orderData.paid_amount = 0;
+        orderData.status = 'refunded';
+        orderData.paid_amount = 0;
       }
       if (orderData.payment_status === 'unpaid' && orderData.paid_amount > 0) {
-         if (orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) orderData.payment_status = 'paid';
-         else orderData.payment_status = 'partial';
+        if (orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) orderData.payment_status = 'paid';
+        else orderData.payment_status = 'partial';
       }
       if (orderData.payment_status === 'paid' && orderData.paid_amount < Math.max(0, totalAmount - orderDiscountAmount)) {
-         orderData.payment_status = 'partial';
+        orderData.payment_status = 'partial';
       }
       if (orderData.payment_status === 'partial' && orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) {
-         orderData.payment_status = 'paid';
+        orderData.payment_status = 'paid';
       }
       if (orderData.payment_status === 'partial' && orderData.paid_amount <= 0) {
-         orderData.payment_status = 'unpaid';
+        orderData.payment_status = 'unpaid';
       }
 
       if (isEditing && id) {
@@ -357,7 +352,7 @@ function OrderFormInner({
           setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
           setCurrentDraftId(null);
         }
-        
+
         // Reset form for next order but keep configuration values
         // This helps when processing multiple orders in a queue
         form.reset({
@@ -446,45 +441,45 @@ function OrderFormInner({
             </div>
           </div>
 
-        <div className="w-full md:w-75">
-          <Controller
-            control={form.control}
-            name="branchId"
-            render={({ field }) => (
-              <div className="flex gap-2 items-center">
-                <FieldLabel>
-                  Branch
-                </FieldLabel>
-                <BranchFormSelector
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Select Branch"
-                />
-                {form.formState.errors.branchId && (
-                  <FieldError>
-                    {form.formState.errors.branchId.message}
-                  </FieldError>
-                )}
-                {!isEditing && (
-                  <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDraftsOpen(true)}
-                >
-                  Drafts
-                  {branchDrafts.length > 0 && (
-                    <span className="ml-2">
-                      <Badge variant="secondary">{branchDrafts.length}</Badge>
-                    </span>
+          <div className="w-full md:w-75">
+            <Controller
+              control={form.control}
+              name="branchId"
+              render={({ field }) => (
+                <div className="flex gap-2 items-center">
+                  <FieldLabel>
+                    Branch
+                  </FieldLabel>
+                  <BranchFormSelector
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Select Branch"
+                  />
+                  {form.formState.errors.branchId && (
+                    <FieldError>
+                      {form.formState.errors.branchId.message}
+                    </FieldError>
                   )}
-                </Button> 
-                )}
-              </div>
-            )}
-          />
+                  {!isEditing && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDraftsOpen(true)}
+                    >
+                      Drafts
+                      {branchDrafts.length > 0 && (
+                        <span className="ml-2">
+                          <Badge variant="secondary">{branchDrafts.length}</Badge>
+                        </span>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            />
+          </div>
         </div>
-      </div>
 
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
@@ -653,7 +648,7 @@ function OrderFormInner({
               </CardContent>
             </Card>
 
-          
+
           </div>
 
           <div className="space-y-6">
@@ -677,12 +672,46 @@ function OrderFormInner({
                       />
                       {!!field.value && (
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {customerDebtSummary?.total_owing && customerDebtSummary.total_owing > 0 ? (
+                          {isDebtSummaryFetching ? (
+                            <div className="flex items-center space-x-2">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Loading balance...</span>
+                            </div>
+                          ) : customerDebtSummary?.total_owing && customerDebtSummary.total_owing > 0 ? (
                             <div className="flex items-center justify-between">
                               <span>Outstanding balance</span>
-                              <span className="font-medium text-destructive">
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <span className="cursor-help underline decoration-dashed underline-offset-4 font-medium text-destructive">
+                                    {formatCurrency(customerDebtSummary.total_owing)}
+                                  </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-80" align="start">
+                                  <div className="space-y-2">
+                                    <h4 className="text-sm font-semibold">Unpaid Orders</h4>
+                                    <div className="max-h-[250px] overflow-y-auto space-y-3 pr-2">
+                                      {customerDebtSummary.unpaid_orders?.map((order) => (
+                                        <div key={order.id} className="text-sm border-b pb-2 last:border-0 last:pb-0">
+                                          <div className="flex justify-between font-medium">
+                                            <span>{order.order_number}</span>
+                                            <span className="text-destructive">{formatCurrency(order.owing_amount)}</span>
+                                          </div>
+                                          <div className="text-xs text-muted-foreground flex justify-between mt-1">
+                                            <span>{order.date ? format(new Date(order.date), 'MMM d, yyyy') : '-'}</span>
+                                            <span>{order.branch_name || 'Main Branch'}</span>
+                                          </div>
+                                          <div className="text-xs text-muted-foreground mt-0.5">
+                                            Recorded by: {order.creator_name || 'System'}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                              {/* <span className="font-medium text-destructive">
                                 {formatCurrency(customerDebtSummary.total_owing)}
-                              </span>
+                              </span> */}
                             </div>
                           ) : (
                             <div>No outstanding balance.</div>
@@ -711,11 +740,11 @@ function OrderFormInner({
                             <SelectValue placeholder="Status" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="completed">Completed</SelectItem>
                             <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            {isEditing &&<SelectItem value="cancelled">Cancelled</SelectItem>}
-                            {isEditing &&<SelectItem value="refunded">Refunded</SelectItem>}
+                            {isEditing && <SelectItem value="cancelled">Cancelled</SelectItem>}
+                            {isEditing && <SelectItem value="refunded">Refunded</SelectItem>}
                           </SelectContent>
                         </Select>
                         {fieldState.error && (
@@ -801,8 +830,8 @@ function OrderFormInner({
                   </div>
                   {!discountCardOpen && appliedDiscount && (
                     <div className="mt-2 text-sm text-muted-foreground flex items-center justify-between">
-                       <span>Applied: {appliedDiscount.discount.code || appliedDiscount.discount.name}</span>
-                       <span className="font-medium text-green-600">-{formatCurrency(appliedDiscount.amount)}</span>
+                      <span>Applied: {appliedDiscount.discount.code || appliedDiscount.discount.name}</span>
+                      <span className="font-medium text-green-600">-{formatCurrency(appliedDiscount.amount)}</span>
                     </div>
                   )}
                 </CardHeader>
@@ -829,13 +858,13 @@ function OrderFormInner({
                               setDiscountCode(trimmed);
                               setSelectedAutoId(undefined);
                               setManuallyCleared(false);
-                              
+
                               // Check validation
                               if (trimmed) {
-                                  const error = validateCode(trimmed);
-                                  if (error) {
-                                      toast.error(error);
-                                  }
+                                const error = validateCode(trimmed);
+                                if (error) {
+                                  toast.error(error);
+                                }
                               }
                             }}
                             disabled={!discountCode.trim() || orderItems.length === 0}
@@ -887,7 +916,7 @@ function OrderFormInner({
                             const isSelected = appliedDiscount?.discount.id === d.id;
                             return (
                               <div key={d.id} className="flex items-center justify-between border rounded-md p-2">
-                                
+
                                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                                   {d.code ? <span>{d.code}</span> : null}
                                 </div>
@@ -897,14 +926,14 @@ function OrderFormInner({
                                   variant={isSelected ? 'secondary' : 'outline'}
                                   size="sm"
                                   onClick={() => {
-                                      setSelectedAutoId(d.id);
-                                      setDiscountCode((d.code ?? '').trim());
-                                      setManuallyCleared(false);
-                                    }}
+                                    setSelectedAutoId(d.id);
+                                    setDiscountCode((d.code ?? '').trim());
+                                    setManuallyCleared(false);
+                                  }}
                                 >
                                   {isSelected ? 'Applied' : 'Use'}
                                 </Button>
-                              
+
                               </div>
                             );
                           })}
@@ -935,7 +964,7 @@ function OrderFormInner({
                   <span>Total</span>
                   <span>{formatCurrency(effectiveTotal)}</span>
                 </div>
-                
+
                 <div className="mt-2 pt-2 border-t">
                   <Controller
                     control={form.control}
@@ -949,17 +978,17 @@ function OrderFormInner({
                           {...field}
                           value={field.value ?? ''}
                           onChange={(e) => {
-                             const val = parseFloat(e.target.value);
-                             field.onChange(val);
-                             if (!isNaN(val)) {
-                                if (val >= effectiveTotal) {
-                                   form.setValue('paymentStatus', 'paid');
-                                } else if (val > 0) {
-                                   form.setValue('paymentStatus', 'partial');
-                                } else {
-                                   form.setValue('paymentStatus', 'unpaid');
-                                }
-                             }
+                            const val = parseFloat(e.target.value);
+                            field.onChange(val);
+                            if (!isNaN(val)) {
+                              if (val >= effectiveTotal) {
+                                form.setValue('paymentStatus', 'paid');
+                              } else if (val > 0) {
+                                form.setValue('paymentStatus', 'partial');
+                              } else {
+                                form.setValue('paymentStatus', 'unpaid');
+                              }
+                            }
                           }}
                           readOnly={paymentStatus === 'paid'}
                           className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-muted/30'}
@@ -971,10 +1000,10 @@ function OrderFormInner({
                     )}
                   />
                   {(paidAmount !== undefined && paidAmount < effectiveTotal) && (
-                     <div className="flex justify-between items-center text-sm text-red-600 mt-2">
-                       <span>Remaining (Arrears)</span>
-                       <span>{formatCurrency(effectiveTotal - (paidAmount || 0))}</span>
-                     </div>
+                    <div className="flex justify-between items-center text-sm text-red-600 mt-2">
+                      <span>Remaining (Arrears)</span>
+                      <span>{formatCurrency(effectiveTotal - (paidAmount || 0))}</span>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1081,8 +1110,8 @@ function OrderFormInner({
                             term === ''
                               ? true
                               : d.values.items.some((it) =>
-                                  String(it.productName || '').toLowerCase().includes(term)
-                                );
+                                String(it.productName || '').toLowerCase().includes(term)
+                              );
                           return minOk && maxOk && termOk;
                         })
                         .map((d) => {
@@ -1137,19 +1166,19 @@ function OrderFormInner({
               </Button>
               {!isEditing && (
                 <Button
-                type="button"
-                variant="secondary"
-                className="flex-1"
-                onClick={handleSaveDraft}
-                disabled={
-                  !Array.isArray(items) ||
-                  items.length === 0 ||
-                  !items.some((it) => (it.inventoryId || '').trim().length > 0)
-                }
-              >
-                <Save className="h-4 w-4 mr-2" /> Save Draft
-              </Button> 
-            )}
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={handleSaveDraft}
+                  disabled={
+                    !Array.isArray(items) ||
+                    items.length === 0 ||
+                    !items.some((it) => (it.inventoryId || '').trim().length > 0)
+                  }
+                >
+                  <Save className="h-4 w-4 mr-2" /> Save Draft
+                </Button>
+              )}
               <Button
                 type="submit"
                 className="flex-1"
@@ -1159,29 +1188,29 @@ function OrderFormInner({
                   updateOrder.isPending
                 }
               >
-                {isEditing ? 'Update Order' : 'Create Order'}
+                {isEditing ? 'Update Sale' : 'Create Sale'}
               </Button>
             </div>
           </div>
         </div>
       </form>
 
-  {/* Recent Orders Section */}
+      {/* Recent Orders Section */}
 
       <div className='mt-8'>
-      <Accordion
-      type="single"
-      collapsible
-      className="w-full"
-    >
-      <AccordionItem value="item-1">
-        <AccordionTrigger>Recent Orders</AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-      
-        {!isEditing && <RecentOrders />}
-        </AccordionContent>
-       </AccordionItem>
-       </Accordion>
+        <Accordion
+          type="single"
+          collapsible
+          className="w-full"
+        >
+          <AccordionItem value="item-1">
+            <AccordionTrigger>Recent Orders</AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4 text-balance">
+
+              {!isEditing && <RecentOrders />}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   );

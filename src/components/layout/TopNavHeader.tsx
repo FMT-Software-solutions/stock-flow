@@ -21,8 +21,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Menu, MoreHorizontal } from 'lucide-react';
+import { Menu, MoreHorizontal, Search } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchStore } from '@/stores/searchStore';
 
 interface TopNavHeaderProps {
   className?: string;
@@ -33,6 +34,7 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
   const { checkPermission } = useRoleCheck();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { setIsOpen: setSearchOpen } = useSearchStore();
 
   const filteredNavItems = navItems.filter((item) => {
     if (item.devOnly && !isDev) return false;
@@ -173,6 +175,14 @@ export function TopNavHeader({ className }: TopNavHeaderProps) {
         </div>
 
         <div className="flex items-center space-x-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSearchOpen(true)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
           <div className="hidden md:inline-block">
             <AiUsageIndicator />
           </div>

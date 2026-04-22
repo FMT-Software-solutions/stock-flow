@@ -51,6 +51,7 @@ export interface Organization {
   ai_daily_limit: number;
   has_purchased: boolean;
   trial_end_date: string | null;
+  sms_sender_id?: string | null;
 }
 
 export interface OrganizationRoleEntity {
@@ -99,6 +100,7 @@ export interface CreateOrganizationData {
   notification_settings?: NotificationSettings;
   theme_name?: string | null;
   is_active: boolean;
+  sms_sender_id?: string | null;
 }
 
 export interface UpdateOrganizationData extends Partial<CreateOrganizationData> {

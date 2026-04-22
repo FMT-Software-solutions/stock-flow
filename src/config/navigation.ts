@@ -6,6 +6,7 @@ import {
   Package,
   ShoppingCart,
   Truck,
+  MessageSquare,
   BarChart3,
   Receipt,
   Tags,
@@ -75,6 +76,13 @@ export const navItems: NavItem[] = [
     label: 'Suppliers',
     permission: { scope: 'suppliers' },
     iconClassName: 'text-amber-500',
+  },
+  {
+    to: '/communication',
+    icon: MessageSquare,
+    label: 'Communication',
+    permission: { scope: 'communication' },
+    iconClassName: 'text-sky-500',
   },
 
   {

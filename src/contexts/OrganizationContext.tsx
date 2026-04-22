@@ -87,17 +87,25 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
   // Handle organization selection logic in useEffect to avoid state updates during render
   useEffect(() => {
     if (userOrganizations.length === 0) return;
-    if (userOrganizations.length === 1) {
-      const onlyId = userOrganizations[0].id;
-      if (currentOrganization?.id !== onlyId || selectedOrgId !== onlyId) {
-        selectOrganization(onlyId);
+    
+    // Always find the current organization from the latest userOrganizations data
+    // This ensures that when userOrganizations updates (e.g. after a mutation), 
+    // currentOrganization gets the updated properties.
+    const activeId = selectedOrgId || (userOrganizations.length === 1 ? userOrganizations[0].id : null);
+    
+    if (activeId) {
+      const latestOrgData = userOrganizations.find(org => org.id === activeId);
+      if (latestOrgData) {
+        // Only update state if the actual data changed, to prevent infinite re-renders
+        if (JSON.stringify(currentOrganization) !== JSON.stringify(latestOrgData)) {
+          setCurrentOrganization(latestOrgData);
+          if (selectedOrgId !== activeId) {
+            setSelectedOrgId(activeId);
+          }
+        }
       }
-      return;
     }
-    if (selectedOrgId && currentOrganization?.id !== selectedOrgId) {
-      selectOrganization(selectedOrgId);
-    }
-  }, [userOrganizations, selectedOrgId, currentOrganization?.id]);
+  }, [userOrganizations, selectedOrgId, currentOrganization]);
 
   const selectOrganization = async (organizationId: string) => {
     const organization = userOrganizations.find(
@@ -107,15 +115,13 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       if (selectedOrgId !== organizationId) {
         setSelectedOrgId(organizationId);
       }
-      if (currentOrganization?.id !== organization.id) {
-        setCurrentOrganization(organization);
-        if (organization.brand_colors) {
-          await setOrgTheme(
-            organization.id,
-            organization.brand_colors.id,
-            organization.brand_colors
-          );
-        }
+      setCurrentOrganization(organization);
+      if (organization.brand_colors) {
+        await setOrgTheme(
+          organization.id,
+          organization.brand_colors.id,
+          organization.brand_colors
+        );
       }
     }
   };

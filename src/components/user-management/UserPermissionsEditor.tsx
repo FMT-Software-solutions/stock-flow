@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { 
-  APP_PERMISSIONS, 
+import {
+  APP_PERMISSIONS,
   getAvailablePermissionsForRole,
   type PermissionAction,
   type PermissionScope,
@@ -33,8 +33,8 @@ interface UserPermissionsEditorProps {
   showResetButtons?: boolean;
 }
 
-export function UserPermissionsEditor({ 
-  role, 
+export function UserPermissionsEditor({
+  role,
   permissionsJson,
   rolePermissions,
   onChange,
@@ -97,9 +97,9 @@ export function UserPermissionsEditor({
 
   const handleScopeToggle = (scope: PermissionScope, enabled: boolean) => {
     if (readOnly) return;
-    
+
     const currentScope = permissions[scope] || { enabled: false, actions: [] };
-    
+
     const newPermissions = {
       ...permissions,
       [scope]: {
@@ -107,7 +107,7 @@ export function UserPermissionsEditor({
         enabled,
         // If enabling, keep existing actions or default to empty. 
         // If disabling, we keep actions but they won't be active because enabled is false.
-        actions: currentScope.actions || [] 
+        actions: currentScope.actions || []
       }
     };
 
@@ -119,10 +119,10 @@ export function UserPermissionsEditor({
 
     const currentScope = permissions[scope];
     // Fallback to role actions if user actions are undefined
-    const currentActions = currentScope 
-      ? (currentScope.actions || []) 
+    const currentActions = currentScope
+      ? (currentScope.actions || [])
       : (rolePermissions?.[scope]?.actions || []);
-    
+
     let newActions: PermissionAction[];
     if (checked) {
       newActions = [...new Set([...currentActions, action])];
@@ -154,16 +154,16 @@ export function UserPermissionsEditor({
     value: string;
     lookback?: DataLookback;
   }> = [
-    { label: 'Default (Up to 1 Month)', value: 'default' },
-    { label: 'Up to 1 Month', value: 'months:1', lookback: { unit: 'months', value: 1 } },
-    { label: 'Up to 2 Months', value: 'months:2', lookback: { unit: 'months', value: 2 } },
-    { label: 'Up to 3 Months', value: 'months:3', lookback: { unit: 'months', value: 3 } },
-    { label: 'Up to 4 Months', value: 'months:4', lookback: { unit: 'months', value: 4 } },
-    { label: 'Up to 6 Months', value: 'months:6', lookback: { unit: 'months', value: 6 } },
-    { label: 'Up to 1 Year', value: 'years:1', lookback: { unit: 'years', value: 1 } },
-    { label: 'Up to 2 Years', value: 'years:2', lookback: { unit: 'years', value: 2 } },
-    { label: 'Forever', value: 'forever', lookback: { unit: 'forever' } },
-  ];
+      { label: 'Default (Up to 1 Month)', value: 'default' },
+      { label: 'Up to 1 Month', value: 'months:1', lookback: { unit: 'months', value: 1 } },
+      { label: 'Up to 2 Months', value: 'months:2', lookback: { unit: 'months', value: 2 } },
+      { label: 'Up to 3 Months', value: 'months:3', lookback: { unit: 'months', value: 3 } },
+      { label: 'Up to 4 Months', value: 'months:4', lookback: { unit: 'months', value: 4 } },
+      { label: 'Up to 6 Months', value: 'months:6', lookback: { unit: 'months', value: 6 } },
+      { label: 'Up to 1 Year', value: 'years:1', lookback: { unit: 'years', value: 1 } },
+      { label: 'Up to 2 Years', value: 'years:2', lookback: { unit: 'years', value: 2 } },
+      { label: 'Forever', value: 'forever', lookback: { unit: 'forever' } },
+    ];
 
   const serializeLookback = (lookback: DataLookback | undefined) => {
     if (!lookback) return 'default';
@@ -214,8 +214,9 @@ export function UserPermissionsEditor({
 
   const activeLookback =
     activeScope === 'dashboard' ||
-    activeScope === 'orders' ||
-    activeScope === 'expenses'
+      activeScope === 'orders' ||
+      activeScope === 'expenses' ||
+      activeScope === 'communication'
       ? getScopeLookback(activeScope)
       : undefined;
 
@@ -224,8 +225,8 @@ export function UserPermissionsEditor({
 
   return (
     <div className="space-y-4">
-    <div className="flex items-center justify-between">
-          {!hideTitleSection && <div>
+      <div className="flex items-center justify-between">
+        {!hideTitleSection && <div>
           <h3 className="text-lg font-medium">Page Access & Permissions</h3>
           <p className="text-sm text-muted-foreground">
             Configure detailed access rights for this user.
@@ -310,7 +311,8 @@ export function UserPermissionsEditor({
           <CardContent className="p-4 space-y-5">
             {(activeScope === 'dashboard' ||
               activeScope === 'orders' ||
-              activeScope === 'expenses') &&
+              activeScope === 'expenses' ||
+              activeScope === 'communication') &&
               activeIsEnabled && (
                 <div className="grid gap-2 max-w-sm">
                   <Label className="text-sm font-medium">
@@ -318,7 +320,9 @@ export function UserPermissionsEditor({
                       ? 'Dashboard Data Duration'
                       : activeScope === 'orders'
                         ? 'Sales & Orders Data Duration'
-                        : 'Expenses Data Duration'}
+                        : activeScope === 'expenses'
+                          ? 'Expenses Data Duration'
+                          : 'Communication Data Duration'}
                   </Label>
                   <Select
                     value={serializeLookback(activeLookback)}

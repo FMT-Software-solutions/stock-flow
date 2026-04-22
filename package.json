@@ -25,7 +25,8 @@
     "git:push": "git push && git push --tags",
     "release": "node release/scripts/release.js",
     "release:status": "node release/scripts/release-manifest.js status",
-    "release:manifest": "node release/scripts/release-manifest.js"
+    "release:manifest": "node release/scripts/release-manifest.js",
+    "sync:communication": "node scripts/sync-communication.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

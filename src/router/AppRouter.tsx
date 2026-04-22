@@ -38,6 +38,7 @@ import { Expenses } from '../pages/Expenses';
 import { Profile } from '../pages/Profile';
 
 import { Settings } from '../pages/Settings';
+import { Communication } from '../pages/Communication';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { OrganizationSelectionProtectedRoute } from '@/components/auth/OrganizationSelectionProtectedRoute';
 import UserManagement from '@/pages/UserManagement';
@@ -266,6 +267,14 @@ function AppRoutes() {
           element={
             <PermissionGuard scope="expenses">
               <Expenses />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="communication"
+          element={
+            <PermissionGuard scope="communication">
+              <Communication />
             </PermissionGuard>
           }
         />

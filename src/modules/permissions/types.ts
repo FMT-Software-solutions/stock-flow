@@ -14,6 +14,7 @@ export type PermissionScope =
   | 'orders'
   | 'customers'
   | 'suppliers'
+  | 'communication'
   | 'reports'
   | 'expenses'
   | 'expense_categories'

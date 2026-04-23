@@ -362,6 +362,20 @@ function OrderFormInner({
 
         toast.success('Order created successfully');
 
+        // Reset form for next order but keep configuration values
+        // This helps when processing multiple orders in a queue
+        form.reset({
+          branchId: values.branchId,
+          customerId: '', // Reset customer
+          status: values.status,
+          paymentStatus: values.paymentStatus,
+          paymentMethod: values.paymentMethod,
+          paidAmount: 0,
+          notes: '',
+          items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
+        });
+        resetState();
+
         if (sendSms && customer?.phone && smsMessage.trim()) {
           try {
             // @ts-ignore
@@ -404,20 +418,6 @@ function OrderFormInner({
           setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
           setCurrentDraftId(null);
         }
-
-        // Reset form for next order but keep configuration values
-        // This helps when processing multiple orders in a queue
-        form.reset({
-          branchId: values.branchId,
-          customerId: '', // Reset customer
-          status: values.status,
-          paymentStatus: values.paymentStatus,
-          paymentMethod: values.paymentMethod,
-          paidAmount: 0,
-          notes: '',
-          items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
-        });
-        resetState();
       }
     } catch (error) {
       console.error(error);

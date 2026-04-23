@@ -429,7 +429,7 @@ export function Communication() {
                                     />
                                     <Label htmlFor={`cust-${customer.id}`} className="flex-1 cursor-pointer">
                                       <div className="font-medium">{customer.firstName} {customer.lastName}</div>
-                                      <div className="text-xs text-muted-foreground">{customer.phone || 'No phone'} • {customer.email || 'No email'}</div>
+                                      <div className="text-xs text-muted-foreground">{customer.phone || 'No phone'}</div>
                                     </Label>
                                   </div>
                                 ))}

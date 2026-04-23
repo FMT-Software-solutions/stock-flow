@@ -21,6 +21,8 @@ import { useMemo, useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import { QuickSmsDialog } from '@/shared-packages/communication';
+import { MessageSquare } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ export default function CustomerDetails() {
   const { currentOrganization } = useOrganization();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
   const { data: customer, isLoading: isLoadingCustomer } = useCustomer(id);
   const { data: orders = [] } = useCustomerOrders(
     id,
@@ -207,9 +210,9 @@ export default function CustomerDetails() {
         const method = row.getValue('paymentMethod') as string | undefined;
         const label = method
           ? method
-              .split('_')
-              .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-              .join(' ')
+            .split('_')
+            .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+            .join(' ')
           : '-';
         return label;
       },
@@ -260,10 +263,10 @@ export default function CustomerDetails() {
 
   const lastOrderTimestamp = orders.length
     ? Math.max(
-        ...orders
-          .map((o) => new Date(o.date).getTime())
-          .filter((t) => !Number.isNaN(t))
-      )
+      ...orders
+        .map((o) => new Date(o.date).getTime())
+        .filter((t) => !Number.isNaN(t))
+    )
     : null;
   const lastOrderDate =
     lastOrderTimestamp !== null ? new Date(lastOrderTimestamp) : null;
@@ -272,12 +275,12 @@ export default function CustomerDetails() {
     : '-';
   const lastOrderRelative = lastOrderDate
     ? (() => {
-        const rel = formatDistanceToNow(lastOrderDate, { addSuffix: true });
-        return rel === 'in less than a minute' ||
-          rel === 'less than a minute ago'
-          ? 'now'
-          : rel;
-      })()
+      const rel = formatDistanceToNow(lastOrderDate, { addSuffix: true });
+      return rel === 'in less than a minute' ||
+        rel === 'less than a minute ago'
+        ? 'now'
+        : rel;
+    })()
     : '-';
 
   const statusCounts = orders.reduce(
@@ -413,8 +416,14 @@ export default function CustomerDetails() {
         </Card>
 
         <Card className="md:col-span-3">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Customer Debts</CardTitle>
+            {totalOwing > 0 && customer?.phone && (
+              <Button size="sm" onClick={() => setShowSmsDialog(true)}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Send SMS Reminder
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {owingOrders.length ? (
@@ -450,7 +459,7 @@ export default function CustomerDetails() {
                       const owing = Math.max(
                         0,
                         (Number.isNaN(total) ? 0 : total) -
-                          (Number.isNaN(paid) ? 0 : paid)
+                        (Number.isNaN(paid) ? 0 : paid)
                       );
                       return (
                         <TableRow key={order.id}>
@@ -521,6 +530,17 @@ export default function CustomerDetails() {
             if (!open) setSelectedOrder(null);
           }}
           order={selectedOrder}
+        />
+      )}
+
+      {customer && (
+        <QuickSmsDialog
+          isOpen={showSmsDialog}
+          onOpenChange={setShowSmsDialog}
+          recipientPhone={customer.phone || undefined}
+          recipientName={`${customer.firstName || ''} ${customer.lastName || ''}`.trim()}
+          memberId={customer.id}
+          defaultMessage={`Hi ${customer.firstName || 'Customer'}, this is a gentle reminder that you have an outstanding balance of GHS ${totalOwing.toFixed(2)}. Please arrange for payment at your earliest convenience.`}
         />
       )}
     </div>

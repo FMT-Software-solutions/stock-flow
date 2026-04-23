@@ -3,7 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { Customer } from '@/types/customer';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit, Trash, Copy, Eye } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash, Copy, Eye, MessageSquare } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,7 @@ import { isDateInRange } from '@/lib/utils';
 import { useDeleteCustomer } from '@/hooks/useCustomerQueries';
 import { toast } from 'sonner';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { QuickSmsDialog } from '@/shared-packages/communication';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ import {
 
 const CustomerActions = ({ customer }: { customer: Customer }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
   const deleteCustomer = useDeleteCustomer();
   const { checkPermission } = useRoleCheck();
   const canEdit = checkPermission('customers', 'edit');
@@ -66,6 +68,11 @@ const CustomerActions = ({ customer }: { customer: Customer }) => {
           >
             Copy Email
           </DropdownMenuItem>
+          {customer.phone && (
+            <DropdownMenuItem onClick={() => setShowSmsDialog(true)}>
+              <MessageSquare className="mr-2 h-4 w-4" /> Send SMS
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <Link
@@ -98,6 +105,15 @@ const CustomerActions = ({ customer }: { customer: Customer }) => {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <QuickSmsDialog
+        isOpen={showSmsDialog}
+        onOpenChange={setShowSmsDialog}
+        recipientPhone={customer.phone}
+        recipientName={`${customer.firstName || ''} ${customer.lastName || ''}`.trim()}
+        memberId={customer.id}
+        defaultMessage={`Hi ${customer.firstName || 'Customer'}, `}
+      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

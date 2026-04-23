@@ -41,8 +41,12 @@ import { Badge } from '@/components/ui/badge';
 import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
 import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
 import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
-import { useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
+import { useCustomerDebtSummary, useCustomer } from '@/hooks/useCustomerQueries';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { sendSmsMessage } from '@/shared-packages/communication/services/sms.service';
+import { useCreateCommunicationHistory } from '@/shared-packages/communication/hooks/useCommunicationHistory';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -196,12 +200,21 @@ function OrderFormInner({
   const paymentStatus = form.watch('paymentStatus');
   const paidAmount = form.watch('paidAmount');
   const customerId = form.watch('customerId');
+  const { data: customer } = useCustomer(customerId || undefined);
   const [customerDebtRequestId, setCustomerDebtRequestId] = useState(0);
   const { data: customerDebtSummary, isFetching: isDebtSummaryFetching } = useCustomerDebtSummary({
     organizationId: currentOrganization?.id,
     customerId: customerId || undefined,
     requestId: customerDebtRequestId,
   });
+
+  const [sendSms, setSendSms] = useLocalStorage('order-send-sms', false);
+  const [smsMessage, setSmsMessage] = useLocalStorage(
+    'order-sms-message',
+    'Hi {name}, thank you for your purchase of {total}. We appreciate your business! - {orgName}'
+  );
+  const createHistoryMutation = useCreateCommunicationHistory();
+
   const orderItems: DiscountOrderItem[] = useMemo(() => {
     return items
       .map((item) => {
@@ -344,10 +357,49 @@ function OrderFormInner({
         toast.success('Order updated successfully');
         navigate('/orders');
       } else {
-        await createOrder.mutateAsync(orderData);
+        const createdOrder = await createOrder.mutateAsync(orderData);
         if (appliedDiscount) await incrementUsage.mutateAsync(appliedDiscount.discount.id);
 
         toast.success('Order created successfully');
+
+        if (sendSms && customer?.phone && smsMessage.trim()) {
+          try {
+            // @ts-ignore
+            const senderId = currentOrganization.sms_sender_id || (import.meta as any).env?.VITE_DEFAULT_SMS_SENDER_ID || 'FMTSoftware';
+
+            const finalMessage = smsMessage
+              .replace(/\{name\}/gi, customer.firstName || 'Customer')
+              .replace(/\{total\}/gi, formatCurrency(effectiveTotal))
+              .replace(/\{orgName\}/gi, currentOrganization.name || 'us');
+
+            await sendSmsMessage({
+              sender: senderId,
+              message: finalMessage,
+              recipients: [{ phone: customer.phone.trim() }],
+              sandbox: false,
+              organizationId: currentOrganization.id
+            });
+
+            if (createHistoryMutation) {
+              await createHistoryMutation.mutateAsync({
+                type: 'sms',
+                content: finalMessage,
+                recipient_type: 'custom',
+                recipient_ids: [customer.id],
+                recipient_count: 1,
+                status: 'sent',
+                metadata: {
+                  source: 'order_creation',
+                  orderId: createdOrder?.id,
+                  delivered_count: 1
+                }
+              });
+            }
+          } catch (smsError: any) {
+            console.error('Failed to send SMS:', smsError);
+          }
+        }
+
         if (currentDraftId) {
           setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
           setCurrentDraftId(null);
@@ -1008,6 +1060,45 @@ function OrderFormInner({
                 </div>
               </CardContent>
             </Card>
+
+            {!isEditing && customer && customer.phone && (
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="sendSms"
+                      checked={sendSms}
+                      onCheckedChange={(checked) => setSendSms(checked as boolean)}
+                    />
+                    <Label
+                      htmlFor="sendSms"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Send SMS receipt to customer
+                    </Label>
+                  </div>
+                  {sendSms && (
+                    <div className="space-y-2 mt-4">
+                      <div className="flex justify-between">
+                        <Label htmlFor="smsMessage">Message Template</Label>
+                        <span className="text-xs text-muted-foreground">{smsMessage.length}/150</span>
+                      </div>
+                      <Textarea
+                        id="smsMessage"
+                        value={smsMessage}
+                        onChange={(e) => setSmsMessage(e.target.value)}
+                        placeholder="Thank you for your purchase!"
+                        maxLength={150}
+                        className="resize-none bg-background"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use placeholders: <code className="bg-muted px-1 py-0.5 rounded">{"{name}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{total}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{orgName}"}</code>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Sheet open={draftsOpen} onOpenChange={setDraftsOpen}>
               <SheetContent side="right" className="w-full sm:max-w-md p-0">

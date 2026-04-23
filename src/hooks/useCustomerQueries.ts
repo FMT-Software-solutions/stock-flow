@@ -164,7 +164,7 @@ export function useCreateCustomer() {
         phone: customer.phone,
         address: customer.address,
         organization_id: customer.organizationId,
-        branch_id: customer.branchId,
+        branch_id: customer.branchId === '' ? null : customer.branchId,
       };
 
       const { data, error } = await supabase
@@ -192,7 +192,9 @@ export function useUpdateCustomer() {
       if (updates.email !== undefined) dbData.email = updates.email;
       if (updates.phone !== undefined) dbData.phone = updates.phone;
       if (updates.address !== undefined) dbData.address = updates.address;
-      if (updates.branchId !== undefined) dbData.branch_id = updates.branchId;
+      if (updates.branchId !== undefined) {
+        dbData.branch_id = updates.branchId === '' ? null : updates.branchId;
+      }
 
       const { data, error } = await supabase
         .from('customers')

@@ -257,7 +257,7 @@ export function useCreateExpense() {
           status: expense.status,
           reference: expense.reference,
           attachment_url: expense.attachmentUrl,
-          branch_id: expense.branchId,
+          branch_id: expense.branchId === '' ? null : expense.branchId,
           organization_id: expense.organizationId,
           created_by: user.id,
         })
@@ -290,7 +290,7 @@ export function useBulkCreateExpenses() {
         status: expense.status,
         reference: expense.reference,
         attachment_url: expense.attachmentUrl,
-        branch_id: expense.branchId,
+        branch_id: expense.branchId === '' ? null : expense.branchId,
         organization_id: expense.organizationId,
         created_by: user.id,
       }));
@@ -316,7 +316,7 @@ export function useUpdateExpense() {
       const updateData: any = {
         updated_at: new Date().toISOString(),
       };
-      
+
       if (updates.date !== undefined) updateData.date = updates.date;
       if (updates.amount !== undefined) updateData.amount = updates.amount;
       if (updates.categoryId !== undefined) updateData.category_id = updates.categoryId;
@@ -326,7 +326,9 @@ export function useUpdateExpense() {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.reference !== undefined) updateData.reference = updates.reference;
       if (updates.attachmentUrl !== undefined) updateData.attachment_url = updates.attachmentUrl;
-      if (updates.branchId !== undefined) updateData.branch_id = updates.branchId;
+      if (updates.branchId !== undefined) {
+        updateData.branch_id = updates.branchId === '' ? null : updates.branchId;
+      }
 
       const { data, error } = await supabase
         .from('expenses')

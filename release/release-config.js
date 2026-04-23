@@ -8,13 +8,14 @@
 
 module.exports = {
   // Version information
-  version: "1.0.0",
-  
+  version: "1.1.0",
+
   // Release notes in markdown format
   releaseNotes: `### Added
-- Initial release of Stock Flow
+- Communication features
 
 ### Improved / Changed
+- Routing
 
 ### Bug Fixes
 `,

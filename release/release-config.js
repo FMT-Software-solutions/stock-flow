@@ -8,14 +8,14 @@
 
 module.exports = {
   // Version information
-  version: "1.1.0",
+  version: "1.1.01",
 
   // Release notes in markdown format
   releaseNotes: `### Added
-- Communication features
+- Sale negotiation features
 
 ### Improved / Changed
-- Routing
+- Customer DB
 
 ### Bug Fixes
 `,

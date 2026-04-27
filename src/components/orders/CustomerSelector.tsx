@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, ChevronsUpDown, Plus, User } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, User, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,12 +31,16 @@ import { Field, FieldLabel, FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useCreateCustomer } from '@/hooks/useCustomerQueries';
 import { toast } from 'sonner';
+import { ModernFileUpload } from '@/components/shared/ModernFileUpload';
+import { uploadImageToCloudinary, deleteImageFromCloudinary } from '@/utils/cloudinary';
 
 const customerSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(2, 'Last name is required'),
   email: z.email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().optional(),
+  address: z.string().optional(),
+  images: z.array(z.string()).max(3, 'Maximum 3 images allowed').optional(),
 });
 
 function QuickCustomerForm({
@@ -48,6 +52,7 @@ function QuickCustomerForm({
 }) {
   const { currentOrganization } = useOrganization();
   const createCustomer = useCreateCustomer();
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(customerSchema),
@@ -56,8 +61,50 @@ function QuickCustomerForm({
       lastName: '',
       email: '',
       phone: '',
+      address: '',
+      images: [] as string[],
     },
   });
+
+  const handleImagesUpload = async (
+    files: File[],
+    currentImages: string[],
+    onChange: (urls: string[]) => void
+  ) => {
+    try {
+      setIsUploading(true);
+      const remainingSlots = 3 - currentImages.length;
+      const filesToUpload = files.slice(0, remainingSlots);
+
+      if (files.length > remainingSlots) {
+        toast.warning(`Only ${remainingSlots} more image(s) can be added. Maximum is 3.`);
+      }
+
+      const uploadPromises = filesToUpload.map((file) => uploadImageToCloudinary(file));
+      const newUrls = await Promise.all(uploadPromises);
+
+      onChange([...currentImages, ...newUrls]);
+    } catch (error) {
+      console.error('Upload failed', error);
+      toast.error('Failed to upload some images');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleImageDelete = async (
+    urlToDelete: string,
+    currentImages: string[],
+    onChange: (urls: string[]) => void
+  ) => {
+    try {
+      await deleteImageFromCloudinary(urlToDelete);
+      onChange(currentImages.filter(url => url !== urlToDelete));
+    } catch (error) {
+      console.error('Delete failed', error);
+      toast.error('Failed to delete image');
+    }
+  };
 
   async function onSubmit(values: z.infer<typeof customerSchema>) {
     if (!currentOrganization?.id) return;
@@ -130,13 +177,89 @@ function QuickCustomerForm({
           </Field>
         )}
       />
+      <Controller
+        control={form.control}
+        name="address"
+        render={({ field, fieldState }) => (
+          <Field data-invalid={!!fieldState.error}>
+            <FieldLabel>Address / Location</FieldLabel>
+            <Input {...field} />
+            {fieldState.error && (
+              <FieldError>{fieldState.error.message}</FieldError>
+            )}
+          </Field>
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="images"
+        render={({ field, fieldState }) => {
+          const currentImages = field.value || [];
+          return (
+            <Field data-invalid={!!fieldState.error}>
+              <FieldLabel>Customer Pictures (Max 3)</FieldLabel>
+              <div className="grid grid-cols-3 gap-2">
+                {currentImages.map((url: string, index: number) => (
+                  <div
+                    key={index}
+                    className="relative aspect-square w-full overflow-hidden rounded-md border"
+                  >
+                    <img
+                      src={url}
+                      alt={`Customer picture ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute right-1 top-1 h-4 w-4"
+                      onClick={() =>
+                        handleImageDelete(url, currentImages, field.onChange)
+                      }
+                    >
+                      <X className="h-2 w-2" />
+                    </Button>
+                  </div>
+                ))}
+                {currentImages.length < 3 && (
+                  <div className="relative aspect-square h-full w-full">
+                    <ModernFileUpload
+                      variant="compact"
+                      className="h-full w-full"
+                      multiple={true}
+                      onFilesSelect={(files) =>
+                        handleImagesUpload(files, currentImages, field.onChange)
+                      }
+                      onFileSelect={(file) =>
+                        handleImagesUpload([file], currentImages, field.onChange)
+                      }
+                      disabled={isUploading}
+                      maxSize={5}
+                    />
+                    {isUploading && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 text-[10px] font-medium text-center p-1 rounded-md">
+                        <Loader2 className="h-4 w-4 animate-spin mb-1" />
+                        <span>Uploading...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {fieldState.error && (
+                <FieldError>{fieldState.error.message}</FieldError>
+              )}
+            </Field>
+          );
+        }}
+      />
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button
           type="button"
-          disabled={createCustomer.isPending}
+          disabled={createCustomer.isPending || isUploading}
           onClick={() => form.handleSubmit(onSubmit)()}
         >
           {createCustomer.isPending ? 'Creating...' : 'Create Customer'}

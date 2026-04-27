@@ -9,6 +9,7 @@ const mapCustomerFromDB = (data: any): Customer => ({
   email: data.email,
   phone: data.phone,
   address: data.address,
+  images: data.images,
   organizationId: data.organization_id,
   branchId: data.branch_id,
   branchName: data.branch?.name,
@@ -163,6 +164,7 @@ export function useCreateCustomer() {
         email: customer.email,
         phone: customer.phone,
         address: customer.address,
+        images: customer.images || [],
         organization_id: customer.organizationId,
         branch_id: customer.branchId === '' ? null : customer.branchId,
       };
@@ -192,6 +194,7 @@ export function useUpdateCustomer() {
       if (updates.email !== undefined) dbData.email = updates.email;
       if (updates.phone !== undefined) dbData.phone = updates.phone;
       if (updates.address !== undefined) dbData.address = updates.address;
+      if (updates.images !== undefined) dbData.images = updates.images;
       if (updates.branchId !== undefined) {
         dbData.branch_id = updates.branchId === '' ? null : updates.branchId;
       }

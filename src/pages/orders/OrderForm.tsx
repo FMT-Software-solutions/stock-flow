@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp, Loader2, Pencil } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
@@ -256,11 +256,52 @@ function OrderFormInner({
   const incrementUsage = useIncrementDiscountUsage();
   const validateDiscount = useValidateDiscountServerSide();
 
-  const totalAmount = items.reduce((sum, item) => {
+  const [isEditingSubtotal, setIsEditingSubtotal] = useState(false);
+  const [customSubtotalStr, setCustomSubtotalStr] = useState<string>('');
+
+  const calculatedTotalAmount = items.reduce((sum, item) => {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unitPrice) || 0;
     return sum + qty * price;
   }, 0);
+
+  // Clear custom subtotal if items change
+  useEffect(() => {
+    setIsEditingSubtotal(false);
+    setCustomSubtotalStr('');
+  }, [calculatedTotalAmount]);
+
+  const totalAmount = isEditingSubtotal && customSubtotalStr !== '' && !isNaN(Number(customSubtotalStr))
+    ? Number(customSubtotalStr)
+    : calculatedTotalAmount;
+
+  // Distribute custom subtotal proportionally across items to keep DB consistent
+  const distributeSubtotal = (itemsToDistribute: any[], targetTotal: number) => {
+    if (calculatedTotalAmount === 0 || targetTotal === calculatedTotalAmount) return itemsToDistribute;
+    const ratio = targetTotal / calculatedTotalAmount;
+
+    let runningTotal = 0;
+    return itemsToDistribute.map((item, index) => {
+      const qty = Number(item.quantity) || 1;
+
+      if (index === itemsToDistribute.length - 1) {
+        // Last item absorbs the rounding difference
+        const remainder = targetTotal - runningTotal;
+        return {
+          ...item,
+          unitPrice: Number((remainder / qty).toFixed(2))
+        };
+      }
+
+      const newUnitPrice = Number((item.unitPrice * ratio).toFixed(2));
+      runningTotal += newUnitPrice * qty;
+      return {
+        ...item,
+        unitPrice: newUnitPrice
+      };
+    });
+  };
+
   const effectiveTotal = Math.max(0, totalAmount - (appliedDiscount?.amount ?? 0));
 
   // Auto-fill paid amount based on status logic
@@ -295,8 +336,13 @@ function OrderFormInner({
         );
       }
 
+      // Distribute any subtotal changes first
+      const distributedItems = isEditingSubtotal && customSubtotalStr !== '' && !isNaN(Number(customSubtotalStr))
+        ? distributeSubtotal(values.items, Number(customSubtotalStr))
+        : values.items;
+
       // Enrich items with product details (snapshot)
-      const enrichedItems = values.items.map((item) => {
+      const enrichedItems = distributedItems.map((item) => {
         const invItem = inventory.find((i) => i.id === item.inventoryId);
         const discountAmount = discountDistribution[item.inventoryId] || 0;
         return {
@@ -308,6 +354,7 @@ function OrderFormInner({
           sku: invItem?.sku,
           quantity: item.quantity,
           unit_price: item.unitPrice,
+          original_price: item.originalPrice !== undefined ? item.originalPrice : item.unitPrice,
           total_price: item.quantity * item.unitPrice,
           discount_amount: discountAmount,
         };
@@ -560,6 +607,9 @@ function OrderFormInner({
                   const currentQty = Number(item?.quantity) || 0;
                   const simulatedStock = maxQty - currentQty;
 
+                  const originalPrice = form.watch(`items.${index}.originalPrice`);
+                  const isChanged = originalPrice !== undefined && Number(item?.unitPrice) !== Number(originalPrice);
+
                   return (
                     <div
                       key={field.id}
@@ -583,6 +633,10 @@ function OrderFormInner({
                                       `items.${index}.unitPrice`,
                                       price
                                     );
+                                    form.setValue(
+                                      `items.${index}.originalPrice`,
+                                      price
+                                    );
                                   }
                                 }}
                                 branchId={selectedBranchId}
@@ -597,6 +651,9 @@ function OrderFormInner({
                                 <FieldError>
                                   {fieldState.error.message}
                                 </FieldError>
+                              )}
+                              {isChanged && (
+                                <div className="h-[10px]"></div>
                               )}
                             </Field>
                           )}
@@ -628,6 +685,9 @@ function OrderFormInner({
                                   }}
                                   value={(field.value as number) ?? ''}
                                 />
+                                {isChanged && (
+                                  <div className="h-[15px]"></div>
+                                )}
                               </Field>
                             );
                           }}
@@ -637,31 +697,46 @@ function OrderFormInner({
                         <Controller
                           control={form.control}
                           name={`items.${index}.unitPrice`}
-                          render={({ field, fieldState }) => (
-                            <Field data-invalid={!!fieldState.error}>
-                              <FieldLabel>Price</FieldLabel>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                {...field}
-                                readOnly
-                                className="bg-muted"
-                                value={(field.value as number) ?? ''}
-                              />
-                            </Field>
-                          )}
+                          render={({ field, fieldState }) => {
+                            return (
+                              <Field data-invalid={!!fieldState.error}>
+                                <FieldLabel>Price</FieldLabel>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  {...field}
+                                  value={(field.value as number) ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value ? Number(e.target.value) : '';
+                                    field.onChange(val);
+                                  }}
+                                />
+                                {isChanged && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    Original: {formatCurrency(Number(originalPrice))}
+                                  </div>
+                                )}
+                              </Field>
+                            );
+                          }}
                         />
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive mb-1 shrink-0"
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive mb-1 shrink-0"
+                          onClick={() => remove(index)}
+                          disabled={fields.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        {isChanged && (
+                          <div className="h-[15px]"></div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -997,69 +1072,7 @@ function OrderFormInner({
               </Collapsible>
             </Card>
 
-            <Card className="bg-card/50">
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center text-sm">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(totalAmount)}</span>
-                </div>
-                {appliedDiscount?.amount ? (
-                  <div className="flex justify-between items-center text-sm text-green-600 mt-2">
-                    <span>Discount</span>
-                    <span>-{formatCurrency(appliedDiscount.amount)}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between items-center text-lg font-bold pt-2 mt-2 border-t">
-                  <span>Total</span>
-                  <span>{formatCurrency(effectiveTotal)}</span>
-                </div>
 
-                <div className="mt-2 pt-2 border-t">
-                  <Controller
-                    control={form.control}
-                    name="paidAmount"
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={!!fieldState.error}>
-                        <FieldLabel>Paid Amount</FieldLabel>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            field.onChange(val);
-                            if (!isNaN(val)) {
-                              if (val >= effectiveTotal) {
-                                form.setValue('paymentStatus', 'paid');
-                              } else if (val > 0) {
-                                form.setValue('paymentStatus', 'partial');
-                              } else {
-                                form.setValue('paymentStatus', 'unpaid');
-                              }
-                            }
-                          }}
-                          readOnly={paymentStatus === 'paid'}
-                          className={paymentStatus === 'paid' ? 'bg-muted' : 'bg-muted/30'}
-                        />
-                        {fieldState.error && (
-                          <FieldError>{fieldState.error.message}</FieldError>
-                        )}
-                      </Field>
-                    )}
-                  />
-                  {(paidAmount !== undefined && paidAmount < effectiveTotal) && (
-                    <div className="flex justify-between items-center text-sm text-red-600 mt-2">
-                      <span>Remaining (Arrears)</span>
-                      <span>{formatCurrency(effectiveTotal - (paidAmount || 0))}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
             {!isEditing && customer && customer.phone && (
               <Card className="bg-primary/5 border-primary/20">
@@ -1246,20 +1259,111 @@ function OrderFormInner({
               </SheetContent>
             </Sheet>
 
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => navigate('/orders')}
-              >
+          </div>
+        </div>
+
+        {/* Fixed Footer Bar */}
+        <div className="sticky bottom-0 z-40 bg-background/95 backdrop-blur border px-4 sm:px-8 py-4 mt-8 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.1)]">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-8 w-full lg:w-auto">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                Subtotal
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditingSubtotal) {
+                      setIsEditingSubtotal(false);
+                      setCustomSubtotalStr('');
+                    } else {
+                      setIsEditingSubtotal(true);
+                      setCustomSubtotalStr(calculatedTotalAmount.toString());
+                    }
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                  title={isEditingSubtotal ? "Cancel edit" : "Edit subtotal"}
+                >
+                  {isEditingSubtotal ? <X className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                </button>
+              </span>
+              {isEditingSubtotal ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="h-7 w-24 text-sm px-2 py-1 mt-0.5"
+                  value={customSubtotalStr}
+                  onChange={(e) => setCustomSubtotalStr(e.target.value)}
+                  autoFocus
+                />
+              ) : (
+                <span className="font-medium">{formatCurrency(totalAmount)}</span>
+              )}
+            </div>
+            {appliedDiscount?.amount ? (
+              <div className="flex flex-col text-green-600">
+                <span className="text-xs">Discount</span>
+                <span className="font-medium">-{formatCurrency(appliedDiscount.amount)}</span>
+              </div>
+            ) : null}
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Total</span>
+              <span className="text-xl font-bold">{formatCurrency(effectiveTotal)}</span>
+            </div>
+            {(paidAmount !== undefined && paidAmount < effectiveTotal) && (
+              <div className="flex flex-col text-destructive ml-auto lg:ml-4">
+                <span className="text-xs">Remaining (Arrears)</span>
+                <span className="font-medium">{formatCurrency(effectiveTotal - (paidAmount || 0))}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+            <div className="flex items-center gap-3 bg-muted/50 p-2 px-3 rounded-lg w-full sm:w-auto border">
+              <FieldLabel className="mb-0 whitespace-nowrap font-medium">Paid Amount</FieldLabel>
+              <Controller
+                control={form.control}
+                name="paidAmount"
+                render={({ field, fieldState }) => (
+                  <div className="relative flex-1 sm:w-32">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        field.onChange(val);
+                        if (!isNaN(val)) {
+                          if (val >= effectiveTotal) {
+                            form.setValue('paymentStatus', 'paid');
+                          } else if (val > 0) {
+                            form.setValue('paymentStatus', 'partial');
+                          } else {
+                            form.setValue('paymentStatus', 'unpaid');
+                          }
+                        }
+                      }}
+                      readOnly={paymentStatus === 'paid'}
+                      className={`h-9 ${paymentStatus === 'paid' ? 'bg-muted' : 'bg-background'}`}
+                    />
+                    {fieldState.error && (
+                      <span className="absolute -top-10 left-0 text-xs text-destructive bg-background border border-destructive/20 px-2 py-1 rounded shadow-sm whitespace-nowrap z-50">
+                        {fieldState.error.message}
+                      </span>
+                    )}
+                  </div>
+                )}
+              />
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => navigate('/orders')}>
                 Cancel
               </Button>
               {!isEditing && (
                 <Button
                   type="button"
                   variant="secondary"
-                  className="flex-1"
+                  className="flex-1 sm:flex-none"
                   onClick={handleSaveDraft}
                   disabled={
                     !Array.isArray(items) ||
@@ -1267,17 +1371,13 @@ function OrderFormInner({
                     !items.some((it) => (it.inventoryId || '').trim().length > 0)
                   }
                 >
-                  <Save className="h-4 w-4 mr-2" /> Save Draft
+                  <Save className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Save Draft</span>
                 </Button>
               )}
               <Button
                 type="submit"
-                className="flex-1"
-                disabled={
-                  !selectedBranchId ||
-                  createOrder.isPending ||
-                  updateOrder.isPending
-                }
+                className="flex-1 sm:flex-none"
+                disabled={!selectedBranchId || createOrder.isPending || updateOrder.isPending}
               >
                 {isEditing ? 'Update Sale' : 'Create Sale'}
               </Button>

@@ -5,6 +5,7 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  images?: string[] | null;
   organizationId: string;
   branchId?: string;
   branchName?: string;

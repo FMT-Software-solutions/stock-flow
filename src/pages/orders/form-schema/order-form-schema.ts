@@ -22,6 +22,7 @@ export const orderSchema = z.object({
         inventoryId: z.string().min(1, 'Product is required'),
         quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
         unitPrice: z.coerce.number().min(0, 'Price must be non-negative'),
+        originalPrice: z.coerce.number().optional(),
         productName: z.string().optional(), // For optimistic UI or passing data
       })
     )

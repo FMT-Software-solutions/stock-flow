@@ -148,6 +148,7 @@ export const columns: ColumnDef<Customer>[] = [
         row.lastName || '',
         row.email || '',
         row.phone || '',
+        row.address || '',
       ]
         .join(' ')
         .trim(),
@@ -160,9 +161,8 @@ export const columns: ColumnDef<Customer>[] = [
       <DataTableColumnHeader column={column} title="Name" />
     ),
     cell: ({ row }) => {
-      const fullName = `${row.original.firstName || ''} ${
-        row.original.lastName || ''
-      }`.trim();
+      const fullName = `${row.original.firstName || ''} ${row.original.lastName || ''
+        }`.trim();
       return (
         <div className="flex items-center gap-1 group/copy">
           <Link
@@ -236,6 +236,29 @@ export const columns: ColumnDef<Customer>[] = [
               className="h-3 w-3 opacity-0 group-hover/copy:opacity-100 cursor-pointer transition-opacity"
               onClick={() => {
                 navigator.clipboard.writeText(phone);
+                toast.success('Copied to clipboard');
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'address',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Address" />
+    ),
+    cell: ({ row }) => {
+      const address = row.getValue('address') as string;
+      return (
+        <div className="flex items-center gap-1 group/copy max-w-[200px]">
+          <div className="truncate" title={address || ''}>{address || <span className="text-muted-foreground">-</span>}</div>
+          {address && (
+            <Copy
+              className="h-3 w-3 opacity-0 group-hover/copy:opacity-100 cursor-pointer transition-opacity shrink-0"
+              onClick={() => {
+                navigator.clipboard.writeText(address);
                 toast.success('Copied to clipboard');
               }}
             />

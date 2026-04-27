@@ -58,6 +58,11 @@ export const customerExportFields: ExportField[] = [
     accessorFn: (row: any) => row.original.phone,
   },
   {
+    id: 'address',
+    label: 'Address',
+    accessorFn: (row: any) => row.original.address,
+  },
+  {
     id: 'branchName',
     label: 'Branch',
     accessorFn: (row: any) => row.original.branchName,

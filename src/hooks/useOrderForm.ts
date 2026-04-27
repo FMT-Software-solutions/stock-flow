@@ -21,6 +21,7 @@ export const useOrderForm = ({ id }: UseOrderFormProps) => {
           inventoryId: item.inventory_id || '',
           quantity: Number(item.quantity),
           unitPrice: Number(item.unit_price),
+          originalPrice: item.original_price != null ? Number(item.original_price) : Number(item.unit_price),
           productName: item.product_name,
         })) || [];
 

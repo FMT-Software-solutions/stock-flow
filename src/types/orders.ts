@@ -13,6 +13,7 @@ export interface OrderItem {
   sku?: string | null;
   quantity: number;
   unit_price: number;
+  original_price?: number | null;
   total_price: number;
   discount_amount?: number;
   created_at: string;

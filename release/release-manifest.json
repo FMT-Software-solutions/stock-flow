@@ -1,0 +1,14 @@
+{
+  "releases": [
+    {
+      "version": "1.1.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "download_url": "https://your-domain.com/releases/stock-flow-setup-1.0.0.exe",
+      "file_size": 122453981,
+      "release_notes": "### Added\n- Communication features\n\n### Improved / Changed\n- Routing\n\n### Bug Fixes\n",
+      "status": "draft",
+      "created_at": "2026-04-23T01:36:13.193Z"
+    }
+  ]
+}

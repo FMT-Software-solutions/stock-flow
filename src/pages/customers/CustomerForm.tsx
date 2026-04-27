@@ -217,7 +217,7 @@ export function CustomerForm() {
                     <FieldLabel htmlFor="phone">Phone</FieldLabel>
                     <Input
                       id="phone"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+233456765678"
                       {...field}
                     />
                     {fieldState.error && (

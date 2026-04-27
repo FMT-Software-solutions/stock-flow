@@ -8,7 +8,7 @@
 
 module.exports = {
   // Version information
-  version: "1.1.01",
+  version: "1.1.1",
 
   // Release notes in markdown format
   releaseNotes: `### Added

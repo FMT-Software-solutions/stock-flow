@@ -2,11 +2,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useUpdateStore } from './stores/updateStore';
-import type { AutoUpdateResult, DownloadProgress } from '@/types/electron';
+import type { AutoUpdateResult, DownloadProgress, PlatformInfo } from '@/types/electron';
 import { Download } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { openExternalUrl } from '@/utils/external-url';
-type InstallType = 'appimage' | 'package';
 
 import { toast } from 'sonner';
 
@@ -30,23 +29,21 @@ export const RestartToUpdateButton: React.FC<RestartToUpdateButtonProps> = ({
     setIsDownloadComplete,
   } = useUpdateStore();
 
-  const [installType, setInstallType] = useState<InstallType>('appimage');
+  const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
 
-  // Fetch install type on mount
+  // Fetch platform info on mount
   useEffect(() => {
-    async function fetchInstallType() {
-      if (window.electron?.ipcRenderer) {
+    async function fetchPlatformInfo() {
+      if (window.electron?.getPlatformInfo) {
         try {
-          const info = await window.electron.ipcRenderer.invoke(
-            'get-platform-info'
-          );
-          setInstallType(info.installType || 'package');
+          const info = await window.electron.getPlatformInfo();
+          setPlatformInfo(info);
         } catch (e) {
-          setInstallType('package');
+          console.error('Failed to get platform info', e);
         }
       }
     }
-    fetchInstallType();
+    fetchPlatformInfo();
   }, []);
 
   // Listen for automatic download events
@@ -249,8 +246,10 @@ export const RestartToUpdateButton: React.FC<RestartToUpdateButtonProps> = ({
     );
   }
 
-  // Show install updates button for AppImage
-  if (installType === 'appimage' && isDownloadComplete) {
+  const isLinuxPackage = platformInfo?.platform === 'linux' && platformInfo?.installType === 'package';
+
+  // Show install updates button for AppImage and Windows
+  if (!isLinuxPackage && isDownloadComplete) {
     return (
       <Button
         onClick={handleInstallUpdates}
@@ -268,8 +267,8 @@ export const RestartToUpdateButton: React.FC<RestartToUpdateButtonProps> = ({
     );
   }
 
-  // For .deb/.rpm (installType === 'package'), show Download from Website bustton
-  if (installType === 'package' && hasUpdate) {
+  // For Linux packages (.deb/.rpm), show Download from Website button
+  if (isLinuxPackage && hasUpdate) {
     const handleDownloadClick = () => {
       const downloadUrl = import.meta.env.VITE_DOWNLOADS_PAGE_URL || '';
       if (downloadUrl) {
@@ -288,7 +287,7 @@ export const RestartToUpdateButton: React.FC<RestartToUpdateButtonProps> = ({
         title="Go to the download page to get the latest version"
       >
         <Download className="h-3 w-3 mr-2" />
-        Download from Website
+        Download Updates
       </Button>
     );
   }

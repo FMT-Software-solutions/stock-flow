@@ -133,7 +133,11 @@ function downloadFileWithProgress(url: string, filePath: string): Promise<any> {
     let lastProgressUpdate = 0
     const PROGRESS_THROTTLE_MS = 100 // Throttle progress updates to every 100ms
     
-    const request = https.get(url, (response: any) => {
+    // Choose http or https based on the protocol
+    const isHttps = url.startsWith('https:');
+    const client = isHttps ? https : require('http');
+
+    const request = client.get(url, (response: any) => {
       // Handle redirects
       if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
         const redirectUrl = response.headers.location

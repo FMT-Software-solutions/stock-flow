@@ -470,7 +470,7 @@ export function UpdateSettings({ className }: UpdateSettingsProps) {
                 <div className="flex items-center space-x-2">
                   {/* Show different buttons based on Linux installation type */}
                   {platformInfo?.platform === 'linux' &&
-                  platformInfo.installType === 'package' ? (
+                    platformInfo.installType === 'package' ? (
                     <Button
                       onClick={() => {
                         const downloadUrl = import.meta.env.VITE_DOWNLOADS_PAGE_URL || '';
@@ -484,7 +484,7 @@ export function UpdateSettings({ className }: UpdateSettingsProps) {
                       )}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Download from Website
+                      Download updates
                     </Button>
                   ) : (
                     <Button
@@ -521,7 +521,7 @@ export function UpdateSettings({ className }: UpdateSettingsProps) {
                   )}
 
                   {(isDownloading || downloadProgress) &&
-                    platformInfo?.installType !== 'package' && (
+                    !(platformInfo?.platform === 'linux' && platformInfo?.installType === 'package') && (
                       <Button
                         onClick={cancelDownload}
                         variant="outline"

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-04-28
+
+### Added
+
+### Improved / Changed
+- Sale entry enhancements
+
+### Bug Fixes
+- Fixed a bug in the sale deletion process
+
+
 ## [1.1.01] - 2026-04-27
 
 ### Added

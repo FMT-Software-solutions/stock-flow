@@ -151,6 +151,30 @@ export default function CustomerDetails() {
 
     const columns: ColumnDef<Order>[] = [
         {
+            id: 'search',
+            accessorFn: (row) => {
+                const items = row.items?.map((item) => item.product_name).join(' ') || '';
+                const branchName = row.branch?.name || '';
+                const paymentMethod = row.payment_method
+                    ? row.payment_method.replace(/_/g, ' ')
+                    : '';
+
+                return [
+                    row.order_number || '',
+                    branchName,
+                    items,
+                    row.total_amount?.toString() || '',
+                    row.paid_amount?.toString() || '',
+                    row.status || '',
+                    row.payment_status || '',
+                    paymentMethod,
+                ]
+                .join(' ')
+                .trim();
+        },
+        enableHiding: true,
+    },
+        {
             accessorKey: 'order_number',
             id: 'orderNumber',
             header: ({ column }) => (
@@ -528,11 +552,12 @@ export default function CustomerDetails() {
                             <DataTable
                                 columns={columns}
                                 data={orders}
-                                searchKey="orderNumber"
+                                searchKey="search"
                                 storageKey={`customer-orders-${customer.id}`}
                                 exportFields={customerOrderExportFields}
                                 filterFields={filterFields}
                                 canExport={canExportOrders}
+                                defaultColumnVisibility={{ search: false }}
                             />
                         </div>
                     </CardContent>

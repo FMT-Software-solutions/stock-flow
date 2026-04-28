@@ -19,6 +19,7 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import { StatCard } from './components/StatCard';
 import { CustomersExportDialog } from './export/CustomersExportDialog';
+import { CustomerHoverLink } from '@/components/shared/CustomerHoverLink';
 
 type CustomersReport = {
   total_customers: number;
@@ -149,7 +150,11 @@ export function CustomersSection({
                 >
                   <div className="flex items-center gap-3">
                     <div className="text-muted-foreground font-bold">#{i + 1}</div>
-                    <div className="font-medium">{c.name}</div>
+                    <CustomerHoverLink
+                      customerId={c.customer_id}
+                      customerName={c.name}
+                      className="font-medium"
+                    />
                   </div>
                   <div className="text-right">
                     <div className="font-bold">{formatCurrency(c.total_spent)}</div>
@@ -219,7 +224,11 @@ export function CustomersSection({
                   >
                     <div className="flex items-center gap-3">
                       <div className="text-muted-foreground font-bold">#{i + 1}</div>
-                      <div className="font-medium">{c.name}</div>
+                      <CustomerHoverLink
+                        customerId={c.customer_id}
+                        customerName={c.name}
+                        className="font-medium"
+                      />
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-orange-600">
@@ -229,8 +238,8 @@ export function CustomersSection({
                         {c.open_orders} open orders
                         {lastOwingDate
                           ? ` • ${format(lastOwingDate, 'MMMM dd, yyyy')} (${formatDistanceToNow(
-                              lastOwingDate
-                            )} ago)`
+                            lastOwingDate
+                          )} ago)`
                           : ''}
                       </div>
                     </div>

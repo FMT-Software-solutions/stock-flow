@@ -19,6 +19,7 @@ import { supabase } from '@/utils/supabase';
 import { SalesSummary } from './sales/SalesSummary';
 import { dateToBucketKey, nextBucket, startOfUnit, formatStatusLabel, paymentStatusDisplay, type GroupUnit, type RowGroup } from './sales/utils';
 import { SalesExportDialog } from './export/SalesExportDialog';
+import { CustomerHoverLink } from '@/components/shared/CustomerHoverLink';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import {
@@ -40,7 +41,7 @@ import {
   YAxis,
 } from 'recharts';
 
- 
+
 
 interface SalesSectionProps {
   orgId?: string;
@@ -70,8 +71,8 @@ export function SalesSection({
   const exportBranchNames =
     branchIds && branchIds.length
       ? branchIds
-          .map((id) => availableBranches.find((b) => b.id === id)?.name)
-          .filter((n): n is string => !!n)
+        .map((id) => availableBranches.find((b) => b.id === id)?.name)
+        .filter((n): n is string => !!n)
       : [];
   const startIso = dateRange?.from ? new Date(dateRange.from).toISOString() : null;
   const endIso = dateRange?.to ? new Date(dateRange.to).toISOString() : null;
@@ -205,7 +206,7 @@ export function SalesSection({
       .sort((a, b) => b.value - a.value);
   }, [filteredOrders]);
 
- 
+
 
   const customerOptions = useMemo<Option[]>(() => {
     const set = new Set<string>();
@@ -239,19 +240,19 @@ export function SalesSection({
       }
       return cols.reverse();
     }
-      const bucketDates = new Map<string, number>();
-      filteredOrders.forEach((o) => {
-        const d = new Date(o.date || o.created_at);
-        const start = startOfUnit(d, groupUnit);
-        const key = dateToBucketKey(start.toISOString(), groupUnit);
-        const ts = start.getTime();
-        if (!bucketDates.has(key) || (bucketDates.get(key) || 0) < ts) {
-          bucketDates.set(key, ts);
-        }
-      });
-      return Array.from(bucketDates.entries())
-        .sort((a, b) => (b[1] - a[1]))
-        .map(([k]) => k);
+    const bucketDates = new Map<string, number>();
+    filteredOrders.forEach((o) => {
+      const d = new Date(o.date || o.created_at);
+      const start = startOfUnit(d, groupUnit);
+      const key = dateToBucketKey(start.toISOString(), groupUnit);
+      const ts = start.getTime();
+      if (!bucketDates.has(key) || (bucketDates.get(key) || 0) < ts) {
+        bucketDates.set(key, ts);
+      }
+    });
+    return Array.from(bucketDates.entries())
+      .sort((a, b) => (b[1] - a[1]))
+      .map(([k]) => k);
   }, [filteredOrders, dateRange, groupUnit]);
 
   const pivotRows = useMemo(() => {
@@ -295,6 +296,7 @@ export function SalesSection({
           o.customer?.name ||
           'Guest';
         rowLabel = customerName;
+        meta = { customerId: o.customer?.id };
       }
       const existing = rowsMap.get(rowLabel) || { columns: {}, meta };
       const colAgg = existing.columns[bucket] || { total: 0, paid: 0, due: 0 };
@@ -313,7 +315,7 @@ export function SalesSection({
     rows.sort((a, b) => a.rowLabel.localeCompare(b.rowLabel));
     return rows;
   }, [filteredOrders, groupUnit, rowGroup]);
- 
+
 
   return (
     <>
@@ -339,7 +341,7 @@ export function SalesSection({
             </div>
           </CardContent>
         </Card>
-       
+
         <Card>
           <CardHeader>
             <CardTitle>Revenue</CardTitle>
@@ -354,7 +356,7 @@ export function SalesSection({
                 <CurrencyDisplay amount={salesStats?.owings ?? totalOwings} />
               </span>
             </div>
-           
+
             <div className="flex justify-between items-center text-orange-500 mt-2">
               <span className="text-xs text-muted-foreground">Refunds</span>
               <span className='text-sm'>
@@ -363,7 +365,7 @@ export function SalesSection({
             </div>
           </CardContent>
         </Card>
-       
+
         {template === 'pivot' && (
           <Card className="md:col-span-3 lg:col-span-2">
             <CardHeader>
@@ -415,7 +417,7 @@ export function SalesSection({
                     className="w-full"
                   />
                 </div>
-                
+
               </div>
             </CardContent>
           </Card>
@@ -605,7 +607,7 @@ export function SalesSection({
             )}
           </CardContent>
         </Card>
-        
+
       </div>
 
       {template === 'pivot' && (
@@ -636,7 +638,17 @@ export function SalesSection({
                     return (
                       <tr key={r.rowLabel} className="border-t">
                         <td className="p-2 font-medium min-w-32.5">
-                          <div>{r.rowLabel}</div>
+                          {rowGroup === 'customer' && r.meta?.customerId ? (
+                            <div>
+                              <CustomerHoverLink
+                                customerId={r.meta.customerId}
+                                customerName={r.rowLabel}
+                                className="font-medium"
+                              />
+                            </div>
+                          ) : (
+                            <div>{r.rowLabel}</div>
+                          )}
                           {r.meta?.items && Array.isArray(r.meta.items) && r.meta.items.length > 0 && (
                             <div className="mt-1 space-y-1 text-xs text-muted-foreground">
                               {r.meta.items.map((it: string, idx: number) => (
@@ -661,9 +673,9 @@ export function SalesSection({
                                 </div>
                               ) : (
                                 <div className="flex flex-col items-end">
-                                  
-                                   <CurrencyDisplay amount={c.paid} />
-                                
+
+                                  <CurrencyDisplay amount={c.paid} />
+
                                   {showDue && (
                                     <span className="text-[10px] text-red-500 font-medium">
                                       Due: <CurrencyDisplay amount={c.due} />
@@ -678,12 +690,12 @@ export function SalesSection({
                           {(rowGroup === 'payment_status' || rowGroup === 'status') && r.rowLabel === 'Refunded' ? (
                             <div className="flex flex-col items-end">
                               <span className="text-[10px] text-orange-500 font-medium">
-                               <CurrencyDisplay amount={rowTotals.total} />
+                                <CurrencyDisplay amount={rowTotals.total} />
                               </span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-end">
-                               <CurrencyDisplay amount={rowTotals.paid} />
+                              <CurrencyDisplay amount={rowTotals.paid} />
                               {(rowGroup === 'payment_status' ? r.rowLabel === 'Partially Paid' && rowTotals.due > 0 : rowTotals.due > 0) && (
                                 <span className="text-[10px] text-red-500 font-medium">
                                   Due: <CurrencyDisplay amount={rowTotals.due} />
@@ -745,7 +757,7 @@ export function SalesSection({
           </CardContent>
         </Card>
       )}
-      
+
       {template === 'summary' && (
         <SalesSummary orders={filteredOrders} groupUnit={groupUnit} dateRange={dateRange} />
       )}
@@ -797,7 +809,12 @@ export function SalesSection({
                           <div className="text-[10px] text-muted-foreground">{formatDistanceToNow(d, { addSuffix: true })}</div>
                         </td>
                         <td className="p-2">#{o.order_number}</td>
-                        <td className="p-2">{customerName}</td>
+                        <td className="p-2">
+                          <CustomerHoverLink
+                            customerId={o.customer?.id}
+                            customerName={customerName}
+                          />
+                        </td>
                         <td className="p-2">{o.branch?.name || 'Unspecified'}</td>
                         <td className="p-2">
                           <div className="space-y-1">
@@ -812,7 +829,7 @@ export function SalesSection({
                             <CurrencyDisplay amount={o.paid_amount || 0} />
                             {due > 0 && <span className={due > 0 ? 'text-[10px] text-red-500 font-medium' : 'text-[10px] text-muted-foreground'}>
                               Due: <CurrencyDisplay amount={due} />
-                            </span> }
+                            </span>}
                           </div>
                         </td>
                         <td className="p-2">{recordedBy || '-'}</td>
@@ -843,6 +860,6 @@ export function SalesSection({
         onClose={onExportClose}
         branchNames={exportBranchNames}
       />
-      </>
+    </>
   );
 }

@@ -9,10 +9,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer } from 'lucide-react';
+import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useDeleteOrder } from '@/hooks/useOrders';
+import { useCurrency } from '@/hooks/useCurrency';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { QuickSmsDialog } from '@/shared-packages/communication/components/sms/QuickSmsDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +39,11 @@ export function OrderActions({ order }: OrderActionsProps) {
   const deleteOrder = useDeleteOrder();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const { checkPermission } = useRoleCheck();
+  const { formatCurrency } = useCurrency();
+  const { currentOrganization } = useOrganization();
   const canEdit = checkPermission('orders', 'edit');
   const canDelete = checkPermission('orders', 'delete');
   const canExport = checkPermission('orders', 'export');
@@ -46,6 +52,9 @@ export function OrderActions({ order }: OrderActionsProps) {
     navigator.clipboard.writeText(order.order_number);
     toast.success('Order number copied to clipboard');
   };
+
+  const totalItemsToRestore = order.items?.reduce((sum, item) => sum + Number(item.quantity), 0) || 0;
+  const shouldShowRestoreNote = totalItemsToRestore > 0 && order.status !== 'cancelled' && order.status !== 'refunded';
 
   const handleDelete = () => {
     deleteOrder.mutate(order.id, {
@@ -107,6 +116,17 @@ export function OrderActions({ order }: OrderActionsProps) {
                 Print Receipt
               </DropdownMenuItem>
             )}
+          {order.customer && order.customer.phone && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSmsDialog(true);
+              }}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Send SMS
+            </DropdownMenuItem>
+          )}
           {canEdit && (
             <DropdownMenuItem
               onClick={(e) => {
@@ -145,8 +165,15 @@ export function OrderActions({ order }: OrderActionsProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will delete the
-              order.
+              This action cannot be undone. This will delete the order.
+              {shouldShowRestoreNote && (
+                <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 rounded-md text-sm border border-amber-200 dark:border-amber-800">
+                  <p className="font-medium mb-1">Stock Restoration</p>
+                  <p>
+                    <strong>{totalItemsToRestore}</strong> unit{totalItemsToRestore !== 1 ? 's' : ''} of stock will be restored back to inventory upon deletion.
+                  </p>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -168,6 +195,17 @@ export function OrderActions({ order }: OrderActionsProps) {
         }}
         order={order}
       />
+
+      {order.customer && (
+        <QuickSmsDialog
+          isOpen={showSmsDialog}
+          onOpenChange={setShowSmsDialog}
+          recipientName={`${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()}
+          recipientPhone={order.customer.phone}
+          defaultMessage={`Dear ${order.customer.first_name || 'Customer'}, your order #${order.order_number} for ${formatCurrency(order.total_amount)} has been confirmed by ${currentOrganization?.name || 'us'}. Thank you for your business!`}
+          metadata={{ orderId: order.id }}
+        />
+      )}
     </div>
   );
 }

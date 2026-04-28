@@ -7,9 +7,9 @@ import { OrderItemsCell } from '@/components/orders/OrderItemsCell';
 import { OrderStatusCell } from '@/components/orders/OrderStatusCell';
 import { OrderPaymentStatusCell } from '@/components/orders/OrderPaymentStatusCell';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
+import { CustomerHoverLink } from '@/components/shared/CustomerHoverLink';
 import { OrderActions } from './OrderActions';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
-import { Link } from 'react-router-dom';
 import { useState } from 'react';
 
 function OrderNumberCell({ order }: { order: Order }) {
@@ -35,6 +35,36 @@ function OrderNumberCell({ order }: { order: Order }) {
 }
 
 export const columns: ColumnDef<Order>[] = [
+  {
+    id: 'search',
+    accessorFn: (row) => {
+      const items = row.items?.map((item) => item.product_name).join(' ') || '';
+      const branchName = row.branch?.name || '';
+      const customerName = row.customer
+        ? `${row.customer.first_name || ''} ${row.customer.last_name || ''}`.trim() ||
+        row.customer.email ||
+        ''
+        : '';
+      const paymentMethod = row.payment_method
+        ? row.payment_method.replace(/_/g, ' ')
+        : '';
+
+      return [
+        row.order_number || '',
+        branchName,
+        customerName,
+        items,
+        row.total_amount?.toString() || '',
+        row.paid_amount?.toString() || '',
+        row.status || '',
+        row.payment_status || '',
+        paymentMethod,
+      ]
+        .join(' ')
+        .trim();
+    },
+    enableHiding: true,
+  },
   // We wll enable select column later
   // {
   //   id: 'select',
@@ -74,12 +104,12 @@ export const columns: ColumnDef<Order>[] = [
       <DataTableColumnHeader column={column} title="Branch" />
     ),
     cell: ({ row }) => {
-        const branch = row.original.branch;
-        return branch ? <span className='max-w-21.25 truncate line-clamp-1' title={branch.name}>{branch.name}</span> : '-';
+      const branch = row.original.branch;
+      return branch ? <span className='max-w-21.25 truncate line-clamp-1' title={branch.name}>{branch.name}</span> : '-';
     },
     filterFn: (row, id, value) => {
-        // Simple filter for now, usually handled by server or strict equality
-        return value.includes(row.getValue(id));
+      // Simple filter for now, usually handled by server or strict equality
+      return value.includes(row.getValue(id));
     }
   },
   {
@@ -110,7 +140,7 @@ export const columns: ColumnDef<Order>[] = [
     header: 'Items',
     cell: ({ row }) => <OrderItemsCell items={row.original.items || []} />,
   },
-  
+
   {
     accessorKey: 'total_amount',
     id: 'totalAmount',
@@ -120,11 +150,11 @@ export const columns: ColumnDef<Order>[] = [
     cell: ({ row }) => {
       const val = row.getValue('totalAmount') as number | string;
       const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
-      return <CurrencyDisplay amount={isNaN(amount) ? 0 : amount}  />;
+      return <CurrencyDisplay amount={isNaN(amount) ? 0 : amount} />;
     },
     filterFn: () => {
-        // Range filter logic if needed, but simplified for now
-        return true; 
+      // Range filter logic if needed, but simplified for now
+      return true;
     }
   },
   {
@@ -137,15 +167,15 @@ export const columns: ColumnDef<Order>[] = [
       const paid = (row.getValue('paidAmount') as number) || 0;
       const total = row.original.total_amount || 0;
       const arrears = total - paid;
-      
+
       return (
         <div className="flex flex-col">
-            <CurrencyDisplay amount={paid} />
-            {arrears > 0 && row.original.payment_status !== 'refunded' && (
-                 <span className="text-[10px] text-red-500 font-medium">
-                   Due: <CurrencyDisplay amount={arrears} />
-                 </span>
-            )}
+          <CurrencyDisplay amount={paid} />
+          {arrears > 0 && row.original.payment_status !== 'refunded' && (
+            <span className="text-[10px] text-red-500 font-medium">
+              Due: <CurrencyDisplay amount={arrears} />
+            </span>
+          )}
         </div>
       );
     },
@@ -158,7 +188,7 @@ export const columns: ColumnDef<Order>[] = [
     ),
     cell: ({ row }) => <OrderPaymentStatusCell order={row.original} />,
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id));
+      return value.includes(row.getValue(id));
     },
   },
   {
@@ -171,14 +201,14 @@ export const columns: ColumnDef<Order>[] = [
       const raw = row.getValue('paymentMethod') as string | undefined;
       const label = raw
         ? raw
-            .split('_')
-            .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-            .join(' ')
+          .split('_')
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+          .join(' ')
         : '-';
       return <span className="text-xs">{label}</span>;
     },
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id));
+      return value.includes(row.getValue(id));
     },
     enableHiding: true,
   },
@@ -188,28 +218,27 @@ export const columns: ColumnDef<Order>[] = [
       <DataTableColumnHeader column={column} title="Customer" />
     ),
     accessorFn: (row) => {
-        const customer = row.customer;
-        if (!customer) return '-';
-        return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email || 'Guest';
+      const customer = row.customer;
+      if (!customer) return '-';
+      return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email || 'Guest';
     },
     cell: ({ row }) => {
-        const customer = row.original.customer;
-        if (!customer) return '-';
-        const name =
-          `${customer.first_name || ''} ${customer.last_name || ''}`.trim() ||
-          customer.email ||
-          'Guest';
-        return (
-          <Link
-            to={`/customers/details/${customer.id}`}
-            className="hover:underline text-xs"
-          >
-            {name}
-          </Link>
-        );
+      const customer = row.original.customer;
+      if (!customer) return '-';
+      const name =
+        `${customer.first_name || ''} ${customer.last_name || ''}`.trim() ||
+        customer.email ||
+        'Guest';
+      return (
+        <CustomerHoverLink
+          customerId={customer.id}
+          customerName={name}
+          className="text-xs"
+        />
+      );
     },
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id));
+      return value.includes(row.getValue(id));
     },
   },
   {
@@ -219,7 +248,7 @@ export const columns: ColumnDef<Order>[] = [
     ),
     cell: ({ row }) => <OrderStatusCell order={row.original} />,
     filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id));
+      return value.includes(row.getValue(id));
     },
   },
 
@@ -230,7 +259,7 @@ export const columns: ColumnDef<Order>[] = [
       <DataTableColumnHeader column={column} title="Created At" />
     ),
     cell: ({ row }) => {
-     const date = new Date(row.getValue('createdAt'));
+      const date = new Date(row.getValue('createdAt'));
       const relativeTime = formatDistanceToNow(date, { addSuffix: true });
       return (
         <div className="flex flex-col">
@@ -256,7 +285,7 @@ export const columns: ColumnDef<Order>[] = [
       <DataTableColumnHeader column={column} title="Updated At" />
     ),
     cell: ({ row }) => {
-     const date = new Date(row.getValue('updatedAt'));
+      const date = new Date(row.getValue('updatedAt'));
       const relativeTime = formatDistanceToNow(date, { addSuffix: true });
       return (
         <div className="flex flex-col">
@@ -275,7 +304,7 @@ export const columns: ColumnDef<Order>[] = [
     },
     enableHiding: true,
   },
-  
+
   {
     id: 'actions',
     header: 'Actions',

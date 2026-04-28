@@ -57,6 +57,28 @@ export function InventoryItemDetails() {
   const columns = useMemo<ColumnDef<Order>[]>(
     () => [
       {
+        id: 'search',
+        accessorFn: (row) => {
+          const item = (row.items || []).find((i: any) => i.inventory_id === id);
+          const paymentMethod = row.payment_method
+            ? row.payment_method.replace(/_/g, ' ')
+            : '';
+          const orderDate = format(new Date(row.date), 'MMM dd, yyyy h:mma');
+
+          return [
+            orderDate,
+            item?.unit_price?.toString() || '',
+            item?.quantity?.toString() || '',
+            row.total_amount?.toString() || '',
+            row.status || '',
+            paymentMethod,
+          ]
+            .join(' ')
+            .trim();
+        },
+        enableHiding: true,
+      },
+      {
         accessorKey: 'date',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Order Date" />
@@ -512,9 +534,10 @@ export function InventoryItemDetails() {
         <DataTable
           columns={columns}
           data={orders}
-          searchKey="date"
+          searchKey="search"
           storageKey={`inventory-history-${id}`}
           canExport={canExportOrders}
+          defaultColumnVisibility={{ search: false }}
         />
       </div>
     </div>

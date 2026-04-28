@@ -18,6 +18,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
           creator:profiles!orders_created_by_fkey1(first_name, last_name)
         `)
         .eq('organization_id', organizationId)
+        .eq('is_deleted', false)
         .order('date', { ascending: false });
 
       if (branchIds && branchIds.length > 0) {
@@ -49,6 +50,7 @@ export function useInventoryOrders(inventoryId?: string) {
           customer:customers(id, first_name, last_name, email, phone)
         `)
         .eq('items.inventory_id', inventoryId)
+        .eq('is_deleted', false)
         .order('date', { ascending: false });
 
       if (error) throw error;
@@ -77,6 +79,7 @@ export function useCustomerOrders(
           customer:customers(id, first_name, last_name, email, phone)
         `)
         .eq('customer_id', customerId)
+        .eq('is_deleted', false)
         .order('date', { ascending: false });
 
       if (organizationId) {
@@ -110,6 +113,7 @@ export function useOrder(orderId?: string) {
           customer:customers(id, first_name, last_name, email, phone)
         `)
         .eq('id', orderId)
+        .eq('is_deleted', false)
         .single();
 
       if (error) throw error;
@@ -247,6 +251,11 @@ export function useDeleteOrder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
   });
 }

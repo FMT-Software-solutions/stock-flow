@@ -18,7 +18,7 @@ export const columns: ColumnDef<Expense>[] = [
       ]
         .join(" ")
         .trim(),
-    enableHiding: false,
+    enableHiding: true,
   },
   {
     accessorKey: "date",

@@ -79,7 +79,7 @@ export function DiscountManager() {
         [row.name || '', row.code || '', String(row.value ?? '')]
           .join(' ')
           .trim(),
-      enableHiding: false,
+      enableHiding: true,
       header: () => null,
       cell: () => null,
     },

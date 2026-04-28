@@ -1,5 +1,5 @@
 appId: com.fmtsoftware.stock-flow
-productName: stock-flow
+productName: StockFlow
 copyright: Copyright © 2025 FMT Software Solutions
 
 artifactName: stock-flow-setup-${version}.${ext}
@@ -30,14 +30,14 @@ nsis:
   allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: stock-flow
+  shortcutName: StockFlow
   installerIcon: release/assets/favicon.ico
   uninstallerIcon: release/assets/favicon.ico
   installerHeaderIcon: release/assets/favicon.ico
   installerSidebar: release/assets/fmt-sidebar-banner.bmp
   deleteAppDataOnUninstall: false
   runAfterFinish: true
-  menuCategory: 'stock-flow'
+  menuCategory: Finance
   displayLanguageSelector: false
   installerLanguages:
     - en_US

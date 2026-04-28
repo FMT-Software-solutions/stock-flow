@@ -1,8 +1,17 @@
-import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { CustomerSelector } from '@/components/orders/CustomerSelector';
+import { InventorySelector } from '@/components/orders/InventorySelector';
+import { RecentOrders } from '@/components/orders/RecentOrders';
+import { BranchFormSelector } from '@/components/shared/BranchFormSelector';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -10,43 +19,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Plus, Save, FolderOpen, X, ChevronDown, ChevronUp, Loader2, Pencil } from 'lucide-react';
-import { useCurrency } from '@/hooks/useCurrency';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
-import { useInventoryEntries } from '@/hooks/useInventoryQueries';
-import { BranchFormSelector } from '@/components/shared/BranchFormSelector';
-import { InventorySelector } from '@/components/orders/InventorySelector';
-import { CustomerSelector } from '@/components/orders/CustomerSelector';
-import { RecentOrders } from '@/components/orders/RecentOrders';
-import { toast } from 'sonner';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useCurrency } from '@/hooks/useCurrency';
+import { useCustomer, useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
+import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
+import { useInventoryEntries } from '@/hooks/useInventoryQueries';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
+import { useOrderForm } from '@/hooks/useOrderForm';
+import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
+import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
+import { useCreateCommunicationHistory } from '@/shared-packages/communication/hooks/useCommunicationHistory';
+import { sendSmsMessage } from '@/shared-packages/communication/services/sms.service';
+import type { Order } from '@/types/orders';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ChevronDown, ChevronLeft, ChevronUp, FolderOpen, Loader2, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   orderSchema,
-  type OrderFormValues,
   PERSIST_KEYS,
+  type OrderFormValues,
 } from './form-schema/order-form-schema';
-import { useOrderForm } from '@/hooks/useOrderForm';
-import type { Order } from '@/types/orders';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { useBranchContext } from '@/contexts/BranchContext';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { format, formatDistanceToNow } from 'date-fns';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
-import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
-import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
-import { useCustomerDebtSummary, useCustomer } from '@/hooks/useCustomerQueries';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { sendSmsMessage } from '@/shared-packages/communication/services/sms.service';
-import { useCreateCommunicationHistory } from '@/shared-packages/communication/hooks/useCommunicationHistory';
+import { OrderSuccessBanner } from './OrderSuccessBanner';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -70,6 +71,8 @@ export function OrderForm() {
     </div>
   );
 }
+
+
 
 interface OrderFormInnerProps {
   isEditing: boolean;
@@ -97,6 +100,8 @@ function OrderFormInner({
     defaultValues.branchId
   );
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [lastCreatedOrderId, setLastCreatedOrderId] = useState<string | null>(null);
+  const [wasLastSmsSent, setWasLastSmsSent] = useState<boolean>(false);
   type OrderDraft = { id: string; createdAt: string; values: OrderFormValues };
   const draftsKey = `order-drafts-${currentOrganization?.id || 'global'}`;
   const [drafts, setDrafts] = useLocalStorage<OrderDraft[]>(draftsKey, []);
@@ -409,6 +414,8 @@ function OrderFormInner({
 
         toast.success('Order created successfully');
 
+        let smsSent = false;
+
         // Reset form for next order but keep configuration values
         // This helps when processing multiple orders in a queue
         form.reset({
@@ -425,6 +432,7 @@ function OrderFormInner({
 
         if (sendSms && customer?.phone && smsMessage.trim()) {
           try {
+            smsSent = true;
             // @ts-ignore
             const senderId = currentOrganization.sms_sender_id || (import.meta as any).env?.VITE_DEFAULT_SMS_SENDER_ID || 'FMTSoftware';
 
@@ -465,6 +473,9 @@ function OrderFormInner({
           setDrafts((prev) => prev.filter((d) => d.id !== currentDraftId));
           setCurrentDraftId(null);
         }
+
+        setLastCreatedOrderId(createdOrder.id);
+        setWasLastSmsSent(smsSent);
       }
     } catch (error) {
       console.error(error);
@@ -1385,6 +1396,12 @@ function OrderFormInner({
           </div>
         </div>
       </form>
+
+      {lastCreatedOrderId && !isEditing && (
+        <div className="mt-4">
+          <OrderSuccessBanner orderId={lastCreatedOrderId} wasSmsSent={wasLastSmsSent} onExpire={() => setLastCreatedOrderId(null)} />
+        </div>
+      )}
 
       {/* Recent Orders Section */}
 

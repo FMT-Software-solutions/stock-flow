@@ -162,7 +162,7 @@ export const columns: ColumnDef<Supplier>[] = [
       ]
         .join(' ')
         .trim(),
-    enableHiding: false,
+    enableHiding: true,
   },
   // {
   //   id: 'select',

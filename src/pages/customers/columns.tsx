@@ -152,7 +152,7 @@ export const columns: ColumnDef<Customer>[] = [
       ]
         .join(' ')
         .trim(),
-    enableHiding: false,
+    enableHiding: true,
   },
   {
     id: 'name',

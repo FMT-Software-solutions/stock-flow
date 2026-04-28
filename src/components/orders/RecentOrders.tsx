@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
+import { OrderActions } from '@/pages/orders/OrderActions';
 
 export function RecentOrders() {
     const { currentOrganization } = useOrganization();
@@ -54,11 +55,14 @@ export function RecentOrders() {
                                 {formatDistanceToNow(new Date(order.date), { addSuffix: true })}
                             </p>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                             <div className="font-bold text-sm">{formatCurrency(order.total_amount)}</div>
-                             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 capitalize">
-                                {order.status}
-                             </Badge>
+                        <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="font-bold text-sm">{formatCurrency(order.paid_amount)}</div>
+                                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 capitalize">
+                                    {order.status}
+                                </Badge>
+                            </div>
+                            <OrderActions order={order} />
                         </div>
                     </div>
                 ))}

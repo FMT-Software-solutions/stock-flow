@@ -184,13 +184,14 @@ export function Orders() {
             }`}
           columns={columns}
           data={orders}
-          searchKey="orderNumber"
+          searchKey="search"
           filterFields={filterFields}
           exportFields={orderExportFields}
           storageKey="stockflow-orders-table"
           canExport={canExportOrders}
           orgId={currentOrganization?.id}
           defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
+          defaultColumnVisibility={{ search: false }}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
         />
       </div>

@@ -29,7 +29,7 @@ export function SenderIdManager() {
 
   const [senderId, setSenderId] = useState('');
   const [reason, setReason] = useState(
-    'Used to send updates, event notifications, and church announcements to our congregation members.'
+    'Used to send order confirmations, product updates and other business notifications to our customers'
   );
 
   const { data: requests = [], isLoading, refetch, isRefetching } = useSenderIdRequests(currentOrganization?.id);
@@ -85,7 +85,7 @@ export function SenderIdManager() {
       }
 
       setSenderId('');
-      setReason('Used to send updates, event notifications, and church announcements to our congregation members.');
+      setReason('Used to send order confirmations, product updates and other business notifications to our customers');
     } catch (error) {
       // Error handled by hook toast
     }
@@ -99,7 +99,7 @@ export function SenderIdManager() {
 
   const handleCancelEdit = () => {
     setSenderId('');
-    setReason('Used to send updates, event notifications, and church announcements to our congregation members.');
+    setReason('Used to send order confirmations, product updates and other business notifications to our customers');
     setEditingRequestId(null);
   };
 

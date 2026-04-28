@@ -1,6 +1,16 @@
 {
   "releases": [
     {
+      "version": "1.1.2",
+      "platform": "win32",
+      "architecture": "x64",
+      "download_url": "https://your-domain.com/releases/stock-flow-setup-1.1.1.exe",
+      "file_size": 122470148,
+      "release_notes": "### Added\n\n### Improved / Changed\n- Sale entry enhancements\n\n### Bug Fixes\n- Fixed a bug in the sale deletion process\n",
+      "status": "draft",
+      "created_at": "2026-04-28T14:40:58.640Z"
+    },
+    {
       "version": "1.1.1",
       "platform": "win32",
       "architecture": "x64",

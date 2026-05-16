@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-05-16
+
+### Added
+  - Order or Sale payment history
+
+### Improved / Changed
+- Sales entry workflow
+- SMS templates for quick sms dialog
+
+### Bug Fixes
+
+
 ## [1.1.2] - 2026-04-28
 
 ### Added

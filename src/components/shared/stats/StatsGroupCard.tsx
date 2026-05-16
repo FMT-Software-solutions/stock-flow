@@ -67,6 +67,14 @@ export function StatsGroupCard<TData>({
           const result = field.calculate(data);
           const FieldIcon = field.icon;
 
+          if (field.fullWidth) {
+            return (
+              <div key={field.id} className={cn('py-1.5', index !== group.fields.length - 1 && 'border-b')}>
+                {result.value}
+              </div>
+            );
+          }
+
           return (
             <div
               key={field.id}

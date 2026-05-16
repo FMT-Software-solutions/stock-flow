@@ -33,11 +33,13 @@ import { useOrderForm } from '@/hooks/useOrderForm';
 import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
 import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
 import { useCreateCommunicationHistory } from '@/shared-packages/communication/hooks/useCommunicationHistory';
+import { useCommunicationTemplates, useCreateTemplate } from '@/shared-packages/communication/hooks/useCommunicationTemplates';
 import { sendSmsMessage } from '@/shared-packages/communication/services/sms.service';
 import type { Order } from '@/types/orders';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ChevronDown, ChevronLeft, ChevronUp, FolderOpen, Loader2, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -216,8 +218,57 @@ function OrderFormInner({
   const [sendSms, setSendSms] = useLocalStorage('order-send-sms', false);
   const [smsMessage, setSmsMessage] = useLocalStorage(
     'order-sms-message',
-    'Hi {name}, thank you for your purchase of {total}. We appreciate your business! - {orgName}'
+    'Hi {c_first_name}, thank you for your purchase of {order_total}. We appreciate your business! - {org_name}'
   );
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default');
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const { data: templates } = useCommunicationTemplates();
+  const createTemplateMutation = useCreateTemplate();
+  const smsTemplates = templates?.filter(t => t.type === 'sms') || [];
+
+  useEffect(() => {
+    const savedId = localStorage.getItem('sms_pref_order_success');
+    if (savedId) {
+      const tpl = smsTemplates.find(t => t.id === savedId);
+      if (tpl) {
+        setSmsMessage(tpl.content);
+        setSelectedTemplateId(tpl.id);
+      }
+    }
+  }, [smsTemplates.length, setSmsMessage]);
+
+  const handleTemplateChange = (val: string) => {
+    setSelectedTemplateId(val);
+    if (val === 'default') {
+      setSmsMessage('Hi {c_first_name}, thank you for your purchase of {order_total}. We appreciate your business! - {org_name}');
+      localStorage.removeItem('sms_pref_order_success');
+    } else {
+      const tpl = smsTemplates.find(t => t.id === val);
+      if (tpl) {
+        setSmsMessage(tpl.content);
+        localStorage.setItem('sms_pref_order_success', val);
+      }
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplateName.trim() || !smsMessage.trim()) return;
+    try {
+      await createTemplateMutation.mutateAsync({
+        name: newTemplateName,
+        type: 'sms',
+        content: smsMessage,
+      });
+      setIsPopoverOpen(false);
+      setNewTemplateName('');
+    } catch (e) {
+      // Error handled in mutation
+    }
+  };
+
   const createHistoryMutation = useCreateCommunicationHistory();
 
   const orderItems: DiscountOrderItem[] = useMemo(() => {
@@ -406,18 +457,18 @@ function OrderFormInner({
           id,
           ...orderData,
         });
-        toast.success('Order updated successfully');
+        toast.success('Sale updated successfully');
         navigate('/orders');
       } else {
         const createdOrder = await createOrder.mutateAsync(orderData);
         if (appliedDiscount) await incrementUsage.mutateAsync(appliedDiscount.discount.id);
 
-        toast.success('Order created successfully');
+        toast.success('Sale created successfully');
 
         let smsSent = false;
 
-        // Reset form for next order but keep configuration values
-        // This helps when processing multiple orders in a queue
+        // Reset form for next sale but keep configuration values
+        // This helps when processing multiple sales in a queue
         form.reset({
           branchId: values.branchId,
           customerId: '', // Reset customer
@@ -436,10 +487,22 @@ function OrderFormInner({
             // @ts-ignore
             const senderId = currentOrganization.sms_sender_id || (import.meta as any).env?.VITE_DEFAULT_SMS_SENDER_ID || 'FMTSoftware';
 
-            const finalMessage = smsMessage
-              .replace(/\{name\}/gi, customer.firstName || 'Customer')
-              .replace(/\{total\}/gi, formatCurrency(effectiveTotal))
-              .replace(/\{orgName\}/gi, currentOrganization.name || 'us');
+            let finalMessage = smsMessage;
+
+            // Check if variables are used without replacement logic matching them
+            // E.g., user just types `{c_first_name}` directly into the box
+            const placeholders: Record<string, string> = {
+              c_first_name: customer.firstName || 'Customer',
+              c_last_name: customer.lastName || '',
+              order_total: formatCurrency(effectiveTotal),
+              order_number: createdOrder?.order_number || '',
+              org_name: currentOrganization.name || 'us'
+            };
+
+            Object.entries(placeholders).forEach(([key, value]) => {
+              const regex = new RegExp(`\\{${key}\\}`, 'gi');
+              finalMessage = finalMessage.replace(regex, value);
+            });
 
             await sendSmsMessage({
               sender: senderId,
@@ -479,7 +542,7 @@ function OrderFormInner({
       }
     } catch (error) {
       console.error(error);
-      toast.error('Failed to save order');
+      toast.error('Failed to save sale');
     }
   }
   function handleSaveDraft() {
@@ -1103,8 +1166,55 @@ function OrderFormInner({
                   </div>
                   {sendSms && (
                     <div className="space-y-2 mt-4">
+                      <div className="flex justify-between items-center gap-2 mb-2">
+                        <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+                          <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue placeholder="Use a template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Default Message</SelectItem>
+                            {smsTemplates.map(template => (
+                              <SelectItem key={template.id} value={template.id}>
+                                {template.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 text-xs whitespace-nowrap" disabled={!smsMessage.trim()}>
+                              <Save className="h-3 w-3 mr-1" />
+                              Save as Template
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-3" align="end">
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label htmlFor="template-name" className="text-xs font-medium">Template Name</Label>
+                                <Input
+                                  id="template-name"
+                                  placeholder="e.g. Order Success"
+                                  className="h-8 text-xs"
+                                  value={newTemplateName}
+                                  onChange={e => setNewTemplateName(e.target.value)}
+                                />
+                              </div>
+                              <Button
+                                size="sm"
+                                className="w-full h-8 text-xs"
+                                onClick={handleSaveTemplate}
+                                disabled={!newTemplateName.trim() || createTemplateMutation.isPending}
+                              >
+                                {createTemplateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Template'}
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
                       <div className="flex justify-between">
-                        <Label htmlFor="smsMessage">Message Template</Label>
+                        <Label htmlFor="smsMessage">Message Content</Label>
                         <span className="text-xs text-muted-foreground">{smsMessage.length}/150</span>
                       </div>
                       <Textarea
@@ -1116,7 +1226,7 @@ function OrderFormInner({
                         className="resize-none bg-background"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Use placeholders: <code className="bg-muted px-1 py-0.5 rounded">{"{name}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{total}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{orgName}"}</code>
+                        Available variables: <code className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{"{c_first_name}"}</code> <code className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{"{c_last_name}"}</code> <code className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{"{order_number}"}</code> <code className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{"{order_total}"}</code> <code className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{"{org_name}"}</code>
                       </p>
                     </div>
                   )}
@@ -1405,7 +1515,7 @@ function OrderFormInner({
 
       {/* Recent Orders Section */}
 
-      <div className='mt-8'>
+      {!isEditing && <div className='mt-8'>
         <Accordion
           type="single"
           collapsible
@@ -1419,7 +1529,7 @@ function OrderFormInner({
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-      </div>
+      </div>}
     </div>
   );
 }

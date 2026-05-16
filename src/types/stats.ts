@@ -1,11 +1,12 @@
+import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface StatResult {
-  value: string | number;
-  subValue?: string | number;
+  value: ReactNode;
+  subValue?: ReactNode;
   trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  footer?: string;
+  trendValue?: ReactNode;
+  footer?: ReactNode;
 }
 
 export interface StatsField<TData> {
@@ -14,6 +15,7 @@ export interface StatsField<TData> {
   icon?: LucideIcon;
   calculate: (data: TData[]) => StatResult;
   className?: string; // For custom styling of the value/label
+  fullWidth?: boolean;
 }
 
 export interface StatsGroup<TData> {

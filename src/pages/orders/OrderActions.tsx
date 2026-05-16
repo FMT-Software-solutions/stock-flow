@@ -9,25 +9,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer, MessageSquare } from 'lucide-react';
+import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer, MessageSquare, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useDeleteOrder } from '@/hooks/useOrders';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { QuickSmsDialog } from '@/shared-packages/communication/components/sms/QuickSmsDialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ReceiptDialog } from '@/components/orders/ReceiptDialog';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 
 interface OrderActionsProps {
@@ -41,6 +33,7 @@ export function OrderActions({ order }: OrderActionsProps) {
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const { checkPermission } = useRoleCheck();
   const { formatCurrency } = useCurrency();
   const { currentOrganization } = useOrganization();
@@ -103,6 +96,17 @@ export function OrderActions({ order }: OrderActionsProps) {
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
+          {canEdit && order.payment_status !== 'paid' && order.payment_status !== 'refunded' && order.status !== 'cancelled' && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPaymentDialog(true);
+              }}
+            >
+              <Banknote className="mr-2 h-4 w-4" />
+              Add Payment
+            </DropdownMenuItem>
+          )}
           {canExport &&
             order.payment_status !== 'refunded' &&
             order.payment_status !== 'unpaid' && (
@@ -160,6 +164,12 @@ export function OrderActions({ order }: OrderActionsProps) {
         order={order}
       />
 
+      <AddPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        order={order}
+      />
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -204,6 +214,14 @@ export function OrderActions({ order }: OrderActionsProps) {
           recipientPhone={order.customer.phone}
           defaultMessage={`Dear ${order.customer.first_name || 'Customer'}, your order #${order.order_number} for ${formatCurrency(order.total_amount)} has been confirmed by ${currentOrganization?.name || 'us'}. Thank you for your business!`}
           metadata={{ orderId: order.id }}
+          context="order_list_action"
+          placeholders={{
+            c_first_name: order.customer.first_name || 'Customer',
+            c_last_name: order.customer.last_name || '',
+            order_number: order.order_number,
+            order_total: formatCurrency(order.total_amount),
+            org_name: currentOrganization?.name || 'us'
+          }}
         />
       )}
     </div>

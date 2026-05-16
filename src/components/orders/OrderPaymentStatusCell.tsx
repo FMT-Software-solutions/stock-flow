@@ -17,7 +17,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Banknote, Loader2 } from 'lucide-react';
+import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
 
 interface OrderPaymentStatusCellProps {
   order: Order;
@@ -26,6 +27,7 @@ interface OrderPaymentStatusCellProps {
 export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
   const updateOrder = useUpdateOrder();
   const [showPartialDialog, setShowPartialDialog] = useState(false);
+  const [showAddPaymentDialog, setShowAddPaymentDialog] = useState(false);
   const [partialAmount, setPartialAmount] = useState<number>(
     order.paid_amount || 0
   );
@@ -121,7 +123,7 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
 
   return (
     <>
-      <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
         <Select
           defaultValue={order.payment_status}
           onValueChange={handleUpdate}
@@ -147,6 +149,18 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
             <SelectItem value="refunded">Refunded</SelectItem>
           </SelectContent>
         </Select>
+
+        {order.payment_status === 'partial' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 rounded-lg hover:bg-yellow-100 text-yellow-700"
+            title="Add Payment"
+            onClick={() => setShowAddPaymentDialog(true)}
+          >
+            <Banknote className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <Dialog open={showPartialDialog} onOpenChange={setShowPartialDialog}>
@@ -172,6 +186,7 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
             <Button
               variant="outline"
               onClick={() => setShowPartialDialog(false)}
+              disabled={updateOrder.isPending}
             >
               Cancel
             </Button>
@@ -179,11 +194,17 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
               onClick={confirmPartialUpdate}
               disabled={updateOrder.isPending}
             >
-              Save
+              {updateOrder.isPending ? 'Updating...' : 'Confirm'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPaymentDialog
+        order={order}
+        open={showAddPaymentDialog}
+        onOpenChange={setShowAddPaymentDialog}
+      />
     </>
   );
 }

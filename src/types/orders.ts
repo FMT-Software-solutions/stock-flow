@@ -19,6 +19,21 @@ export interface OrderItem {
   created_at: string;
 }
 
+export interface OrderPayment {
+  id: string;
+  organization_id: string;
+  order_id: string;
+  amount: number;
+  payment_method?: string | null;
+  notes?: string | null;
+  created_at: string;
+  created_by?: string | null;
+  creator?: {
+    first_name?: string;
+    last_name?: string;
+  } | null;
+}
+
 export interface Order {
   id: string;
   organization_id: string;
@@ -42,6 +57,7 @@ export interface Order {
 
   // Relations
   items?: OrderItem[];
+  payments?: OrderPayment[];
   customer?: {
     id: string;
     first_name?: string;

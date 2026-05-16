@@ -13,6 +13,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
         .select(`
           *,
           items:order_items(*),
+          payments:order_payments(*, creator:profiles!order_payments_created_by_fkey1(first_name, last_name)),
           branch:branches(id, name, abbreviation),
           customer:customers(id, first_name, last_name, email, phone),
           creator:profiles!orders_created_by_fkey1(first_name, last_name)
@@ -109,8 +110,10 @@ export function useOrder(orderId?: string) {
         .select(`
           *,
           items:order_items(*),
+          payments:order_payments(*, creator:profiles!order_payments_created_by_fkey1(first_name, last_name)),
           branch:branches(id, name, abbreviation),
-          customer:customers(id, first_name, last_name, email, phone)
+          customer:customers(id, first_name, last_name, email, phone),
+          creator:profiles!orders_created_by_fkey1(first_name, last_name)
         `)
         .eq('id', orderId)
         .eq('is_deleted', false)
@@ -233,6 +236,39 @@ export function useUpdateOrder() {
       queryClient.invalidateQueries({ queryKey: ['reports'] });
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+}
+
+export function useAddOrderPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      orderId: string;
+      amount: number;
+      paymentMethod?: string;
+      notes?: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.rpc('add_order_payment', {
+        p_order_id: params.orderId,
+        p_amount: params.amount,
+        p_payment_method: params.paymentMethod || null,
+        p_notes: params.notes || null,
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 }

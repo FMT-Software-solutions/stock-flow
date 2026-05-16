@@ -582,6 +582,12 @@ export default function CustomerDetails() {
                     recipientName={`${customer.firstName || ''} ${customer.lastName || ''}`.trim()}
                     memberId={customer.id}
                     defaultMessage={`Hi ${customer.firstName || 'Customer'}, this is a gentle reminder that you have an outstanding balance of GHS ${totalOwing.toFixed(2)}. Please arrange for payment at your earliest convenience.`}
+                    context="customer_payment_reminder"
+                    placeholders={{
+                        c_first_name: customer.firstName || 'Customer',
+                        c_last_name: customer.lastName || '',
+                        total_owing: totalOwing.toFixed(2)
+                    }}
                 />
             )}
         </div>

@@ -2,7 +2,7 @@
   "name": "stock-flow",
   "private": true,
   "version": "1.1.2",
-  "description": "Stock or Inventory Tracking System for businesses",
+  "description": "Stock or Inventory Management System for businesses",
   "author": "FMT Software Solutions",
   "main": "electron-app/dist/main.js",
   "scripts": {

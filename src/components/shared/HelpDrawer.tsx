@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -19,6 +19,7 @@ import { Separator } from '../ui/separator';
 import { HelpCircle, Mail, Bug, MessageSquare, X, Info } from 'lucide-react';
 import { IssueReportModal } from './IssueReportModal';
 import { openExternalUrl } from '../../utils/external-url';
+import { isElectron } from '@/utils/asset-path';
 
 interface HelpDrawerProps {
   children: React.ReactNode;
@@ -27,6 +28,13 @@ interface HelpDrawerProps {
 export function HelpDrawer({ children }: HelpDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showIssueReport, setShowIssueReport] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('');
+
+  useEffect(() => {
+    if (isElectron() && window.electron?.getAppVersion) {
+      window.electron.getAppVersion().then(setAppVersion);
+    }
+  }, []);
 
   const handleContactFMT = () => {
     openExternalUrl('https://fmtsoftware.com/contact');
@@ -74,17 +82,18 @@ export function HelpDrawer({ children }: HelpDrawerProps) {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <h4 className="font-medium">stock-flow</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Version 1.0.0
-                      </p>
+                      <h4 className="font-medium">Stock Flow</h4>
+                      {isElectron() && appVersion && (
+                        <p className="text-sm text-muted-foreground">
+                          Version {appVersion}
+                        </p>
+                      )}
                     </div>
                     <Separator />
                     <div>
                       <h4 className="font-medium">Description</h4>
                       <p className="text-sm text-muted-foreground">
-                        Stock or Inventory Tracking System for businesses
-                        Built with React, Electron, and modern web technologies.
+                        Stockflow is a powerful, multi-organization inventory management system designed to help businesses track stock, manage sales, monitor expenses, and generate advanced reports.
                       </p>
                     </div>
                   </CardContent>

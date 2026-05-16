@@ -113,6 +113,11 @@ const CustomerActions = ({ customer }: { customer: Customer }) => {
         recipientName={`${customer.firstName || ''} ${customer.lastName || ''}`.trim()}
         memberId={customer.id}
         defaultMessage={`Hi ${customer.firstName || 'Customer'}, `}
+        context="customer_list_general"
+        placeholders={{
+          c_first_name: customer.firstName || 'Customer',
+          c_last_name: customer.lastName || ''
+        }}
       />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

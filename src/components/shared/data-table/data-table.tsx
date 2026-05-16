@@ -69,9 +69,30 @@ export function DataTable<TData, TValue>({
     setPageSize(pagination.pageSize)
   }, [pagination.pageSize])
 
+  // Wrap columns to inject our custom search filter function for the searchKey
+  const tableColumns = React.useMemo(() => {
+    if (!searchKey) return columns;
+    return columns.map(col => {
+      // Handle both string ids and object properties
+      const colId = typeof col === 'string' ? col : col.id || (col as any).accessorKey;
+      if (colId === searchKey) {
+        return {
+          ...col,
+          filterFn: ((row: any, columnId: string, filterValue: any) => {
+            const rowValue = String(row.getValue(columnId) || "");
+            const searchTerms = String(filterValue || "");
+            const normalize = (str: string) => str.replace(/[\s\-_]/g, "").toLowerCase();
+            return normalize(rowValue).includes(normalize(searchTerms));
+          }) as any
+        } as ColumnDef<TData, TValue>;
+      }
+      return col;
+    });
+  }, [columns, searchKey]);
+
   const table = useReactTable({
     data,
-    columns,
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,8 +8,13 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCreateCommunicationHistory } from '../../hooks/useCommunicationHistory';
-import { Loader2, MessageSquare, AlertCircle } from 'lucide-react';
+import { useCommunicationTemplates, useCreateTemplate } from '../../hooks/useCommunicationTemplates';
+import { Loader2, MessageSquare, AlertCircle, Save } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Utility to check if a phone number is a valid Ghana number
 const isGhanaPhoneNumber = (phone: string | undefined): boolean => {
@@ -38,6 +43,8 @@ interface QuickSmsDialogProps {
     recipients?: { phone: string, name?: string, id?: string }[];
     defaultMessage: string;
     metadata?: Record<string, any>;
+    context?: string;
+    placeholders?: Record<string, string | number>;
 }
 
 export function QuickSmsDialog({
@@ -49,13 +56,81 @@ export function QuickSmsDialog({
     recipients = [],
     defaultMessage,
     metadata,
+    context,
+    placeholders,
 }: QuickSmsDialogProps) {
     const [message, setMessage] = useState(defaultMessage);
     const [isSending, setIsSending] = useState(false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default');
+    const [newTemplateName, setNewTemplateName] = useState('');
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
     const { currentOrganization } = useOrganization();
     const { data: balanceData, isLoading: isLoadingBalance } = useSmsBalance(currentOrganization?.id);
+    const { data: templates } = useCommunicationTemplates();
+    const createTemplateMutation = useCreateTemplate();
     const queryClient = useQueryClient();
     const createHistoryMutation = useCreateCommunicationHistory();
+
+    const smsTemplates = templates?.filter(t => t.type === 'sms') || [];
+
+    const applyPlaceholders = (text: string) => {
+        if (!placeholders) return text;
+        let result = text;
+        Object.entries(placeholders).forEach(([key, value]) => {
+            const regex = new RegExp(`\\{${key}\\}`, 'g');
+            result = result.replace(regex, String(value));
+        });
+        return result;
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            let initialMsg = defaultMessage;
+            let appliedId = 'default';
+            if (context) {
+                const savedId = localStorage.getItem(`sms_pref_${context}`);
+                if (savedId) {
+                    const tpl = smsTemplates.find(t => t.id === savedId);
+                    if (tpl) {
+                        initialMsg = applyPlaceholders(tpl.content);
+                        appliedId = tpl.id;
+                    }
+                }
+            }
+            setMessage(initialMsg);
+            setSelectedTemplateId(appliedId);
+        }
+    }, [isOpen, context, smsTemplates.length]);
+
+    const handleTemplateChange = (val: string) => {
+        setSelectedTemplateId(val);
+        if (val === 'default') {
+            setMessage(defaultMessage);
+            if (context) localStorage.removeItem(`sms_pref_${context}`);
+        } else {
+            const tpl = smsTemplates.find(t => t.id === val);
+            if (tpl) {
+                setMessage(applyPlaceholders(tpl.content));
+                if (context) localStorage.setItem(`sms_pref_${context}`, val);
+            }
+        }
+    };
+
+    const handleSaveTemplate = async () => {
+        if (!newTemplateName.trim() || !message.trim()) return;
+        try {
+            await createTemplateMutation.mutateAsync({
+                name: newTemplateName,
+                type: 'sms',
+                content: message,
+            });
+            setIsPopoverOpen(false);
+            setNewTemplateName('');
+        } catch (e) {
+            // Error is handled by mutation hook
+        }
+    };
 
     const rawRecipients = recipients.length > 0 ? recipients : (recipientPhone ? [{ phone: recipientPhone, name: recipientName, id: memberId }] : []);
 
@@ -101,9 +176,20 @@ export function QuickSmsDialog({
                 return;
             }
 
+            let finalMessage = message;
+
+            // Optional fallback: If the user directly typed variables but didn't select a template, 
+            // ensure they still get replaced at send time.
+            if (placeholders) {
+                Object.entries(placeholders).forEach(([key, value]) => {
+                    const regex = new RegExp(`\\{${key}\\}`, 'gi');
+                    finalMessage = finalMessage.replace(regex, String(value));
+                });
+            }
+
             await sendSmsMessage({
                 sender: senderId,
-                message,
+                message: finalMessage,
                 recipients: validRecipients,
                 sandbox: isSandbox,
                 organizationId: currentOrganization?.id
@@ -114,7 +200,7 @@ export function QuickSmsDialog({
                 const memberIds = actualRecipients.map(r => r.id).filter(Boolean) as string[];
                 await createHistoryMutation.mutateAsync({
                     type: 'sms',
-                    content: message,
+                    content: finalMessage,
                     recipient_type: 'custom',
                     recipient_ids: memberIds,
                     recipient_count: validRecipients.length,
@@ -166,7 +252,54 @@ export function QuickSmsDialog({
                         </Alert>
                     )}
 
-                    <div className="flex justify-between items-center text-sm">
+                    <div className="flex justify-between items-center gap-2">
+                        <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+                            <SelectTrigger className="w-full h-8 text-xs">
+                                <SelectValue placeholder="Use a template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="default">Default Message</SelectItem>
+                                {smsTemplates.map(template => (
+                                    <SelectItem key={template.id} value={template.id}>
+                                        {template.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-8 text-xs whitespace-nowrap" disabled={!message.trim()}>
+                                    <Save className="h-3 w-3 mr-1" />
+                                    Save as Template
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-3" align="end">
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="template-name" className="text-xs font-medium">Template Name</Label>
+                                        <Input
+                                            id="template-name"
+                                            placeholder="e.g. Payment Reminder"
+                                            className="h-8 text-xs"
+                                            value={newTemplateName}
+                                            onChange={e => setNewTemplateName(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="w-full h-8 text-xs"
+                                        onClick={handleSaveTemplate}
+                                        disabled={!newTemplateName.trim() || createTemplateMutation.isPending}
+                                    >
+                                        {createTemplateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Template'}
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs">
                         <span className="font-medium text-muted-foreground">
                             {recipientCount === 1 ? `To: ${actualRecipients[0]?.phone}` : `Recipients: ${recipientCount}`}
                         </span>
@@ -182,6 +315,12 @@ export function QuickSmsDialog({
                         className="resize-none"
                         placeholder="Type your message here..."
                     />
+
+                    {placeholders && Object.keys(placeholders).length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Available variables: {Object.keys(placeholders).map(k => <code key={k} className="bg-muted px-1 py-0.5 rounded text-[10px] mr-1">{`{${k}}`}</code>)}
+                        </p>
+                    )}
 
                     {!isLoadingBalance && !hasEnoughCredits && (
                         <Alert variant="destructive" className="py-2">

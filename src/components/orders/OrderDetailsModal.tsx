@@ -8,7 +8,11 @@ import type { Order } from '@/types/orders';
 import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { UserInfo } from '@/components/shared/UserInfo';
+import { Banknote } from 'lucide-react';
+import { useState } from 'react';
+import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
 
 interface OrderDetailsModalProps {
   open: boolean;
@@ -22,17 +26,28 @@ export function OrderDetailsModal({
   order,
 }: OrderDetailsModalProps) {
   const { formatCurrency } = useCurrency();
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const paidAmount = Number(order.paid_amount ?? 0);
   const totalAmount = Number(order.total_amount ?? 0);
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const customerName = order.customer
-    ? `${order.customer.first_name || ''} ${
-        order.customer.last_name || ''
+    ? `${order.customer.first_name || ''} ${order.customer.last_name || ''
       }`.trim() ||
-      order.customer.name ||
-      'Customer'
+    order.customer.name ||
+    'Customer'
     : 'Walk-in Customer';
-  const customerContact = order.customer?.phone || order.customer?.email || '';
+  const getPaymentStatusStyles = (status: string) => {
+    let className = 'bg-gray-100 text-gray-800 border-gray-200';
+    if (status === 'paid')
+      className = 'bg-green-100 text-green-800 border-green-200';
+    if (status === 'partial')
+      className = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (status === 'unpaid')
+      className = 'bg-red-100 text-red-800 border-red-200';
+    if (status === 'refunded')
+      className = 'bg-purple-100 text-purple-800 border-purple-200';
+    return className;
+  };
 
   if (!order) return null;
 
@@ -72,15 +87,24 @@ export function OrderDetailsModal({
               <span className="text-xs text-muted-foreground">
                 Payment Status
               </span>
-              <div>
+              <div className="flex items-center gap-2">
                 <Badge
-                  variant={
-                    order.payment_status === 'paid' ? 'outline' : 'destructive'
-                  }
-                  className="capitalize"
+                  variant="outline"
+                  className={`capitalize ${getPaymentStatusStyles(order.payment_status)}`}
                 >
                   {order.payment_status}
                 </Badge>
+                {order.payment_status === 'partial' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full hover:bg-yellow-100 text-yellow-700"
+                    title="Add Payment"
+                    onClick={() => setShowPaymentDialog(true)}
+                  >
+                    <Banknote className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
             <div className="space-y-1">
@@ -92,9 +116,9 @@ export function OrderDetailsModal({
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Customer</span>
               <div className="font-medium text-sm">{customerName}</div>
-              {customerContact && (
+              {(order.customer?.phone || order.customer?.email) && (
                 <div className="text-xs text-muted-foreground">
-                  {customerContact}
+                  {order.customer?.phone || order.customer?.email}
                 </div>
               )}
             </div>
@@ -194,6 +218,50 @@ export function OrderDetailsModal({
             </div>
           </div>
 
+          {/* Payment History */}
+          {order.payments && order.payments.length > 0 && (
+            <div className="border rounded-lg overflow-hidden mt-2">
+              <div className="bg-muted/50 p-3 text-xs font-medium uppercase tracking-wider">
+                Payment History
+              </div>
+              <div className="divide-y max-h-40 overflow-y-auto">
+                {order.payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="p-3 text-sm flex justify-between items-center hover:bg-muted/20"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {formatCurrency(payment.amount)}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex gap-2">
+                        <span className="capitalize">
+                          {payment.payment_method?.replace('_', ' ') || 'Unknown'}
+                        </span>
+                        {payment.notes && (
+                          <>
+                            <span>•</span>
+                            <span className="italic">{payment.notes}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(payment.created_at), 'MMM dd, yyyy h:mm a')}
+                      </div>
+                      {payment.creator && (
+                        <div className="text-xs text-muted-foreground">
+                          by {payment.creator.first_name} {payment.creator.last_name}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Meta Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <UserInfo
@@ -212,6 +280,11 @@ export function OrderDetailsModal({
           </div>
         </div>
       </DialogContent>
+      <AddPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        order={order}
+      />
     </Dialog>
   );
 }

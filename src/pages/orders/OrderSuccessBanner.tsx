@@ -47,7 +47,7 @@ export function OrderSuccessBanner({ orderId, wasSmsSent, onExpire }: { orderId:
 
     return (
         <>
-            <Alert className="mb-6 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100 relative">
+            <Alert variant="default" className="mb-6 bg-green-500/10 relative">
                 <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <AlertTitle className="text-green-800 dark:text-green-300 font-semibold flex items-center gap-2">
                     Sale Recorded Successfully
@@ -60,7 +60,7 @@ export function OrderSuccessBanner({ orderId, wasSmsSent, onExpire }: { orderId:
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="bg-white hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-700 dark:hover:bg-green-800"
+                            className="bg-white hover:bg-green-500/10 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-700 dark:hover:bg-green-800"
                             onClick={() => setShowReceipt(true)}
                         >
                             <Printer className="mr-2 h-4 w-4" />
@@ -71,7 +71,7 @@ export function OrderSuccessBanner({ orderId, wasSmsSent, onExpire }: { orderId:
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="bg-white hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-700 dark:hover:bg-green-800"
+                                className="bg-white hover:bg-green-500/10 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-700 dark:hover:bg-green-800"
                                 onClick={() => setShowSms(true)}
                             >
                                 <MessageSquare className="mr-2 h-4 w-4" />
@@ -96,6 +96,14 @@ export function OrderSuccessBanner({ orderId, wasSmsSent, onExpire }: { orderId:
                     recipientPhone={order.customer.phone}
                     defaultMessage={defaultMessage}
                     metadata={{ orderId: order.id }}
+                    context="order_success"
+                    placeholders={{
+                        c_first_name: order.customer.first_name || 'Customer',
+                        c_last_name: order.customer.last_name || '',
+                        order_number: order.order_number,
+                        order_total: formatCurrency(order.total_amount),
+                        org_name: currentOrganization?.name || 'us'
+                    }}
                 />
             )}
         </>

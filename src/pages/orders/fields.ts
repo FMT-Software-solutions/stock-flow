@@ -7,6 +7,8 @@ import { paymentStatuses } from '@/constants/payment-statuses';
 import { ShoppingCart, DollarSign, Clock } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
+import { createElement } from 'react';
+import { RecentPaymentsList } from '@/components/orders/RecentPaymentsList';
 
 export const getOrderFilterFields = (
   branches: { label: string; value: string }[],
@@ -283,6 +285,16 @@ export const getOrderStatsGroups = (
             }
             return { value: formatted, subValue: rel };
           },
+        },
+        {
+          id: 'recent_payments',
+          label: 'Latest Payment History',
+          fullWidth: true,
+          calculate: (data) => {
+            return {
+              value: createElement(RecentPaymentsList, { orders: data, formatCurrency })
+            };
+          }
         },
       ],
     },

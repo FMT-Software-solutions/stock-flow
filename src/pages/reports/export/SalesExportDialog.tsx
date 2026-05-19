@@ -12,19 +12,19 @@ import { format } from 'date-fns';
 import { XLSX } from './utils/styles';
 import { buildSalesWorkbook, buildSalesPdfDoc } from './utils/salesExport';
 import { useCurrency } from '@/hooks/useCurrency';
-import type { Order } from '@/types/orders';
+import type { LedgerOrder } from '@/hooks/useSalesLedgerReport';
 import type { GroupUnit, RowGroup } from '../sales/utils';
 
-interface SalesExportDialogProps {
+export interface SalesExportDialogProps {
   template: 'detailed' | 'pivot' | 'summary';
-  orders: Order[];
+  orders: LedgerOrder[];
   groupUnit: GroupUnit;
   rowGroup: RowGroup;
   organizationName?: string;
   dateRange?: DateRange;
   open: boolean;
   onClose: () => void;
-  branchNames?: string[];
+  branchNames: string[];
 }
 
 export function SalesExportDialog({
@@ -123,8 +123,8 @@ export function SalesExportDialog({
                 {template === 'detailed'
                   ? 'Detailed Table'
                   : template === 'pivot'
-                  ? 'Pivot Tables'
-                  : 'Summary Table'}
+                    ? 'Pivot Tables'
+                    : 'Summary Table'}
               </label>
             </div>
             <div className="flex items-center gap-2">

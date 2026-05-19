@@ -185,14 +185,30 @@ export const getOrderStatsGroups = (
     },
     {
       id: 'revenue',
-      title: 'Revenue',
+      title: 'Revenue & Sales',
       icon: DollarSign,
       fields: [
         {
-          id: 'paid_revenue',
-          label: 'Revenue',
+          id: 'gross_sales',
+          label: 'Total Order Value',
           calculate: (data) => {
             const total = data.reduce((sum, o) => {
+              const val = o.total_amount as unknown as number | string | undefined;
+              const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
+              return sum + (isNaN(Number(amount)) ? 0 : Number(amount));
+            }, 0);
+            return { value: formatCurrency(total) };
+          },
+          className: 'text-blue-600',
+        },
+        {
+          id: 'paid_revenue',
+          label: 'Total Paid',
+          calculate: (data) => {
+            const total = data.reduce((sum, o) => {
+              if (o.payments && o.payments.length > 0) {
+                return sum + o.payments.reduce((s, p) => s + Number(p.amount), 0);
+              }
               const val = o.paid_amount as unknown as number | string | undefined;
               const amount = typeof val === 'string' ? parseFloat(val) : val ?? 0;
               return sum + (isNaN(Number(amount)) ? 0 : Number(amount));
@@ -202,9 +218,10 @@ export const getOrderStatsGroups = (
             ).length;
             return {
               value: formatCurrency(total),
-              subValue: `${paidCount} orders`,
+              subValue: `${paidCount} order(s)`,
             };
           },
+          className: 'text-green-600',
         },
         {
           id: 'owings',

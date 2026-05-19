@@ -545,9 +545,29 @@ export function Dashboard() {
       cardVariant: 'glass',
       fields: [
         {
+          id: 'gross_sales',
+          label: 'Gross Sales',
+          calculate: (data) => ({ value: formatCurrency(data[0]?.gross_sales ?? 0) }),
+          className: 'text-blue-600',
+        },
+        {
           id: 'revenue',
-          label: 'Total Revenue',
-          calculate: (data) => ({ value: formatCurrency(data[0]?.total_revenue ?? 0) }),
+          label: 'Revenue Collected',
+          calculate: (data) => {
+            const current = data[0]?.revenue_from_current_sales ?? 0;
+            const previous = data[0]?.revenue_from_previous_sales ?? 0;
+            const total = data[0]?.revenue_collected ?? data[0]?.total_revenue ?? 0;
+
+            return {
+              value: formatCurrency(total),
+              subValue: (current > 0 || previous > 0) ? (
+                <div className="flex flex-col text-[10px] mt-1 text-muted-foreground/80 font-normal">
+                  <span>From Current Sales: {formatCurrency(current)}</span>
+                  <span>From Previous Sales: {formatCurrency(previous)}</span>
+                </div>
+              ) : undefined
+            };
+          },
           className: 'text-green-600',
         },
         {
@@ -564,17 +584,17 @@ export function Dashboard() {
         },
         {
           id: 'orders',
-          label: 'Total Orders',
+          label: 'Total New Orders',
           calculate: (data) => ({ value: data[0]?.total_orders ?? 0 }),
         },
         {
           id: 'completed',
-          label: 'Completed',
+          label: 'Completed Orders',
           calculate: (data) => ({ value: data[0]?.breakdown?.completed ?? 0 }),
         },
         {
           id: 'pending',
-          label: 'Pending',
+          label: 'Pending Orders',
           calculate: (data) => ({ value: data[0]?.breakdown?.pending ?? 0 }),
         },
       ],

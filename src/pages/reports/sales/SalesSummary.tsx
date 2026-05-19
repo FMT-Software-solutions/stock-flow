@@ -11,6 +11,7 @@ interface OrderLike {
   total_amount?: number;
   paid_amount?: number;
   payment_status?: string | null;
+  payments?: any[];
 }
 
 interface SalesSummaryProps {
@@ -52,7 +53,7 @@ export function SalesSummary({
   }, [orders, dateRange, groupUnit]);
 
   const bucketAgg = useMemo(() => {
-    const agg: Record<string, { paid: number; due: number }> = {};
+    const agg: Record<string, { paid: number; gross: number; due: number }> = {};
     orders.forEach((o) => {
       const d = new Date(o.date || o.created_at || new Date().toISOString());
       const key = dateToBucketKey(d.toISOString(), groupUnit);
@@ -60,10 +61,22 @@ export function SalesSummary({
       const paid = o.paid_amount || 0;
       const ps = String(o.payment_status || '').toLowerCase();
       const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-      const cur = agg[key] || { paid: 0, due: 0 };
-      cur.paid += paid;
+      const cur = agg[key] || { paid: 0, gross: 0, due: 0 };
+      cur.gross += total;
       cur.due += due;
       agg[key] = cur;
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pDate = new Date(p.created_at);
+          const pKey = dateToBucketKey(pDate.toISOString(), groupUnit);
+          const pCur = agg[pKey] || { paid: 0, gross: 0, due: 0 };
+          pCur.paid += Number(p.amount);
+          agg[pKey] = pCur;
+        });
+      } else {
+        cur.paid += paid;
+      }
     });
     return agg;
   }, [orders, groupUnit]);
@@ -79,16 +92,20 @@ export function SalesSummary({
             <thead>
               <tr>
                 <th className="text-left p-2 min-w-50">Time</th>
-                <th className="text-right p-2">Revenue</th>
+                <th className="text-right p-2">Gross Sales</th>
+                <th className="text-right p-2">Revenue Collected</th>
                 <th className="text-right p-2">Owings</th>
               </tr>
             </thead>
             <tbody>
               {buckets.map((b) => {
-                const c = bucketAgg[b] || { paid: 0, due: 0 };
+                const c = bucketAgg[b] || { paid: 0, gross: 0, due: 0 };
                 return (
                   <tr key={b} className="border-t">
                     <td className="p-2">{b}</td>
+                    <td className="p-2 text-right">
+                      <CurrencyDisplay amount={c.gross} />
+                    </td>
                     <td className="p-2 text-right">
                       <CurrencyDisplay amount={c.paid} />
                     </td>
@@ -99,17 +116,24 @@ export function SalesSummary({
                 );
               })}
               {(() => {
-                const grand = Object.values(bucketAgg).reduce(
-                  (acc, v) => ({
-                    paid: acc.paid + v.paid,
-                    due: acc.due + v.due,
-                  }),
-                  { paid: 0, due: 0 }
+                const grand = buckets.reduce(
+                  (acc, b) => {
+                    const v = bucketAgg[b] || { paid: 0, gross: 0, due: 0 };
+                    return {
+                      gross: acc.gross + v.gross,
+                      paid: acc.paid + v.paid,
+                      due: acc.due + v.due,
+                    };
+                  },
+                  { paid: 0, gross: 0, due: 0 }
                 );
                 return (
                   <tr className="border-t font-bold">
                     <td className="p-2 sticky bottom-0 bg-card min-w-30">
                       Total
+                    </td>
+                    <td className="p-2 text-right sticky bottom-0 bg-card">
+                      <CurrencyDisplay amount={grand.gross} />
                     </td>
                     <td className="p-2 text-right sticky bottom-0 bg-card">
                       <CurrencyDisplay amount={grand.paid} />

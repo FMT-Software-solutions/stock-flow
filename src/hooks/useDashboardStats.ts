@@ -25,6 +25,10 @@ export interface ProductStats {
 export interface SalesStats {
   total_orders: number;
   total_revenue: number;
+  gross_sales: number;
+  revenue_collected: number;
+  revenue_from_previous_sales?: number;
+  revenue_from_current_sales?: number;
   owings?: number;
   refunds?: number;
   breakdown: Record<string, number>;
@@ -135,6 +139,10 @@ export function useDashboardStats({
       prev ?? {
         total_orders: 0,
         total_revenue: 0,
+        gross_sales: 0,
+        revenue_collected: 0,
+        revenue_from_previous_sales: 0,
+        revenue_from_current_sales: 0,
         owings: 0,
         refunds: 0,
         breakdown: {},

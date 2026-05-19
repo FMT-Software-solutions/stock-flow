@@ -1,7 +1,7 @@
 import { XLSX, setColumnWidths, styleHeaderRowAt } from './styles';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Order } from '@/types/orders';
+import type { LedgerOrder } from '@/hooks/useSalesLedgerReport';
 import type { DateRange } from 'react-day-picker';
 import { dateToBucketKey, startOfUnit, nextBucket, paymentStatusDisplay, type GroupUnit, type RowGroup } from '../../sales/utils';
 import { differenceInDays, format, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
@@ -21,7 +21,7 @@ function bucketKeyFromDate(d: Date, unit: GroupUnit) {
 
 interface CommonParams {
   template: Template;
-  orders: Order[];
+  orders: LedgerOrder[];
   groupUnit: GroupUnit;
   rowGroup: RowGroup;
   organizationName?: string;
@@ -58,16 +58,24 @@ export function buildSalesWorkbook({
         const paid = Number(o.paid_amount || 0);
         const ps = String(o.payment_status || '').toLowerCase();
         const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-        acc.revenue += paid;
+        acc.gross += total;
+
+        if (o.payments && o.payments.length > 0) {
+          acc.revenue += o.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        } else {
+          acc.revenue += paid;
+        }
+
         acc.owings += due;
         if (ps === 'refunded') acc.refunds += total;
         return acc;
       },
-      { revenue: 0, owings: 0, refunds: 0 }
+      { revenue: 0, gross: 0, owings: 0, refunds: 0 }
     );
     const body: (string | number)[][] = [
       ['Total Orders', orders.length],
-      ['Total Revenue', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
+      ['Gross Sales', formatCurrency ? formatCurrency(totals.gross) : totals.gross],
+      ['Revenue Collected', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
       ['Owings', formatCurrency ? formatCurrency(totals.owings) : totals.owings],
       ['Refunds', formatCurrency ? formatCurrency(totals.refunds) : totals.refunds],
     ];
@@ -100,8 +108,8 @@ export function buildSalesWorkbook({
     ]);
     meta.push([]);
     meta.push([]);
-    const header = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Payment Method', 'Status', 'Total', 'Paid', 'Due'];
-    const body: (string | number)[][] = orders.map((o) => {
+    const header = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Sale Amount', 'Collected in Period', 'Total Paid', 'Due'];
+    const body: (string | number)[][] = orders.map((o: any) => {
       const d = new Date(o.date || o.created_at);
       const dateStr = format(d, 'MMM, dd yyyy');
       const customerName =
@@ -109,31 +117,62 @@ export function buildSalesWorkbook({
         o.customer?.email ||
         o.customer?.name ||
         'Guest';
-      const items =
-        (o.items || [])
-          .map((it) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`)
-          .join('\n');
-      const pm = (o.payment_method || 'other')
-        .toString()
-        .split('_')
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ');
+      const itemsStr = (o.items || []).map((it: any) => `${it.product_name} x${it.quantity}`).join(', ');
       const total = Number(o.total_amount || 0);
       const paid = Number(o.paid_amount || 0);
-      const due = String(o.payment_status || '').toLowerCase() === 'refunded' ? 0 : Math.max(0, total - paid);
-      const status = (o.status || '').toString().split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-      return [
+      const periodPaid = Number(o.period_collected || 0);
+      const ps = String(o.payment_status || '').toLowerCase();
+      const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
+      const status = (o.status || '').toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+      const row: (string | number)[] = [
         dateStr,
         o.order_number,
         customerName,
-        items,
-        o.branch?.name || 'Unspecified',
-        pm,
+        itemsStr,
+        o.branch?.name || '-',
         status,
-        formatCurrency ? formatCurrency(total) : total,
-        formatCurrency ? formatCurrency(paid) : paid,
-        formatCurrency ? formatCurrency(due) : due,
+        total,
+        periodPaid,
+        paid,
+        due,
       ];
+      return row;
+    });
+
+    // Add Ledger Sheet
+    const ledgerHeader = ['Order / Payment Date', 'Customer / Method', 'Recorded By / Sale Amt', 'Notes / Collected in Period', 'Amount / Status'];
+    const ledgerBody: (string | number)[][] = [];
+
+    orders.forEach((o: any) => {
+      if (o.period_collected > 0 && o.payments && o.payments.length > 0) {
+        const customerName =
+          ((o.customer?.first_name || '') + ' ' + (o.customer?.last_name || '')).trim() ||
+          o.customer?.email ||
+          o.customer?.name ||
+          'Guest';
+        const ps = (o.payment_status || '').toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+        ledgerBody.push([
+          `Order #${o.order_number}`,
+          customerName,
+          `Sale: ${formatCurrency ? formatCurrency(Number(o.total_amount || 0)) : Number(o.total_amount || 0)}`,
+          `Collected: ${formatCurrency ? formatCurrency(Number(o.period_collected || 0)) : Number(o.period_collected || 0)}`,
+          `Status: ${ps}`
+        ]);
+
+        o.payments.forEach((p: any) => {
+          ledgerBody.push([
+            `   ${format(new Date(p.created_at), 'MMM dd, yyyy h:mm a')}`,
+            `   ${(p.payment_method || '').replace('_', ' ')}`,
+            p.recorded_by || '-',
+            p.notes || '-',
+            Number(p.amount)
+          ]);
+        });
+
+        ledgerBody.push(['', '', '', '', '']); // Visual spacing
+      }
     });
     const aoa = [...meta, header, ...body];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -165,6 +204,14 @@ export function buildSalesWorkbook({
     }
     (ws as any)['!pageSetup'] = { orientation: 'landscape', scale: 90, fitToWidth: 1 };
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Detailed');
+
+    // Add Ledger Sheet to Workbook
+    const ledgerAoa = [...meta, ledgerHeader, ...ledgerBody];
+    const ledgerWs = XLSX.utils.aoa_to_sheet(ledgerAoa);
+    const ledgerHeaderRowIndex = meta.length;
+    setColumnWidths(ledgerWs, [20, 12, 24, 18, 18, 24, 16]);
+    styleHeaderRowAt(ledgerWs, ledgerHeader, ledgerHeaderRowIndex);
+    XLSX.utils.book_append_sheet(wb, ledgerWs, 'Payment Ledger');
   }
 
   if (includeData && template === 'pivot') {
@@ -200,11 +247,11 @@ export function buildSalesWorkbook({
       return list;
     })();
 
-    type Agg = { total: number; paid: number; due: number };
+    type Agg = { total: number; paid: number; gross: number; due: number };
     const rowsMap = new Map<string, Record<string, Agg>>();
     let rowItemsMap: Map<string, string[]> | undefined;
     source.forEach((o) => {
-      const bucket = bucketKeyFromDate(startOfUnit(new Date(o.date || o.created_at), groupUnit), groupUnit);
+      const bucket = dateToBucketKey(startOfUnit(new Date(o.date || o.created_at), groupUnit).toISOString(), groupUnit);
       const total = Number(o.total_amount || 0);
       const paid = Number(o.paid_amount || 0);
       const ps = String(o.payment_status || '').toLowerCase();
@@ -217,7 +264,7 @@ export function buildSalesWorkbook({
           o.customer?.name ||
           'Guest';
         rowLabel = `#${o.order_number} — ${customerName}`;
-        const items = (o.items || []).map((it) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`);
+        const items = (o.items || []).map((it: any) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`);
         if (!rowItemsMap) rowItemsMap = new Map<string, string[]>();
         const existing = rowItemsMap.get(rowLabel) || [];
         rowItemsMap.set(rowLabel, existing.concat(items));
@@ -227,8 +274,8 @@ export function buildSalesWorkbook({
         const k = (o.payment_status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'payment_method') {
-        const pm = o.payment_method || 'other';
-        rowLabel = pm.toString().split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        const pm = o.payments && o.payments.length > 0 ? o.payments[0].payment_method : 'other';
+        rowLabel = pm.toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'status') {
         const k = (o.status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
@@ -241,10 +288,21 @@ export function buildSalesWorkbook({
         rowLabel = customerName;
       }
       const row = rowsMap.get(rowLabel) || {};
-      const cell = row[bucket] || { total: 0, paid: 0, due: 0 };
+      const cell = row[bucket] || { total: 0, paid: 0, gross: 0, due: 0 };
       cell.total += total;
-      cell.paid += paid;
+      cell.gross += total;
       cell.due += due;
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pBucket = dateToBucketKey(startOfUnit(new Date(p.created_at), groupUnit).toISOString(), groupUnit);
+          const pCell = row[pBucket] || { total: 0, paid: 0, gross: 0, due: 0 };
+          pCell.paid += Number(p.amount);
+          row[pBucket] = pCell;
+        });
+      } else {
+        cell.paid += paid;
+      }
       row[bucket] = cell;
       rowsMap.set(rowLabel, row);
     });
@@ -257,15 +315,19 @@ export function buildSalesWorkbook({
           return items.length ? `${label}\n${items.join('\n')}` : label;
         })();
         const row: (string | number)[] = [labelFull];
+        let grossTotal = 0;
         let paidTotal = 0;
         let dueTotal = 0;
         cols.forEach((c) => {
-          const v = map[c] || { total: 0, paid: 0, due: 0 };
+          const v = map[c] || { total: 0, paid: 0, gross: 0, due: 0 };
+          row.push(formatCurrency ? formatCurrency(v.gross) : v.gross);
           row.push(formatCurrency ? formatCurrency(v.paid) : v.paid);
           row.push(formatCurrency ? formatCurrency(v.due) : v.due);
+          grossTotal += v.gross;
           paidTotal += v.paid;
           dueTotal += v.due;
         });
+        row.push(formatCurrency ? formatCurrency(grossTotal) : grossTotal);
         row.push(formatCurrency ? formatCurrency(paidTotal) : paidTotal);
         row.push(formatCurrency ? formatCurrency(dueTotal) : dueTotal);
         body.push(row);
@@ -283,20 +345,20 @@ export function buildSalesWorkbook({
       meta.push([]);
       meta.push([]);
       const headerTop = ['Item', ...cols, 'Total'];
-      const headerSub = ['Item', ...cols.flatMap(() => ['Revenue', 'Due']), 'Revenue', 'Due'];
+      const headerSub = ['Item', ...cols.flatMap(() => ['Gross', 'Revenue', 'Due']), 'Gross', 'Revenue', 'Due'];
       const aoa = [...meta, headerTop, headerSub, ...body];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const headerTopIndex = meta.length;
       const headerSubIndex = meta.length + 1;
       const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
       for (let i = 0; i < cols.length; i++) {
-        const startCol = 1 + i * 2;
-        merges.push({ s: { r: headerTopIndex, c: startCol }, e: { r: headerTopIndex, c: startCol + 1 } });
+        const startCol = 1 + i * 3;
+        merges.push({ s: { r: headerTopIndex, c: startCol }, e: { r: headerTopIndex, c: startCol + 2 } });
       }
-      const totalStart = 1 + cols.length * 2;
-      merges.push({ s: { r: headerTopIndex, c: totalStart }, e: { r: headerTopIndex, c: totalStart + 1 } });
+      const totalStart = 1 + cols.length * 3;
+      merges.push({ s: { r: headerTopIndex, c: totalStart }, e: { r: headerTopIndex, c: totalStart + 2 } });
       (ws as any)['!merges'] = merges;
-      setColumnWidths(ws, [40, ...cols.flatMap(() => [14, 14]), 16, 16]);
+      setColumnWidths(ws, [40, ...cols.flatMap(() => [14, 14, 14]), 16, 16, 16]);
       styleHeaderRowAt(ws, headerTop, headerTopIndex);
       styleHeaderRowAt(ws, headerSub, headerSubIndex);
       {
@@ -393,7 +455,7 @@ export function buildSalesWorkbook({
         .sort((a, b) => b[1] - a[1])
         .map(([k]) => k);
     })();
-    const agg: Record<string, { paid: number; due: number }> = {};
+    const agg: Record<string, { paid: number; gross: number; due: number }> = {};
     orders.forEach((o) => {
       const d = new Date(o.date || o.created_at || new Date().toISOString());
       const key = dateToBucketKey(d.toISOString(), groupUnit);
@@ -401,10 +463,21 @@ export function buildSalesWorkbook({
       const paid = Number(o.paid_amount || 0);
       const ps = String(o.payment_status || '').toLowerCase();
       const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-      const cur = agg[key] || { paid: 0, due: 0 };
-      cur.paid += paid;
+      const cur = agg[key] || { paid: 0, gross: 0, due: 0 };
+      cur.gross += total;
       cur.due += due;
       agg[key] = cur;
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pKey = dateToBucketKey(p.created_at, groupUnit);
+          const pCur = agg[pKey] || { paid: 0, gross: 0, due: 0 };
+          pCur.paid += Number(p.amount);
+          agg[pKey] = pCur;
+        });
+      } else {
+        cur.paid += paid;
+      }
     });
     const meta: (string | number)[][] = [];
     if (organizationName) meta.push([organizationName]);
@@ -417,16 +490,17 @@ export function buildSalesWorkbook({
     ]);
     meta.push([]);
     meta.push([]);
-    const header = ['Time', 'Revenue (Paid)', 'Owings (Due)'];
+    const header = ['Time', 'Gross Sales', 'Revenue Collected', 'Owings (Due)'];
     const body: (string | number)[][] = buckets.map((b) => [
       b,
+      formatCurrency ? formatCurrency(agg[b]?.gross || 0) : agg[b]?.gross || 0,
       formatCurrency ? formatCurrency(agg[b]?.paid || 0) : agg[b]?.paid || 0,
       formatCurrency ? formatCurrency(agg[b]?.due || 0) : agg[b]?.due || 0,
     ]);
     const aoa = [...meta, header, ...body];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const headerRowIndex = meta.length;
-    setColumnWidths(ws, [24, 16, 16]);
+    setColumnWidths(ws, [24, 16, 16, 16]);
     styleHeaderRowAt(ws, header, headerRowIndex);
     {
       const ref = (ws as any)['!ref'];
@@ -456,7 +530,7 @@ export function buildSalesWorkbook({
       return 'month';
     })();
 
-    const trendBuckets = new Map<number, { revenue: number; owings: number; orders: number }>();
+    const trendBuckets = new Map<number, { revenue: number; gross_sales: number; orders: number }>();
     const getTrendBucketStart = (d: Date) => {
       if (trendUnit === 'day') return startOfDay(d);
       if (trendUnit === 'week') return startOfWeek(d, { weekStartsOn: 1 });
@@ -466,13 +540,23 @@ export function buildSalesWorkbook({
     orders.forEach((o) => {
       const d = new Date(o.date || o.created_at || new Date().toISOString());
       const bucketStart = getTrendBucketStart(d).getTime();
-      const cur = trendBuckets.get(bucketStart) || { revenue: 0, owings: 0, orders: 0 };
-      const paid = Number(o.paid_amount ?? 0);
-      const owing = Math.max(0, Number(o.total_amount ?? 0) - paid);
-      cur.revenue += paid;
-      cur.owings += owing;
+      const cur = trendBuckets.get(bucketStart) || { revenue: 0, gross_sales: 0, orders: 0 };
       cur.orders += 1;
+      cur.gross_sales += Number(o.total_amount ?? 0);
       trendBuckets.set(bucketStart, cur);
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pDate = new Date(p.created_at);
+          const pBucket = getTrendBucketStart(pDate).getTime();
+          const pCur = trendBuckets.get(pBucket) || { revenue: 0, gross_sales: 0, orders: 0 };
+          pCur.revenue += Number(p.amount);
+          trendBuckets.set(pBucket, pCur);
+        });
+      } else if (Number(o.paid_amount) > 0) {
+        cur.revenue += Number(o.paid_amount);
+        trendBuckets.set(bucketStart, cur);
+      }
     });
 
     const trendData = Array.from(trendBuckets.entries())
@@ -480,7 +564,7 @@ export function buildSalesWorkbook({
       .map(([ts, agg]) => ({
         period: format(new Date(ts), 'MMMM d, yyyy'),
         revenue: agg.revenue,
-        owings: agg.owings,
+        gross_sales: agg.gross_sales,
         orders: agg.orders,
       }));
 
@@ -497,11 +581,11 @@ export function buildSalesWorkbook({
       meta.push([]);
       meta.push([]);
 
-      const header = ['Period', 'Revenue', 'Owings', 'Orders'];
+      const header = ['Period', 'Revenue Collected', 'Gross Sales', 'Orders'];
       const body: (string | number)[][] = trendData.map((d) => [
         d.period,
         formatCurrency ? formatCurrency(d.revenue) : d.revenue,
-        formatCurrency ? formatCurrency(d.owings) : d.owings,
+        formatCurrency ? formatCurrency(d.gross_sales) : d.gross_sales,
         d.orders,
       ]);
 
@@ -673,16 +757,24 @@ export function buildSalesPdfDoc({
         const paid = Number(o.paid_amount || 0);
         const ps = String(o.payment_status || '').toLowerCase();
         const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-        acc.revenue += paid;
+        acc.gross += total;
+
+        if (o.payments && o.payments.length > 0) {
+          acc.revenue += o.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        } else {
+          acc.revenue += paid;
+        }
+
         acc.owings += due;
         if (ps === 'refunded') acc.refunds += total;
         return acc;
       },
-      { revenue: 0, owings: 0, refunds: 0 }
+      { revenue: 0, gross: 0, owings: 0, refunds: 0 }
     );
     const rows: (string | number)[][] = [
       ['Total Orders', orders.length],
-      ['Total Revenue', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
+      ['Gross Sales', formatCurrency ? formatCurrency(totals.gross) : totals.gross],
+      ['Revenue Collected', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
       ['Owings', formatCurrency ? formatCurrency(totals.owings) : totals.owings],
       ['Refunds', formatCurrency ? formatCurrency(totals.refunds) : totals.refunds],
     ];
@@ -691,8 +783,8 @@ export function buildSalesPdfDoc({
   }
 
   if (includeData && template === 'detailed') {
-    const head = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Payment Method', 'Status', 'Total', 'Paid'];
-    const rows: (string | number)[][] = orders.map((o) => {
+    const head = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Sale Amount', 'Collected in Period', 'Total Paid'];
+    const rows: (string | number)[][] = orders.map((o: any) => {
       const d = new Date(o.date || o.created_at);
       const dateStr = format(d, 'MMM, dd yyyy');
       const customerName =
@@ -700,37 +792,70 @@ export function buildSalesPdfDoc({
         o.customer?.email ||
         o.customer?.name ||
         'Guest';
-      const items =
-        (o.items || [])
-          .map((it) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`)
-          .join('\n');
-      const pm = (o.payment_method || 'other')
-        .toString()
-        .split('_')
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ');
+      const itemsStr = (o.items || []).map((it: any) => `${it.product_name} x${it.quantity}`).join(', ');
+
       const total = Number(o.total_amount || 0);
       const paid = Number(o.paid_amount || 0);
-      const ps = String(o.payment_status || '').toLowerCase();
-      const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-      const status = (o.status || '').toString().split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-      const paidCell = due > 0
-        ? `${formatCurrency ? formatCurrency(paid) : paid}\n${formatCurrency ? formatCurrency(due) : due}`
-        : `${formatCurrency ? formatCurrency(paid) : paid}`;
-      const row: (string | number)[] = [
+      const periodPaid = Number(o.period_collected || 0);
+      const status = (o.status || '').toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+      return [
         dateStr,
         o.order_number,
         customerName,
-        items,
-        o.branch?.name || 'Unspecified',
-        pm,
+        itemsStr,
+        o.branch?.name || '-',
         status,
         formatCurrency ? formatCurrency(total) : total,
-        paidCell,
+        formatCurrency ? formatCurrency(periodPaid) : periodPaid,
+        formatCurrency ? formatCurrency(paid) : paid,
       ];
-      return row;
     });
-    y = drawTable(head, rows, y, { dueColumns: [head.indexOf('Paid')] });
+
+    // Draw Overview Table
+    y = drawTable(head, rows, y, { dueColumns: [] });
+
+    // Draw Ledger Table
+    const ledgerHeader = ['Order / Payment Date', 'Customer / Method', 'Recorded By / Sale Amt', 'Notes / Collected', 'Amount / Status'];
+    const ledgerBody: (string | number)[][] = [];
+
+    orders.forEach((o: any) => {
+      if (o.period_collected > 0 && o.payments && o.payments.length > 0) {
+        const customerName =
+          ((o.customer?.first_name || '') + ' ' + (o.customer?.last_name || '')).trim() ||
+          o.customer?.email ||
+          o.customer?.name ||
+          'Guest';
+        const ps = (o.payment_status || '').toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+
+        ledgerBody.push([
+          `Order #${o.order_number}`,
+          customerName,
+          `Sale: ${formatCurrency ? formatCurrency(Number(o.total_amount || 0)) : Number(o.total_amount || 0)}`,
+          `Collected: ${formatCurrency ? formatCurrency(Number(o.period_collected || 0)) : Number(o.period_collected || 0)}`,
+          `Status: ${ps}`
+        ]);
+
+        o.payments.forEach((p: any) => {
+          ledgerBody.push([
+            `    ${format(new Date(p.created_at), 'MMM dd, yyyy h:mm a')}`,
+            `    ${(p.payment_method || '').replace('_', ' ')}`,
+            p.recorded_by || '-',
+            p.notes || '-',
+            formatCurrency ? formatCurrency(Number(p.amount)) : Number(p.amount)
+          ]);
+        });
+      }
+    });
+
+    if (ledgerBody.length > 0) {
+      y += 10;
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text('Payment Ledger', 14, y);
+      y += 6;
+      y = drawTable(ledgerHeader, ledgerBody, y, { dueColumns: [] });
+    }
   }
 
   if (includeData && template === 'pivot') {
@@ -762,7 +887,7 @@ export function buildSalesPdfDoc({
         .map(([k]) => k);
     })();
 
-    type Agg = { total: number; paid: number; due: number };
+    type Agg = { total: number; paid: number; gross: number; due: number };
     const rowsMap = new Map<string, Record<string, Agg>>();
     let rowItemsMap: Map<string, string[]> | undefined;
     source.forEach((o) => {
@@ -789,8 +914,8 @@ export function buildSalesPdfDoc({
         const k = (o.payment_status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'payment_method') {
-        const pm = o.payment_method || 'other';
-        rowLabel = pm.toString().split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        const pm = o.payments && o.payments.length > 0 ? o.payments[0].payment_method : 'other';
+        rowLabel = pm.toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'status') {
         const k = (o.status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
@@ -803,10 +928,22 @@ export function buildSalesPdfDoc({
         rowLabel = customerName;
       }
       const row = rowsMap.get(rowLabel) || {};
-      const cell = row[bucket] || { total: 0, paid: 0, due: 0 };
+      const cell = row[bucket] || { total: 0, paid: 0, gross: 0, due: 0 };
       cell.total += total;
-      cell.paid += paid;
+      cell.gross += total;
       cell.due += due;
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pBucket = bucketKeyFromDate(startOfUnit(new Date(p.created_at), groupUnit), groupUnit);
+          const pCell = row[pBucket] || { total: 0, paid: 0, gross: 0, due: 0 };
+          pCell.paid += Number(p.amount);
+          row[pBucket] = pCell;
+        });
+      } else {
+        cell.paid += paid;
+      }
+
       row[bucket] = cell;
       rowsMap.set(rowLabel, row);
     });
@@ -821,7 +958,7 @@ export function buildSalesPdfDoc({
           o.customer?.name ||
           'Guest';
         rowLabel = `#${o.order_number} — ${customerName}`;
-        const items = (o.items || []).map((it) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`);
+        const items = (o.items || []).map((it: any) => `${it.product_name}${it.quantity ? ` x${it.quantity}` : ''}`);
         if (!rowItemsMap) rowItemsMap = new Map<string, string[]>();
         const existing = rowItemsMap.get(rowLabel) || [];
         rowItemsMap.set(rowLabel, existing.concat(items));
@@ -831,8 +968,8 @@ export function buildSalesPdfDoc({
         const k = (o.payment_status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'payment_method') {
-        const pm = o.payment_method || 'other';
-        rowLabel = pm.toString().split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        const pm = o.payments && o.payments.length > 0 ? o.payments[0].payment_method : 'other';
+        rowLabel = pm.toString().split('_').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
       } else if (rowGroup === 'status') {
         const k = (o.status || '').toString();
         rowLabel = k.split('_').map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
@@ -854,22 +991,24 @@ export function buildSalesPdfDoc({
           return items.length ? `${label}\n${items.join('\n')}` : label;
         })();
         const row: (string | number)[] = [labelFull];
+        let grossTotal = 0;
         let paidTotal = 0;
         let dueTotal = 0;
         cols.forEach((c) => {
-          const v = map[c] || { total: 0, paid: 0, due: 0 };
+          const v = map[c] || { total: 0, paid: 0, gross: 0, due: 0 };
           const cell =
             v.due > 0
-              ? `${formatCurrency ? formatCurrency(v.paid) : v.paid}\n${formatCurrency ? formatCurrency(v.due) : v.due}`
-              : `${formatCurrency ? formatCurrency(v.paid) : v.paid}`;
+              ? `${formatCurrency ? formatCurrency(v.gross) : v.gross}\n${formatCurrency ? formatCurrency(v.paid) : v.paid}\n${formatCurrency ? formatCurrency(v.due) : v.due}`
+              : `${formatCurrency ? formatCurrency(v.gross) : v.gross}\n${formatCurrency ? formatCurrency(v.paid) : v.paid}`;
           row.push(cell);
+          grossTotal += v.gross;
           paidTotal += v.paid;
           dueTotal += v.due;
         });
         const totalCell =
           dueTotal > 0
-            ? `${formatCurrency ? formatCurrency(paidTotal) : paidTotal}\n${formatCurrency ? formatCurrency(dueTotal) : dueTotal}`
-            : `${formatCurrency ? formatCurrency(paidTotal) : paidTotal}`;
+            ? `${formatCurrency ? formatCurrency(grossTotal) : grossTotal}\n${formatCurrency ? formatCurrency(paidTotal) : paidTotal}\n${formatCurrency ? formatCurrency(dueTotal) : dueTotal}`
+            : `${formatCurrency ? formatCurrency(grossTotal) : grossTotal}\n${formatCurrency ? formatCurrency(paidTotal) : paidTotal}`;
         row.push(totalCell);
         rows.push(row);
       });
@@ -919,7 +1058,7 @@ export function buildSalesPdfDoc({
         .sort((a, b) => b[1] - a[1])
         .map(([k]) => k);
     })();
-    const agg: Record<string, { paid: number; due: number }> = {};
+    const agg: Record<string, { paid: number; gross: number; due: number }> = {};
     orders.forEach((o) => {
       const d = new Date(o.date || o.created_at || new Date().toISOString());
       const key = dateToBucketKey(d.toISOString(), groupUnit);
@@ -927,14 +1066,26 @@ export function buildSalesPdfDoc({
       const paid = Number(o.paid_amount || 0);
       const ps = String(o.payment_status || '').toLowerCase();
       const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
-      const cur = agg[key] || { paid: 0, due: 0 };
-      cur.paid += paid;
+      const cur = agg[key] || { paid: 0, gross: 0, due: 0 };
+      cur.gross += total;
       cur.due += due;
       agg[key] = cur;
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pKey = dateToBucketKey(p.created_at, groupUnit);
+          const pCur = agg[pKey] || { paid: 0, gross: 0, due: 0 };
+          pCur.paid += Number(p.amount);
+          agg[pKey] = pCur;
+        });
+      } else {
+        cur.paid += paid;
+      }
     });
-    const head = ['Time', 'Revenue (Paid)', 'Owings (Due)'];
+    const head = ['Time', 'Gross Sales', 'Revenue Collected', 'Owings (Due)'];
     const rows: (string | number)[][] = buckets.map((b) => [
       b,
+      formatCurrency ? formatCurrency(agg[b]?.gross || 0) : agg[b]?.gross || 0,
       formatCurrency ? formatCurrency(agg[b]?.paid || 0) : agg[b]?.paid || 0,
       formatCurrency ? formatCurrency(agg[b]?.due || 0) : agg[b]?.due || 0,
     ]);
@@ -950,7 +1101,7 @@ export function buildSalesPdfDoc({
       return 'month';
     })();
 
-    const trendBuckets = new Map<number, { revenue: number; owings: number; orders: number }>();
+    const trendBuckets = new Map<number, { revenue: number; gross_sales: number; orders: number }>();
     const getTrendBucketStart = (d: Date) => {
       if (trendUnit === 'day') return startOfDay(d);
       if (trendUnit === 'week') return startOfWeek(d, { weekStartsOn: 1 });
@@ -960,13 +1111,23 @@ export function buildSalesPdfDoc({
     orders.forEach((o) => {
       const d = new Date(o.date || o.created_at || new Date().toISOString());
       const bucketStart = getTrendBucketStart(d).getTime();
-      const cur = trendBuckets.get(bucketStart) || { revenue: 0, owings: 0, orders: 0 };
-      const paid = Number(o.paid_amount ?? 0);
-      const owing = Math.max(0, Number(o.total_amount ?? 0) - paid);
-      cur.revenue += paid;
-      cur.owings += owing;
+      const cur = trendBuckets.get(bucketStart) || { revenue: 0, gross_sales: 0, orders: 0 };
       cur.orders += 1;
+      cur.gross_sales += Number(o.total_amount ?? 0);
       trendBuckets.set(bucketStart, cur);
+
+      if (o.payments && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pDate = new Date(p.created_at);
+          const pBucket = getTrendBucketStart(pDate).getTime();
+          const pCur = trendBuckets.get(pBucket) || { revenue: 0, gross_sales: 0, orders: 0 };
+          pCur.revenue += Number(p.amount);
+          trendBuckets.set(pBucket, pCur);
+        });
+      } else if (Number(o.paid_amount) > 0) {
+        cur.revenue += Number(o.paid_amount);
+        trendBuckets.set(bucketStart, cur);
+      }
     });
 
     const trendData = Array.from(trendBuckets.entries())
@@ -974,7 +1135,7 @@ export function buildSalesPdfDoc({
       .map(([ts, agg]) => ({
         period: format(new Date(ts), 'MMMM d, yyyy'),
         revenue: agg.revenue,
-        owings: agg.owings,
+        gross_sales: agg.gross_sales,
         orders: agg.orders,
       }));
 
@@ -998,15 +1159,15 @@ export function buildSalesPdfDoc({
     if (trendData.length) {
       ensureSpace(14);
       doc.setFontSize(12);
-      doc.text('Revenue & Owings Trend', 14, y);
+      doc.text('Revenue Collected & Gross Sales Trend', 14, y);
       doc.setFontSize(10);
       y += 6;
 
-      const head = ['Period', 'Revenue', 'Owings', 'Orders'];
+      const head = ['Period', 'Revenue Collected', 'Gross Sales', 'Orders'];
       const rows: (string | number)[][] = trendData.map((d) => [
         d.period,
         formatCurrency ? formatCurrency(d.revenue) : d.revenue,
-        formatCurrency ? formatCurrency(d.owings) : d.owings,
+        formatCurrency ? formatCurrency(d.gross_sales) : d.gross_sales,
         d.orders,
       ]);
       y = drawTable(head, rows, y);

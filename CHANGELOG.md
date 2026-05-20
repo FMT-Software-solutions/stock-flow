@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-05-20
+
+### Added
+  
+### Improved / Changed
+- Sale financial reporting
+
+### Bug Fixes
+
+
 ## [1.1.3] - 2026-05-16
 
 ### Added

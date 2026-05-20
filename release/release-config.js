@@ -8,15 +8,13 @@
 
 module.exports = {
   // Version information
-  version: "1.1.3",
+  version: "1.1.4",
 
   // Release notes in markdown format
   releaseNotes: `### Added
-  - Order or Sale payment history
-
+  
 ### Improved / Changed
-- Sales entry workflow
-- SMS templates for quick sms dialog
+- Sale financial reporting
 
 ### Bug Fixes
 `,

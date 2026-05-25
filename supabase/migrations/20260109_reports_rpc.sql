@@ -276,6 +276,11 @@ BEGIN
 END;
 $$;
 
+-- Ensure no overloaded legacy signature remains (removes ambiguity in PostgREST)
+DROP FUNCTION IF EXISTS public.get_sales_report(
+    UUID, UUID[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT
+);
+
 CREATE OR REPLACE FUNCTION get_sales_report(
     p_organization_id UUID,
     p_branch_ids UUID[] DEFAULT NULL,

@@ -60,6 +60,10 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
     if (newStatus === 'paid') {
       newPaidAmount = order.total_amount;
     } else if (newStatus === 'unpaid' || newStatus === 'refunded') {
+      if (order.paid_amount && order.paid_amount > 0) {
+        toast.error(`Cannot change to ${newStatus} because payments have already been recorded.`);
+        return;
+      }
       newPaidAmount = 0;
     }
 
@@ -85,18 +89,17 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
       toast.error('Partial amount must be greater than 0');
       return;
     }
+    if (partialAmount <= (order.paid_amount || 0)) {
+       toast.error('Amount must be greater than current paid amount. Use Add Payment to record new cash flow.');
+       return;
+    }
     if (partialAmount >= order.total_amount) {
-      // If they enter full amount, should we switch to 'paid'?
-      // User requested: "if status changed to unpaid or refunded, it should set paid amount to zero automatically."
-      // "If we update from other status to partial, we should let user enter paid amount in a popup."
-      // "Make sure all edge cases are handled."
-      // It's safer to just set it to 'paid' if they enter full amount, or warn them.
-      // Let's switch to 'paid' automatically for better UX
+      // If they enter full amount, let's switch to 'paid'
       try {
         await updateOrder.mutateAsync({
           id: order.id,
           payment_status: 'paid',
-          paid_amount: order.total_amount,
+          paid_amount: order.total_amount, // Trigger will catch this and create the ledger entry
         });
         toast.success('Amount covers total, status set to Paid');
         setShowPartialDialog(false);
@@ -111,7 +114,7 @@ export function OrderPaymentStatusCell({ order }: OrderPaymentStatusCellProps) {
       await updateOrder.mutateAsync({
         id: order.id,
         payment_status: 'partial',
-        paid_amount: partialAmount,
+        paid_amount: partialAmount, // Trigger will catch this and create the ledger entry
       });
       toast.success(`Payment status updated to Partial`);
       setShowPartialDialog(false);

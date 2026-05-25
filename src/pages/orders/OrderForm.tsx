@@ -961,8 +961,15 @@ function OrderFormInner({
                       <Field data-invalid={!!fieldState.error}>
                         <FieldLabel>Payment</FieldLabel>
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(val) => {
+                            if (isEditing && existingOrder?.paid_amount && existingOrder.paid_amount > 0 && (val === 'unpaid' || val === 'refunded')) {
+                              toast.error(`Cannot change to ${val} because payments have already been recorded.`);
+                              return;
+                            }
+                            field.onChange(val);
+                          }}
                           value={field.value}
+                          disabled={isEditing}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Payment" />
@@ -1427,7 +1434,14 @@ function OrderFormInner({
             ) : null}
             <div className="flex flex-col">
               <span className="text-xs text-muted-foreground">Total</span>
-              <span className="text-xl font-bold">{formatCurrency(effectiveTotal)}</span>
+              <span className={`text-xl font-bold ${isEditing && paidAmount !== undefined && effectiveTotal < paidAmount ? 'text-destructive' : ''}`}>
+                {formatCurrency(effectiveTotal)}
+              </span>
+              {isEditing && paidAmount !== undefined && effectiveTotal < paidAmount && (
+                <span className="text-[10px] text-destructive absolute -top-6 left-0 bg-background border border-destructive/20 px-2 py-1 rounded shadow-sm whitespace-nowrap">
+                  Total cannot be less than already paid ({formatCurrency(paidAmount)})
+                </span>
+              )}
             </div>
             {(paidAmount !== undefined && paidAmount < effectiveTotal) && (
               <div className="flex flex-col text-destructive ml-auto lg:ml-4">
@@ -1463,10 +1477,16 @@ function OrderFormInner({
                           }
                         }
                       }}
+                      disabled={isEditing}
                       readOnly={paymentStatus === 'paid'}
-                      className={`h-9 ${paymentStatus === 'paid' ? 'bg-muted' : 'bg-background'}`}
+                      className={`h-9 ${(paymentStatus === 'paid' || isEditing) ? 'bg-muted' : 'bg-background'}`}
                     />
-                    {fieldState.error && (
+                    {isEditing && (
+                      <span className="absolute -top-12 left-0 text-[10px] text-muted-foreground bg-background border px-2 py-1 rounded shadow-sm whitespace-nowrap z-50">
+                        Use "Add Payment" in<br />Orders list to update.
+                      </span>
+                    )}
+                    {fieldState.error && !isEditing && (
                       <span className="absolute -top-10 left-0 text-xs text-destructive bg-background border border-destructive/20 px-2 py-1 rounded shadow-sm whitespace-nowrap z-50">
                         {fieldState.error.message}
                       </span>
@@ -1498,7 +1518,12 @@ function OrderFormInner({
               <Button
                 type="submit"
                 className="flex-1 sm:flex-none"
-                disabled={!selectedBranchId || createOrder.isPending || updateOrder.isPending}
+                disabled={
+                  !selectedBranchId ||
+                  createOrder.isPending ||
+                  updateOrder.isPending ||
+                  (isEditing && paidAmount !== undefined && effectiveTotal < paidAmount)
+                }
               >
                 {isEditing ? 'Update Sale' : 'Create Sale'}
               </Button>

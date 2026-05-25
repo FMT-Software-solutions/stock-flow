@@ -179,7 +179,8 @@ BEGIN
     WHERE o.organization_id = p_organization_id
     AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR o.branch_id = ANY(p_branch_ids))
     AND (p_start_date IS NULL OR op.created_at >= p_start_date)
-    AND (p_end_date IS NULL OR op.created_at <= p_end_date);
+    AND (p_end_date IS NULL OR op.created_at <= p_end_date)
+    AND o.is_deleted = false;
 
     -- Breakdown Revenue by Current Sales vs Previous Sales
     SELECT 
@@ -193,7 +194,8 @@ BEGIN
     WHERE o.organization_id = p_organization_id
     AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR o.branch_id = ANY(p_branch_ids))
     AND (p_start_date IS NULL OR op.created_at >= p_start_date)
-    AND (p_end_date IS NULL OR op.created_at <= p_end_date);
+    AND (p_end_date IS NULL OR op.created_at <= p_end_date)
+    AND o.is_deleted = false;
 
     SELECT jsonb_object_agg(status, count)
     INTO v_breakdown
@@ -214,14 +216,19 @@ BEGIN
     FROM (
         SELECT 
             TO_CHAR(day, 'Mon DD') as date,
-            COALESCE(SUM(op.amount), 0) as value
+            COALESCE(op_agg.amount, 0) as value
         FROM generate_series(v_start_date, v_end_date, '1 day'::interval) as day
-        LEFT JOIN order_payments op ON op.created_at::date = day::date
-        LEFT JOIN orders o ON op.order_id = o.id 
-            AND o.organization_id = p_organization_id 
+        LEFT JOIN (
+            SELECT 
+                op.created_at::date as p_date, 
+                SUM(op.amount) as amount
+            FROM order_payments op
+            JOIN orders o ON op.order_id = o.id
+            WHERE o.organization_id = p_organization_id
             AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR o.branch_id = ANY(p_branch_ids))
             AND o.is_deleted = false
-        GROUP BY day
+            GROUP BY op.created_at::date
+        ) op_agg ON op_agg.p_date = day::date
         ORDER BY day
     ) t;
 

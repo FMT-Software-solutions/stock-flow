@@ -172,21 +172,33 @@ BEGIN
     AND (p_end_date IS NULL OR date <= p_end_date)
     AND is_deleted = false;
 
-    SELECT
-        COALESCE(SUM(op.amount), 0),
-        COALESCE(SUM(op.amount) FILTER (WHERE p_start_date IS NOT NULL AND o.date < p_start_date), 0),
-        COALESCE(SUM(op.amount) FILTER (WHERE p_start_date IS NULL OR o.date >= p_start_date), 0)
-    INTO
-        v_revenue_collected,
-        v_revenue_from_previous_sales,
-        v_revenue_from_current_sales
+    -- Calculate Revenue Collected strictly from order_payments
+    SELECT 
+        COALESCE(SUM(amount), 0)
+    INTO 
+        v_revenue_collected
     FROM order_payments op
     JOIN orders o ON op.order_id = o.id
-    WHERE op.organization_id = p_organization_id
-    AND o.is_deleted = false
+    WHERE o.organization_id = p_organization_id
     AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR o.branch_id = ANY(p_branch_ids))
     AND (p_start_date IS NULL OR op.created_at >= p_start_date)
-    AND (p_end_date IS NULL OR op.created_at <= p_end_date);
+    AND (p_end_date IS NULL OR op.created_at <= p_end_date)
+    AND o.is_deleted = false;
+
+    -- Breakdown Revenue by Current Sales vs Previous Sales
+    SELECT 
+        COALESCE(SUM(op.amount) FILTER (WHERE o.date >= p_start_date), 0),
+        COALESCE(SUM(op.amount) FILTER (WHERE p_start_date IS NOT NULL AND o.date < p_start_date), 0)
+    INTO
+        v_revenue_from_current_sales,
+        v_revenue_from_previous_sales
+    FROM order_payments op
+    JOIN orders o ON op.order_id = o.id
+    WHERE o.organization_id = p_organization_id
+    AND (p_branch_ids IS NULL OR cardinality(p_branch_ids) = 0 OR o.branch_id = ANY(p_branch_ids))
+    AND (p_start_date IS NULL OR op.created_at >= p_start_date)
+    AND (p_end_date IS NULL OR op.created_at <= p_end_date)
+    AND o.is_deleted = false;
 
     SELECT jsonb_object_agg(status, count)
     INTO v_breakdown

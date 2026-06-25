@@ -226,7 +226,8 @@ export function buildSalesWorkbook({
           list.push(bucketKeyFromDate(cur, groupUnit));
           cur = nextBucket(cur, groupUnit);
         }
-        return list;
+        // Newest-first to match the on-screen pivot table order.
+        return list.reverse();
       }
       // Generate contiguous buckets from earliest to latest in data
       let minDate: Date | undefined;
@@ -244,7 +245,7 @@ export function buildSalesWorkbook({
         list.push(bucketKeyFromDate(cur, groupUnit));
         cur = nextBucket(cur, groupUnit);
       }
-      return list;
+      return list.reverse();
     })();
 
     type Agg = { total: number; paid: number; gross: number; due: number };
@@ -344,7 +345,14 @@ export function buildSalesWorkbook({
       ]);
       meta.push([]);
       meta.push([]);
-      const headerTop = ['Item', ...cols, 'Total'];
+      // Each period spans 3 sub-columns (Gross, Revenue, Due). The top header row places
+      // the period label at the leftmost cell of each triple with two blank cells after,
+      // so when we merge [c..c+2] the label lands in the centre. Without these blanks the
+      // label cells pack sequentially and the merge picks up the wrong period's name —
+      // which is why month labels disappeared past the first few columns.
+      const headerTop: (string | number)[] = ['Item'];
+      cols.forEach((c) => headerTop.push(c, '', ''));
+      headerTop.push('Total', '', '');
       const headerSub = ['Item', ...cols.flatMap(() => ['Gross', 'Revenue', 'Due']), 'Gross', 'Revenue', 'Due'];
       const aoa = [...meta, headerTop, headerSub, ...body];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -376,15 +384,21 @@ export function buildSalesWorkbook({
           }
         }
       }
+      // Body row layout per period i: Gross @ 1+i*3, Revenue @ 1+i*3+1, Due @ 1+i*3+2.
+      // The Total triple at the right uses the same Gross/Revenue/Due order starting at
+      // `totalStart`. The previous code used stride 2 here, which painted the wrong
+      // columns red as soon as a pivot had more than a couple of periods.
+      const dueCols: number[] = [];
+      for (let i = 0; i < cols.length; i++) dueCols.push(1 + i * 3 + 2);
+      dueCols.push(totalStart + 2);
+      const revenueCols: number[] = [];
+      for (let i = 0; i < cols.length; i++) revenueCols.push(1 + i * 3 + 1);
+      revenueCols.push(totalStart + 1);
+
       {
         const ref = (ws as any)['!ref'];
         if (ref) {
           const range = XLSX.utils.decode_range(ref);
-          const dueCols: number[] = [];
-          for (let i = 0; i < cols.length; i++) {
-            dueCols.push(1 + i * 2 + 1);
-          }
-          dueCols.push(totalStart + 1);
           for (let r = headerSubIndex + 1; r <= range.e.r; r++) {
             for (const c of dueCols) {
               const addr = XLSX.utils.encode_cell({ r, c });
@@ -396,19 +410,6 @@ export function buildSalesWorkbook({
                 };
               }
             }
-          }
-        }
-      }
-      {
-        const ref = (ws as any)['!ref'];
-        if (ref) {
-          const range = XLSX.utils.decode_range(ref);
-          const revenueCols: number[] = [];
-          for (let i = 0; i < cols.length; i++) {
-            revenueCols.push(1 + i * 2);
-          }
-          revenueCols.push(totalStart);
-          for (let r = headerSubIndex + 1; r <= range.e.r; r++) {
             for (const c of revenueCols) {
               const addr = XLSX.utils.encode_cell({ r, c });
               if (ws[addr]) {

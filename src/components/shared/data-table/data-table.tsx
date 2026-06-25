@@ -39,6 +39,8 @@ interface DataTableProps<TData, TValue> {
   defaultColumnFilters?: ColumnFiltersState
   canExport?: boolean
   onFilteredDataChange?: (rows: TData[]) => void
+  onSelectionChange?: (rows: TData[]) => void
+  toolbarActions?: React.ReactNode
   orgId?: string
 }
 
@@ -54,6 +56,8 @@ export function DataTable<TData, TValue>({
   defaultColumnFilters,
   canExport = true,
   onFilteredDataChange,
+  onSelectionChange,
+  toolbarActions,
   orgId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -122,6 +126,13 @@ export function DataTable<TData, TValue>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnFilters, data])
 
+  React.useEffect(() => {
+    if (!onSelectionChange) return
+    const selected = table.getSelectedRowModel().rows.map((r) => r.original as TData)
+    onSelectionChange(selected)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection, data])
+
   const shouldTriggerRowClick = React.useCallback((target: HTMLElement | null) => {
     if (!target) return true;
     if (target.closest('[data-no-row-click="true"]')) return false;
@@ -144,6 +155,7 @@ export function DataTable<TData, TValue>({
         filterFields={filterFields}
         exportFields={exportFields}
         canExport={canExport}
+        toolbarActions={toolbarActions}
       />
       <div className="rounded-md border">
         <Table>

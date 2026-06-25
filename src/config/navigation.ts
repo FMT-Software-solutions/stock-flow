@@ -11,6 +11,7 @@ import {
   Receipt,
   Tags,
   Percent,
+  Inbox,
 } from 'lucide-react';
 
 import type { PermissionScope, PermissionAction } from '@/modules/permissions/types';
@@ -98,6 +99,12 @@ export const navItems: NavItem[] = [
     label: 'Reports',
     permission: { scope: 'reports' },
     iconClassName: 'text-rose-500',
+  },
+  {
+    to: '/requests',
+    icon: Inbox,
+    label: 'Requests',
+    iconClassName: 'text-yellow-500',
   },
   {
     to: '/branches',

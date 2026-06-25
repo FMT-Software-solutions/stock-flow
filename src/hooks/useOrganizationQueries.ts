@@ -207,11 +207,39 @@ export function useUpdateUserRole() {
       userOrganizationId: string;
       role: OrganizationRole;
     }) => {
+      // 1. Find the user_organizations row so we can scope the role lookup to their org.
+      const { data: userOrg, error: lookupError } = await supabase
+        .from('user_organizations')
+        .select('organization_id')
+        .eq('id', userOrganizationId)
+        .single();
+      if (lookupError) throw lookupError;
+      if (!userOrg) throw new Error('User organization not found');
+
+      // 2. Resolve the organization_roles.id for the new role type within that org.
+      //    Without this, the FK that drives permission lookups (RLS, triggers, RPC)
+      //    keeps pointing at the OLD role row and the change has no real effect.
+      const { data: targetRole, error: roleLookupError } = await supabase
+        .from('organization_roles')
+        .select('id')
+        .eq('organization_id', userOrg.organization_id)
+        .eq('type', role)
+        .limit(1)
+        .maybeSingle();
+      if (roleLookupError) throw roleLookupError;
+      if (!targetRole) {
+        throw new Error(
+          `No "${role}" role configured for this organization. Re-run role seeding.`
+        );
+      }
+
+      // 3. Update role + role_id together, and clear per-user permission overrides so
+      //    the new role's defaults take effect (matches the UI's "reset to defaults"
+      //    promise when the role changes).
       const { error: updateError } = await supabase
         .from('user_organizations')
-        .update({ role })
+        .update({ role, role_id: targetRole.id, permissions: null })
         .eq('id', userOrganizationId);
-
       if (updateError) throw updateError;
 
       return { success: true };

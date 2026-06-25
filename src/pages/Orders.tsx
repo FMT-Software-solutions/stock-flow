@@ -6,8 +6,9 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useOrders } from '@/hooks/useOrders';
 import { cn } from '@/lib/utils';
-import { Plus } from 'lucide-react';
+import { CalendarClock, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { RequestDateEditDialog } from '@/components/orders/RequestDateEditDialog';
 import { useNavigate } from 'react-router-dom';
 import { columns } from './orders/columns';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
@@ -35,6 +36,10 @@ export function Orders() {
   const { checkPermission } = useRoleCheck();
   const canCreateOrders = checkPermission('orders', 'create');
   const canExportOrders = checkPermission('orders', 'export');
+  const canRequestDateEdit = checkPermission('orders', 'request_date_edit');
+
+  const [selectedOrders, setSelectedOrders] = useState<Order[]>([]);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
 
   const userPermissions = useMemo<UserPermissions | undefined>(() => {
     if (!currentOrganization?.permissions) return undefined;
@@ -193,8 +198,28 @@ export function Orders() {
           defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
           defaultColumnVisibility={{ search: false }}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
+          onSelectionChange={(rows) => setSelectedOrders(rows as Order[])}
+          toolbarActions={
+            canRequestDateEdit && selectedOrders.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setRequestDialogOpen(true)}
+              >
+                <CalendarClock className="mr-2 h-4 w-4" />
+                Request date edit ({selectedOrders.length})
+              </Button>
+            ) : null
+          }
         />
       </div>
+
+      <RequestDateEditDialog
+        open={requestDialogOpen}
+        onOpenChange={setRequestDialogOpen}
+        orders={selectedOrders}
+      />
     </div>
   );
 }

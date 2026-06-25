@@ -39,6 +39,8 @@ import { Profile } from '../pages/Profile';
 
 import { Settings } from '../pages/Settings';
 import { Communication } from '../pages/Communication';
+import { RequestsPage } from '../pages/requests/RequestsPage';
+import { NotificationsPage } from '../pages/notifications/NotificationsPage';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { OrganizationSelectionProtectedRoute } from '@/components/auth/OrganizationSelectionProtectedRoute';
 import UserManagement from '@/pages/UserManagement';
@@ -290,6 +292,8 @@ function AppRoutes() {
           }
         />
         <Route path="profile" element={<Profile />} />
+        <Route path="requests" element={<RequestsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route
           path="user-management"
           element={

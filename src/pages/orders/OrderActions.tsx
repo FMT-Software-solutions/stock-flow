@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer, MessageSquare, Banknote } from 'lucide-react';
+import { MoreHorizontal, Copy, Eye, Edit, Trash, Printer, MessageSquare, Banknote, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useDeleteOrder } from '@/hooks/useOrders';
@@ -21,6 +21,10 @@ import { ReceiptDialog } from '@/components/orders/ReceiptDialog';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { EditSaleDateDialog } from '@/components/orders/EditSaleDateDialog';
+import { useApprovedItemsForUser } from '@/lib/action-requests/useApprovedItemsForUser';
+import { SALES_EDIT_DATE } from '@/lib/action-requests/registry';
+import type { ActionRequestItem } from '@/lib/action-requests/types';
 
 interface OrderActionsProps {
   order: Order;
@@ -34,6 +38,27 @@ export function OrderActions({ order }: OrderActionsProps) {
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showEditDateDialog, setShowEditDateDialog] = useState(false);
+  const { data: approvedDateEdits } = useApprovedItemsForUser({
+    actionType: SALES_EDIT_DATE,
+    entityType: 'order',
+  });
+  const dateEditItemId = approvedDateEdits?.get(order.id);
+  const synthesizedDateEditItem: ActionRequestItem | null = dateEditItemId
+    ? {
+        id: dateEditItemId,
+        request_id: '',
+        entity_type: 'order',
+        entity_id: order.id,
+        snapshot: { date: order.date, order_number: order.order_number },
+        result: null,
+        state: 'approved',
+        applied_at: null,
+        applied_by: null,
+        created_at: '',
+        updated_at: '',
+      }
+    : null;
   const { checkPermission } = useRoleCheck();
   const { formatCurrency } = useCurrency();
   const { currentOrganization } = useOrganization();
@@ -142,6 +167,17 @@ export function OrderActions({ order }: OrderActionsProps) {
               Edit
             </DropdownMenuItem>
           )}
+          {synthesizedDateEditItem && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditDateDialog(true);
+              }}
+            >
+              <CalendarClock className="mr-2 h-4 w-4" />
+              Edit sale date
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           {canDelete && (
             <DropdownMenuItem
@@ -169,6 +205,14 @@ export function OrderActions({ order }: OrderActionsProps) {
         onOpenChange={setShowPaymentDialog}
         order={order}
       />
+
+      {synthesizedDateEditItem && (
+        <EditSaleDateDialog
+          open={showEditDateDialog}
+          onOpenChange={setShowEditDateDialog}
+          item={synthesizedDateEditItem}
+        />
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

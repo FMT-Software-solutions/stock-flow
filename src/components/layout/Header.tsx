@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface HeaderProps {
   className?: string;
@@ -38,6 +39,8 @@ export function Header({ className }: HeaderProps) {
           >
             <Search className="h-5 w-5" />
           </Button>
+
+          <NotificationBell />
 
           <div className="hidden md:flex items-center space-x-4">
             {/* <AiUsageIndicator /> */}

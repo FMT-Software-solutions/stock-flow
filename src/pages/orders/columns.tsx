@@ -10,7 +10,44 @@ import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { CustomerHoverLink } from '@/components/shared/CustomerHoverLink';
 import { OrderActions } from './OrderActions';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useActiveItemsInOrg, useApprovedItemsForUser } from '@/lib/action-requests/useApprovedItemsForUser';
+import { SALES_EDIT_DATE } from '@/lib/action-requests/registry';
 import { useState } from 'react';
+
+function OrderDateCell({ order }: { order: Order }) {
+  const { data: approved } = useApprovedItemsForUser({
+    actionType: SALES_EDIT_DATE,
+    entityType: 'order',
+  });
+  const { data: active } = useActiveItemsInOrg({
+    actionType: SALES_EDIT_DATE,
+    entityType: 'order',
+  });
+  const date = new Date(order.date);
+  const relativeTime = formatDistanceToNow(date, { addSuffix: true });
+  const hasGrant = approved?.has(order.id);
+  const activeState = active?.get(order.id);
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs font-medium">
+        {format(date, 'MMM dd, yyyy h:mm a')}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {relativeTime === 'in less than a minute' || relativeTime === 'less than a minute ago' ? 'now' : relativeTime}
+      </span>
+      {hasGrant ? (
+        <span className="mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 w-fit">
+          Date edit approved
+        </span>
+      ) : activeState === 'pending' ? (
+        <span className="mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200 w-fit">
+          Edit requested
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function OrderNumberCell({ order }: { order: Order }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -65,29 +102,30 @@ export const columns: ColumnDef<Order>[] = [
     },
     enableHiding: true,
   },
-  // We wll enable select column later
-  // {
-  //   id: 'select',
-  //   header: ({ table }) => (
-  //     <Checkbox
-  //       checked={
-  //         table.getIsAllPageRowsSelected() ||
-  //         (table.getIsSomePageRowsSelected() && 'indeterminate')
-  //       }
-  //       onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-  //       aria-label="Select all"
-  //     />
-  //   ),
-  //   cell: ({ row }) => (
-  //     <Checkbox
-  //       checked={row.getIsSelected()}
-  //       onCheckedChange={(value) => row.toggleSelected(!!value)}
-  //       aria-label="Select row"
-  //     />
-  //   ),
-  //   enableSorting: false,
-  //   enableHiding: false,
-  // },
+  {
+    id: 'select',
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && 'indeterminate')
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+    meta: { noRowClick: true } as any,
+  },
   {
     accessorKey: 'order_number',
     id: 'orderNumber',
@@ -117,20 +155,7 @@ export const columns: ColumnDef<Order>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Date" />
     ),
-    cell: ({ row }) => {
-      const date = new Date(row.getValue('date'));
-      const relativeTime = formatDistanceToNow(date, { addSuffix: true });
-      return (
-        <div className="flex flex-col">
-          <span className="text-xs font-medium">
-            {format(date, 'MMM dd, yyyy h:mm a')}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {relativeTime === 'in less than a minute' || relativeTime === 'less than a minute ago' ? 'now' : relativeTime}
-          </span>
-        </div>
-      );
-    },
+    cell: ({ row }) => <OrderDateCell order={row.original} />,
     filterFn: (row, id, value) => {
       return isDateInRange(row.getValue(id), value);
     },

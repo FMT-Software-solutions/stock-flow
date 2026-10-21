@@ -2,18 +2,18 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-const glob = require('glob');
-const { Octokit } = require('@octokit/rest');
+const https = require('https');
+const { findInstallerFiles, validateDownloadUrls } = require('./lib/installers');
+const { createOctokit, getGitHubToken } = require('./lib/github');
 
 // Load environment variables
 const envLocalPath = path.join(__dirname, '../../.env.local');
 const envPath = path.join(__dirname, '../../.env');
 
 if (fs.existsSync(envLocalPath)) {
-  require('dotenv').config({ path: envLocalPath });
+  require('dotenv').config({ path: envLocalPath, quiet: true });
 } else if (fs.existsSync(envPath)) {
-  require('dotenv').config({ path: envPath });
+  require('dotenv').config({ path: envPath, quiet: true });
 } else {
   console.warn('Warning: No .env.local or .env file found');
 }
@@ -39,181 +39,205 @@ const log = {
   header: (msg) => console.log(`\n${colors.magenta}${colors.bright}═══ ${msg} ═══${colors.reset}\n`),
 };
 
-function findInstallerFiles(config) {
-  const installerFiles = {};
-  
-  Object.keys(config.platforms).forEach(platform => {
-    const platformConfig = config.platforms[platform];
-    const searchPath = path.join(process.cwd(), platformConfig.installerPath);
-    
-    if (fs.existsSync(searchPath)) {
-      const pattern = path.join(searchPath, platformConfig.installerPattern);
-      const files = glob.sync(pattern);
-      
-      if (files.length > 0) {
-        installerFiles[platform] = files[0]; // Take the first match
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const mb = (bytes) => (bytes / 1048576).toFixed(1);
+
+// Streams the installer straight from disk to GitHub's upload endpoint.
+//
+// Octokit's upload goes through fetch, which needs the whole file in memory
+// and runs under undici's 300s headers timeout — a 116 MB installer on a slow
+// connection takes longer than that, and the upload dies near the end. A plain
+// https request has no such timeout, keeps memory flat, and lets us print
+// progress so a slow upload is visibly slow rather than apparently hung.
+function streamUpload({ uploadUrl, filePath, name, size }) {
+  const url = new URL(uploadUrl.replace(/\{.*\}$/, ''));
+  url.searchParams.set('name', name);
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getGitHubToken()}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': size,
+          'User-Agent': 'stock-flow-release-script',
+        },
+      },
+      (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => (body += chunk));
+        response.on('end', () => {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            resolve(JSON.parse(body));
+          } else {
+            const error = new Error(`GitHub answered ${response.statusCode}: ${body.slice(0, 300)}`);
+            error.status = response.statusCode;
+            reject(error);
+          }
+        });
       }
-    }
-  });
-  
-  return installerFiles;
-}
+    );
+    request.on('error', reject);
 
-function execCommand(command, options = {}) {
-  try {
-    const result = execSync(command, { 
-      encoding: 'utf8', 
-      stdio: options.silent ? 'pipe' : 'inherit',
-      ...options 
+    const started = Date.now();
+    let sent = 0;
+    let lastReport = 0;
+    const stream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 });
+    stream.on('data', (chunk) => {
+      sent += chunk.length;
+      const now = Date.now();
+      if (now - lastReport > 5000 || sent === size) {
+        lastReport = now;
+        const rate = sent / Math.max(1, (now - started) / 1000);
+        const left = Math.round((size - sent) / Math.max(rate, 1));
+        process.stdout.write(
+          `\r  ${mb(sent)} / ${mb(size)} MB  ${(rate / 1048576).toFixed(2)} MB/s  ~${left}s left   `
+        );
+      }
     });
-    return result;
-  } catch (error) {
-    throw new Error(`Command failed: ${command}\n${error.message}`);
+    stream.on('end', () => process.stdout.write('\n'));
+    stream.on('error', (error) => {
+      request.destroy(error);
+      reject(error);
+    });
+    stream.pipe(request);
+  });
+}
+
+// Uploads one asset, resuming cleanly after an earlier attempt:
+//   - an already-complete asset of the same name is left alone
+//   - a partial/broken one is deleted first (re-upload would 422 otherwise)
+//   - failures retry with backoff
+async function uploadAssetWithRetry(octokit, { owner, repo, release, name, filePath }, maxRetries = 4) {
+  const size = fs.statSync(filePath).size;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const { data: assets } = await octokit.rest.repos.listReleaseAssets({
+        owner,
+        repo,
+        release_id: release.id,
+        per_page: 100,
+      });
+      const existing = assets.find((a) => a.name === name);
+      if (existing && existing.state === 'uploaded' && existing.size === size) {
+        log.success(`${name} is already uploaded (${mb(size)} MB) — skipping.`);
+        return;
+      }
+      if (existing) {
+        log.info(`Removing incomplete asset ${name} before re-upload...`);
+        await octokit.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: existing.id });
+      }
+    } catch (cleanupError) {
+      log.warning(`Could not check existing assets: ${cleanupError.message}`);
+    }
+
+    try {
+      log.info(`Uploading ${name} (${mb(size)} MB), attempt ${attempt}/${maxRetries}`);
+      await streamUpload({ uploadUrl: release.upload_url, filePath, name, size });
+      return;
+    } catch (uploadError) {
+      // Auth and permission errors won't fix themselves on a retry.
+      if (uploadError.status === 401 || uploadError.status === 403 || attempt === maxRetries) {
+        throw uploadError;
+      }
+      const waitMs = attempt * 5000;
+      log.warning(`Upload attempt ${attempt} failed: ${uploadError.message}. Retrying in ${waitMs / 1000}s...`);
+      await sleep(waitMs);
+    }
   }
 }
 
-async function deleteGitTag(tagName) {
-  try {
-    log.info(`Removing local git tag: ${tagName}`);
-    execCommand(`git tag -d ${tagName}`, { silent: true });
-    
-    log.info(`Removing remote git tag: ${tagName}`);
-    execCommand(`git push origin :refs/tags/${tagName}`, { silent: true });
-    
-    log.success(`Git tag ${tagName} removed successfully`);
-  } catch (error) {
-    log.warning(`Failed to remove git tag ${tagName}: ${error.message}`);
-  }
-}
-
+// Creates the GitHub release for config.version, or reuses it if a previous
+// attempt already created it, then makes sure every installer is attached in
+// full. Safe to run repeatedly. The source tag is never deleted on failure:
+// it marks what was built, and `npm run release:finish` resumes against it.
 async function createGitHubRelease(config, installerFiles) {
   if (!config.github.enabled || !config.github.createRelease) {
     log.info('GitHub release creation is disabled');
     return null;
   }
 
-  log.step('Creating GitHub release...');
-  
-  const token = process.env.GH_TOKEN;
-  if (!token) {
+  log.step('Publishing GitHub release...');
+
+  if (!getGitHubToken()) {
     throw new Error('GH_TOKEN environment variable is required for GitHub releases');
   }
 
-  const octokit = new Octokit({ auth: token });
+  const octokit = createOctokit();
+  const { owner, repo } = config.github;
   const tagName = `v${config.version}`;
-  let releaseCreated = false;
-  
+
+  let release;
   try {
-    // Create the release
-    const releaseResponse = await octokit.rest.repos.createRelease({
-      owner: config.github.owner,
-      repo: config.github.repo,
-      tag_name: tagName,
-      name: `v${config.version}`,
-      body: config.releaseNotes,
-      draft: config.github.draft || false,
-      prerelease: config.github.prerelease || false
-    });
-
-    releaseCreated = true;
-    const releaseId = releaseResponse.data.id;
-    log.success(`GitHub release created: ${releaseResponse.data.html_url}`);
-
-    // Upload assets if configured and available
-    if (config.github.uploadAssets && Object.keys(installerFiles).length > 0) {
-      log.step('Uploading release assets...');
-      
-      for (const [platform, filePath] of Object.entries(installerFiles)) {
-        const fileName = path.basename(filePath);
-        const fileContent = fs.readFileSync(filePath);
-        
-        try {
-          await octokit.rest.repos.uploadReleaseAsset({
-            owner: config.github.owner,
-            repo: config.github.repo,
-            release_id: releaseId,
-            name: fileName,
-            data: fileContent
-          });
-          
-          log.success(`Uploaded ${fileName} for ${platform}`);
-        } catch (uploadError) {
-          log.error(`Failed to upload ${fileName}: ${uploadError.message}`);
-          log.warning('Asset upload failed, but release will continue. You can upload assets manually.');
-          // Don't throw error for asset upload failures, continue with release
-        }
-      }
-    } else if (config.github.uploadAssets && Object.keys(installerFiles).length === 0) {
-      log.info('Asset upload is enabled but no installer files found. Release created without assets.');
-    }
-    
-    return releaseResponse.data;
-  } catch (error) {
-    log.error(`GitHub release failed: ${error.message}`);
-    
-    // Only clean up if release creation itself failed, not just asset uploads
-    if (!releaseCreated) {
-      // Clean up git tag only if release creation failed
-      await deleteGitTag(tagName);
-    } else {
-      log.info('Release was created successfully despite asset upload issues.');
-    }
-    
-    throw error;
+    release = (await octokit.rest.repos.getReleaseByTag({ owner, repo, tag: tagName })).data;
+    log.warning(`GitHub release ${tagName} already exists — reusing it.`);
+  } catch (lookupError) {
+    if (lookupError.status !== 404) throw lookupError;
+    release = (
+      await octokit.rest.repos.createRelease({
+        owner,
+        repo,
+        tag_name: tagName,
+        name: `Release ${tagName}`,
+        body: config.releaseNotes,
+        draft: config.github.draft || false,
+        prerelease: config.github.prerelease || false,
+      })
+    ).data;
+    log.success(`GitHub release created: ${release.html_url}`);
   }
+
+  if (config.github.uploadAssets) {
+    if (Object.keys(installerFiles).length === 0) {
+      throw new Error(`No installer for ${config.version} to upload. Run "npm run release" (or "npm run package") first.`);
+    }
+    const urlProblems = validateDownloadUrls(config, installerFiles);
+    if (urlProblems.length > 0) {
+      urlProblems.forEach((problem) => log.error(problem));
+      throw new Error('Asset name does not match the published download URL');
+    }
+
+    for (const [platform, filePath] of Object.entries(installerFiles)) {
+      const name = path.basename(filePath);
+      await uploadAssetWithRetry(octokit, { owner, repo, release, name, filePath });
+      log.success(`Uploaded ${name} for ${platform}`);
+    }
+  }
+
+  return release;
 }
 
 async function main() {
   try {
     log.header('GitHub Release Publisher');
-    
-    // Load configuration
     const config = require('../release-config');
-    
+
     if (!config.github.enabled) {
       log.info('GitHub publishing is disabled in configuration');
       return;
     }
-    
-    // Validate required environment variables
-    if (!process.env.GH_TOKEN) {
-      throw new Error('GH_TOKEN environment variable is required');
+
+    const installerFiles = findInstallerFiles(config, { log });
+    Object.entries(installerFiles).forEach(([platform, file]) => log.info(`  ${platform}: ${file}`));
+
+    const release = await createGitHubRelease(config, installerFiles);
+    if (release) {
+      log.success(`Release URL: ${release.html_url}`);
     }
-    
-    // Find installer files
-    const installerFiles = findInstallerFiles(config);
-    
-    if (Object.keys(installerFiles).length === 0) {
-      log.warning('No installer files found. Release will be created without assets.');
-      log.info('Installer files can be uploaded manually later if needed.');
-    } else {
-      log.info('Found installer files:');
-      Object.entries(installerFiles).forEach(([platform, path]) => {
-        log.info(`  ${platform}: ${path}`);
-      });
-    }
-    
-    // Create GitHub release
-    const githubRelease = await createGitHubRelease(config, installerFiles);
-    
-    if (githubRelease) {
-      log.success('GitHub release published successfully!');
-      log.info(`Release URL: ${githubRelease.html_url}`);
-    }
-    
   } catch (error) {
-    log.error('GitHub publishing failed:', error.message);
+    log.error(`GitHub publishing failed: ${error.message}`);
+    log.info('Resume with: npm run release:finish');
     process.exit(1);
   }
 }
 
-// Allow script to be run directly or imported
 if (require.main === module) {
   main();
 }
 
-module.exports = {
-  createGitHubRelease,
-  findInstallerFiles,
-  deleteGitTag
-};
+module.exports = { createGitHubRelease };

@@ -5,11 +5,19 @@ copyright: Copyright © 2025 FMT Software Solutions
 artifactName: stock-flow-setup-${version}.${ext}
 directories:
   output: release/build
+# No `electronDist: node_modules/electron/dist` here (print-calc-pro uses it to
+# dodge the win-unpacked.tmp EPERM): with electron-builder 26 it makes the
+# build exit 1 silently before extraResources are copied. The release script
+# retries EPERM instead.
 files:
   - dist/**/*
   - electron-app/dist/**/*
-  - node_modules/**/*
   - package.json
+  # The renderer is fully bundled by Vite into dist/, so the packaged app only
+  # needs the modules the main process require()s at runtime. Shipping every
+  # production dependency again roughly doubled the installer for nothing.
+  - '!node_modules/**/*'
+  - node_modules/dotenv/**/*
 extraResources:
   - from: release/assets
     to: assets

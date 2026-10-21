@@ -16,6 +16,7 @@ if (fs.existsSync(envLocalPath)) {
 }
 // Load release configuration
 const releaseConfig = require('../release-config');
+const { findInstallerFiles } = require('./lib/installers');
 
 const colors = {
   reset: '\x1b[0m',
@@ -87,7 +88,7 @@ async function callEdgeFunction(config, releaseData) {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${supabaseServiceKey}`,
-      'x-client-info': 'food-track-pro-release-script'
+      'x-client-info': 'stock-flow-release-script'
     },
     body: JSON.stringify(releaseData)
   });
@@ -120,6 +121,10 @@ async function publishToSupabase(version, releaseNotes) {
     
     log.info(`Publishing version ${targetVersion}...`);
     
+    // Report the real installer size when the file is here; the config value
+    // is only a fallback for publishing from another machine.
+    const installerFiles = findInstallerFiles({ ...config, version: targetVersion });
+
     // Prepare platforms array for Edge Function
     const platforms = [];
     Object.entries(config.platforms).forEach(([platformName, platformConfig]) => {
@@ -127,7 +132,9 @@ async function publishToSupabase(version, releaseNotes) {
         platform: platformName,
         architecture: platformConfig.architecture,
         download_url: platformConfig.downloadUrlTemplate.replaceAll('{version}', targetVersion),
-        file_size: platformConfig.fileSize || 0,
+        file_size: installerFiles[platformName]
+          ? fs.statSync(installerFiles[platformName]).size
+          : platformConfig.fileSize || 0,
         status: platformConfig.status || 'published',
         is_critical: platformConfig.isCritical || false,
         minimum_version: platformConfig.minimumVersion || null

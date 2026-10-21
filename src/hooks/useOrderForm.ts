@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useOrder } from '@/hooks/useOrders';
+import { untrackedLineKey } from '@/lib/saleLines';
 import { type OrderFormValues, PERSIST_KEYS } from '@/pages/orders/form-schema/order-form-schema';
 
 export interface UseOrderFormProps {
@@ -18,7 +19,9 @@ export const useOrderForm = ({ id }: UseOrderFormProps) => {
       // Format items for the form
       const formattedItems =
         order.items?.map((item) => ({
-          inventoryId: item.inventory_id || '',
+          // Lines of products that don't track stock have no inventory row.
+          inventoryId:
+            item.inventory_id || (item.product_id ? untrackedLineKey(item.product_id, item.variant_id) : ''),
           quantity: Number(item.quantity),
           unitPrice: Number(item.unit_price),
           originalPrice: item.original_price != null ? Number(item.original_price) : Number(item.unit_price),

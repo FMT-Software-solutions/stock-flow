@@ -121,11 +121,17 @@ export function ProductForm() {
       suppliers={suppliers}
       typeIdByName={new Map((variationTypes ?? []).map((t) => [t.name, t.id]))}
       organizationId={orgId}
+      trackStockByDefault={currentOrganization?.track_stock_by_default ?? true}
     />
   );
 }
 
-function initialState(product: Product | null, stockRows: StockRow[], typeIdByName: Map<string, string>): EditorState {
+function initialState(
+  product: Product | null,
+  stockRows: StockRow[],
+  typeIdByName: Map<string, string>,
+  trackStockByDefault: boolean
+): EditorState {
   const variants = product?.variants ?? [];
   const fields: Fields = {
     name: product?.name ?? '',
@@ -140,7 +146,7 @@ function initialState(product: Product | null, stockRows: StockRow[], typeIdByNa
     status: (product?.status?.toLowerCase() as Status) || 'published',
     imageUrl: product?.imageUrl ?? '',
     additionalImages: product?.additionalImages ?? [],
-    trackStock: product?.trackStock ?? true,
+    trackStock: product?.trackStock ?? trackStockByDefault,
   };
 
   const drafts: Record<string, VariantDraft> = {};
@@ -179,6 +185,7 @@ function ProductEditor({
   suppliers,
   typeIdByName,
   organizationId,
+  trackStockByDefault,
 }: {
   product: Product | null;
   stockRows: StockRow[];
@@ -186,6 +193,7 @@ function ProductEditor({
   suppliers: Supplier[];
   typeIdByName: Map<string, string>;
   organizationId?: string;
+  trackStockByDefault: boolean;
 }) {
   const navigate = useNavigate();
   const isEditing = !!product;
@@ -194,7 +202,7 @@ function ProductEditor({
   const canEditStock = checkPermission('inventory', 'edit') || checkPermission('inventory', 'create');
   const saveProduct = useSaveProduct();
 
-  const [initial] = useState(() => initialState(product, stockRows, typeIdByName));
+  const [initial] = useState(() => initialState(product, stockRows, typeIdByName, trackStockByDefault));
   const [state, setState] = useState<EditorState>(initial);
   const [errors, setErrors] = useState<Partial<Record<'name' | 'sellingPrice', string>>>({});
   const [moreOpen, setMoreOpen] = useState(false);

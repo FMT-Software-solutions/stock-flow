@@ -73,6 +73,20 @@ export function Settings() {
     address: '',
     currency: 'GHS',
   });
+  const [isSavingTrackStock, setIsSavingTrackStock] = useState(false);
+
+  const handleTrackStockDefaultChange = async (checked: boolean) => {
+    if (!currentOrganization) return;
+    setIsSavingTrackStock(true);
+    try {
+      await updateOrganization({ id: currentOrganization.id, track_stock_by_default: checked });
+    } catch (error) {
+      console.error('Failed to update stock default:', error);
+      toast.error('Could not save setting');
+    } finally {
+      setIsSavingTrackStock(false);
+    }
+  };
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [notificationSettings, setNotificationSettings] = useState({
@@ -507,6 +521,25 @@ export function Settings() {
                       {isSavingOrgData ? 'Saving...' : 'Save Changes'}
                     </span>
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="track-stock-default" title="Restaurants and service businesses usually turn this off">
+                    Track stock for new products
+                  </Label>
+                  <Switch
+                    id="track-stock-default"
+                    checked={currentOrganization?.track_stock_by_default ?? true}
+                    disabled={isSavingTrackStock}
+                    onCheckedChange={handleTrackStockDefaultChange}
+                  />
                 </div>
               </CardContent>
             </Card>

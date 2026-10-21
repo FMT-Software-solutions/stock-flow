@@ -1,5 +1,5 @@
 import { CustomerSelector } from '@/components/orders/CustomerSelector';
-import { InventorySelector } from '@/components/orders/InventorySelector';
+import { SaleItemPicker } from '@/components/orders/SaleItemPicker';
 import { RecentOrders } from '@/components/orders/RecentOrders';
 import { BranchFormSelector } from '@/components/shared/BranchFormSelector';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -26,7 +26,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCustomer, useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
 import { useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
-import { useInventoryEntries } from '@/hooks/useInventoryQueries';
+import { useSellableProducts } from '@/hooks/useSellableProducts';
+import { isUntrackedLine, parseLineKey, untrackedLineKey } from '@/lib/saleLines';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
 import { useOrderForm } from '@/hooks/useOrderForm';
@@ -117,10 +118,8 @@ function OrderFormInner({
     [drafts, selectedBranchId]
   );
 
-  const { data: inventory = [] } = useInventoryEntries(
-    currentOrganization?.id,
-    selectedBranchId ? [selectedBranchId] : undefined
-  );
+  // Everything sellable in the branch, by sale line key (lib/saleLines).
+  const { optionByKey } = useSellableProducts(currentOrganization?.id, selectedBranchId || undefined);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema) as any,
@@ -274,18 +273,20 @@ function OrderFormInner({
   const orderItems: DiscountOrderItem[] = useMemo(() => {
     return items
       .map((item) => {
-        const invItem = inventory.find((i) => i.id === item.inventoryId);
-        if (!invItem) return null;
+        const option = optionByKey.get(item.inventoryId);
+        if (!option) return null;
+        // Untracked lines carry their product key here; storewide discounts
+        // apply to them, inventory-targeted ones can't match.
         return {
-          inventoryId: invItem.id,
-          productId: invItem.productId,
-          branchId: invItem.branchId || undefined,
-          unitPrice: Number(item.unitPrice || invItem.productPrice || invItem.variantPrice || 0),
+          inventoryId: option.key,
+          productId: option.productId,
+          branchId: selectedBranchId || undefined,
+          unitPrice: Number(item.unitPrice || option.price || 0),
           quantity: Number(item.quantity || 0),
         } as DiscountOrderItem;
       })
       .filter(Boolean) as DiscountOrderItem[];
-  }, [items, inventory]);
+  }, [items, optionByKey, selectedBranchId]);
 
   const {
     discountCode, setDiscountCode,
@@ -398,15 +399,22 @@ function OrderFormInner({
 
       // Enrich items with product details (snapshot)
       const enrichedItems = distributedItems.map((item) => {
-        const invItem = inventory.find((i) => i.id === item.inventoryId);
+        const option = optionByKey.get(item.inventoryId);
+        const line = parseLineKey(item.inventoryId);
+        // When editing, a line may no longer be sellable (e.g. product
+        // archived); keep what the order already recorded for it.
+        const original = existingOrder?.items?.find(
+          (i) => (i.inventory_id ?? untrackedLineKey(i.product_id ?? '', i.variant_id)) === item.inventoryId
+        );
         const discountAmount = discountDistribution[item.inventoryId] || 0;
         return {
-          inventory_id: item.inventoryId,
-          product_id: invItem?.productId,
-          variant_id: invItem?.variantId,
+          // Untracked products have no stock row; stock triggers skip null.
+          inventory_id: line.inventoryId,
+          product_id: option?.productId ?? line.productId ?? original?.product_id,
+          variant_id: option?.variantId ?? line.variantId ?? original?.variant_id,
           product_name:
-            invItem?.productName || item.productName || 'Unknown Product',
-          sku: invItem?.sku,
+            option?.lineName || item.productName || original?.product_name || 'Unknown Product',
+          sku: option?.sku ?? original?.sku,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           original_price: item.originalPrice !== undefined ? item.originalPrice : item.unitPrice,
@@ -670,13 +678,15 @@ function OrderFormInner({
               <CardContent className="space-y-2">
                 {fields.map((field, index) => {
                   const item = items[index];
-                  const selectedItem = inventory.find(
-                    (i) => i.id === item?.inventoryId
-                  );
+                  const selectedOption = item?.inventoryId ? optionByKey.get(item.inventoryId) : undefined;
+                  const unlimited =
+                    !!item?.inventoryId &&
+                    (isUntrackedLine(item.inventoryId) || selectedOption?.stock === null);
 
-                  // Calculate max quantity available (Total stock + original order qty if editing)
-                  let maxQty = selectedItem?.quantity || 0;
-                  if (isEditing && existingOrder?.items) {
+                  // Calculate max quantity available (Total stock + original order qty if editing).
+                  // Products that don't track stock have no limit.
+                  let maxQty = unlimited ? Infinity : selectedOption?.stock || 0;
+                  if (!unlimited && isEditing && existingOrder?.items) {
                     const originalItem = existingOrder.items.find(
                       (i) => i.inventory_id === item?.inventoryId
                     );
@@ -705,28 +715,20 @@ function OrderFormInner({
                             fieldState,
                           }) => (
                             <Field data-invalid={!!fieldState.error}>
-                              <InventorySelector
+                              <SaleItemPicker
                                 value={value}
-                                onChange={(val, price) => {
-                                  onChange(val);
-                                  if (price !== undefined) {
-                                    form.setValue(
-                                      `items.${index}.unitPrice`,
-                                      price
-                                    );
-                                    form.setValue(
-                                      `items.${index}.originalPrice`,
-                                      price
-                                    );
-                                  }
+                                onChange={(key, price) => {
+                                  onChange(key);
+                                  form.setValue(`items.${index}.unitPrice`, price);
+                                  form.setValue(`items.${index}.originalPrice`, price);
                                 }}
                                 branchId={selectedBranchId}
                                 disabled={!selectedBranchId}
-                                excludeIds={items
+                                excludeKeys={items
                                   .filter((_, i) => i !== index)
                                   .map((item) => item.inventoryId)
                                   .filter(Boolean)}
-                                quantityOverride={simulatedStock}
+                                quantityOverride={unlimited ? undefined : simulatedStock}
                               />
                               {fieldState.error && (
                                 <FieldError>
@@ -752,7 +754,7 @@ function OrderFormInner({
                                   type="number"
                                   {...field}
                                   min={1}
-                                  max={maxQty}
+                                  max={unlimited || !selectedOption ? undefined : maxQty}
                                   onChange={(e) => {
                                     const val = Number(e.target.value);
                                     if (val > maxQty) {

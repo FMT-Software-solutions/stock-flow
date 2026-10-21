@@ -120,7 +120,15 @@ const mapStockRow = (row: StockRowRecord): StockRow => ({
 });
 
 const invalidateStock = (queryClient: ReturnType<typeof useQueryClient>) => {
-  ['products', 'product', 'product_stock', 'product_inventory', 'inventory_entries', 'stock_movements'].forEach(
+  [
+    'products',
+    'product',
+    'product_stock',
+    'product_inventory',
+    'inventory_entries',
+    'stock_movements',
+    'organization_variants',
+  ].forEach(
     (key) => queryClient.invalidateQueries({ queryKey: [key] })
   );
 };

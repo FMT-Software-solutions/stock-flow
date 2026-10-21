@@ -52,6 +52,8 @@ export interface Organization {
   has_purchased: boolean;
   trial_end_date: string | null;
   sms_sender_id?: string | null;
+  /** Starting value of "Track stock" on new products. */
+  track_stock_by_default?: boolean;
 }
 
 export interface OrganizationRoleEntity {
@@ -101,6 +103,7 @@ export interface CreateOrganizationData {
   theme_name?: string | null;
   is_active: boolean;
   sms_sender_id?: string | null;
+  track_stock_by_default?: boolean;
 }
 
 export interface UpdateOrganizationData extends Partial<CreateOrganizationData> {

@@ -414,8 +414,8 @@ function ProductEditor({
               </>
             ) : (
               <ModernFileUpload
-                variant="compact"
-                className="h-full w-full"
+                variant="tile"
+                label={uploading ? 'Uploading…' : 'Photo'}
                 onFileSelect={(file) => handleImageUpload([file], 'main')}
                 disabled={uploading}
               />
@@ -693,8 +693,8 @@ function ProductEditor({
                   ))}
                   <div className="aspect-square">
                     <ModernFileUpload
-                      variant="compact"
-                      className="h-full w-full"
+                      variant="tile"
+                      label={uploading ? 'Uploading…' : 'Add'}
                       multiple
                       onFilesSelect={(files) => handleImageUpload(files, 'more')}
                       onFileSelect={(file) => handleImageUpload([file], 'more')}

@@ -1,9 +1,11 @@
-import { Upload, X } from 'lucide-react';
+import { ImagePlus, Upload, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 
-type UploadVariant = 'default' | 'compact';
+// tile: a square drop target (icon + one word) for small spaces such as a
+// product photo slot; it fills its container and shows errors inside itself.
+type UploadVariant = 'default' | 'compact' | 'tile';
 
 interface ModernFileUploadProps {
   onFileSelect: (file: File) => void;
@@ -15,6 +17,8 @@ interface ModernFileUploadProps {
   variant?: UploadVariant;
   multiple?: boolean;
   onFilesSelect?: (files: File[]) => void;
+  /** Text under the icon in the tile variant */
+  label?: string;
 }
 
 export function ModernFileUpload({
@@ -27,6 +31,7 @@ export function ModernFileUpload({
   variant = 'default',
   multiple = false,
   onFilesSelect,
+  label = 'Photo',
 }: ModernFileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +153,38 @@ export function ModernFileUpload({
   );
 
   const clearError = () => setError(null);
+
+  if (variant === 'tile') {
+    return (
+      <div
+        className={cn(
+          'relative flex h-full w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground transition-colors',
+          'hover:border-primary/50 hover:bg-accent/5 hover:text-primary',
+          isDragOver && 'border-primary bg-accent/30 text-primary',
+          disabled && 'cursor-not-allowed opacity-50',
+          error && 'border-destructive text-destructive',
+          className
+        )}
+        title={error ?? `Max ${maxSize}MB`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <input
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          onChange={handleInputChange}
+          disabled={disabled}
+          aria-label={label}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+        />
+        <ImagePlus className="h-5 w-5" />
+        <span className="px-1 text-center text-xs font-medium leading-tight">{error ?? label}</span>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className={cn('space-y-2', className)}>

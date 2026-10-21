@@ -123,6 +123,21 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
   };
 };
 
+// Soft-deletes variants and their stock rows so order history keeps its links.
+const archiveVariants = async (variantIds: string[]) => {
+  const { error: variantError } = await supabase
+    .from('product_variants')
+    .update({ is_deleted: true })
+    .in('id', variantIds);
+  if (variantError) throw variantError;
+
+  const { error: inventoryError } = await supabase
+    .from('inventory')
+    .update({ is_deleted: true })
+    .in('variant_id', variantIds);
+  if (inventoryError) throw inventoryError;
+};
+
 // --- Hooks ---
 
 export function useProducts(organizationId?: string) {
@@ -250,6 +265,8 @@ export function useCreateInventoryEntry() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
+      queryClient.invalidateQueries({ queryKey: ['product_inventory'] });
     },
   });
 }
@@ -335,7 +352,8 @@ export function useProduct(id?: string) {
         const { data: variantsData, error: variantsError } = await supabase
           .from('product_variants')
           .select('*')
-          .eq('product_id', id);
+          .eq('product_id', id)
+          .eq('is_deleted', false);
 
         if (variantsError) {
           console.error('Error fetching variants:', variantsError);
@@ -454,34 +472,31 @@ export function useUpdateProduct() {
 
       if (productError) throw productError;
 
-      // Update inventory logic handling both simple and variant products
-      const hasVariations = updates.hasVariations;
-
-      if (hasVariations && updates.variants) {
-        // 1. Get existing variants to handle deletions
-        const { data: existingVariants } = await supabase
+      // Stock quantities live only in `inventory` and are changed there per
+      // branch. Product and variant saves must never write stock: the form's
+      // quantity is an aggregate across branches and variant.quantity is unused.
+      if (updates.hasVariations && updates.variants) {
+        const { data: existingVariants, error: existingError } = await supabase
           .from('product_variants')
           .select('id')
-          .eq('product_id', id);
+          .eq('product_id', id)
+          .eq('is_deleted', false);
+
+        if (existingError) throw existingError;
 
         const existingIds = existingVariants?.map(v => v.id) || [];
         const incomingIds = updates.variants.filter(v => v.id).map(v => v.id as string);
 
-        // 2. Delete removed variants
-        const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
-        if (idsToDelete.length > 0) {
-          await supabase.from('product_variants').delete().in('id', idsToDelete);
-          await supabase.from('inventory').update({ is_deleted: true }).in('variant_id', idsToDelete);
+        // Archive removed variants. A hard delete would cascade-delete their
+        // inventory rows and unlink past order items.
+        const idsToArchive = existingIds.filter(id => !incomingIds.includes(id));
+        if (idsToArchive.length > 0) {
+          await archiveVariants(idsToArchive);
         }
 
-        // Cleanup any "simple product" inventory row (where variant_id is null) to prevent double counting
-        await supabase.from('inventory').update({ is_deleted: true }).eq('product_id', id).is('variant_id', null);
-
-        // 3. Upsert variants
         for (const variant of updates.variants) {
           if (variant.id) {
-            // Update existing variant
-            await supabase
+            const { error } = await supabase
               .from('product_variants')
               .update({
                 sku: variant.sku,
@@ -490,21 +505,15 @@ export function useUpdateProduct() {
               })
               .eq('id', variant.id);
 
-            // Update inventory for variant (maintain for backward compatibility/views)
-            await supabase
-              .from('inventory')
-              .update({
-                quantity: variant.quantity,
-              })
-              .eq('variant_id', variant.id);
+            if (error) throw error;
           } else {
-            // Insert new variant
             if (!updates.organizationId) {
               console.warn("Organization ID missing for new variant creation during update");
               continue;
             }
 
-            const { data: newVariant, error: insertError } = await supabase
+            // Stock for a new variant is added per branch from the Inventory tab.
+            const { error: insertError } = await supabase
               .from('product_variants')
               .insert({
                 product_id: id,
@@ -512,49 +521,21 @@ export function useUpdateProduct() {
                 price: variant.price,
                 attributes: variant.attributes,
                 organization_id: updates.organizationId,
-              })
-              .select()
-              .single();
+              });
 
             if (insertError) throw insertError;
-
-            // Insert inventory
-            await supabase
-              .from('inventory')
-              .insert({
-                product_id: id,
-                variant_id: newVariant.id,
-                branch_id: updates.branchId,
-                quantity: variant.quantity || 0,
-                organization_id: updates.organizationId,
-                min_stock_level: updates.minStockLevel || 0,
-                location: updates.location,
-              });
           }
         }
-      } else {
-        // Simple Product Logic
+      } else if (updates.hasVariations === false) {
+        const { data: variantsToArchive, error } = await supabase
+          .from('product_variants')
+          .select('id')
+          .eq('product_id', id)
+          .eq('is_deleted', false);
 
-        // If explicitly switched to no variations, clean up any leftovers
-        if (updates.hasVariations === false) {
-          await supabase.from('product_variants').delete().eq('product_id', id);
-          await supabase.from('inventory').update({ is_deleted: true }).eq('product_id', id).not('variant_id', 'is', null);
-        }
-
-        const inventoryData: any = {};
-        if (updates.quantity !== undefined) inventoryData.quantity = updates.quantity;
-        if (updates.minStockLevel !== undefined) inventoryData.min_stock_level = updates.minStockLevel;
-        if (updates.location !== undefined) inventoryData.location = updates.location;
-        if (updates.branchId !== undefined) inventoryData.branch_id = updates.branchId;
-
-        if (Object.keys(inventoryData).length > 0) {
-          const { error: inventoryError } = await supabase
-            .from('inventory')
-            .update(inventoryData)
-            .eq('product_id', id)
-            .is('variant_id', null);
-
-          if (inventoryError) throw inventoryError;
+        if (error) throw error;
+        if (variantsToArchive && variantsToArchive.length > 0) {
+          await archiveVariants(variantsToArchive.map(v => v.id));
         }
       }
     },

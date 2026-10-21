@@ -151,15 +151,12 @@ export function InventoryGenerator({
 
           const isCustom = entry.variantId?.startsWith('custom-');
 
-          // Price Logic: Use default if 0 or undefined
-          const variant = availableVariants.find(
-            (v) => v.id === entry.variantId
-          );
-          const defaultPrice = variant?.price ?? product.sellingPrice;
+          // A blank price is stored as no override so the row keeps following
+          // the variant/product price when that changes later.
           const finalPrice =
             entry.priceOverride && entry.priceOverride > 0
               ? entry.priceOverride
-              : defaultPrice;
+              : undefined;
 
           promises.push(
             createInventory.mutateAsync({

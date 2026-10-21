@@ -908,7 +908,7 @@ export function Dashboard() {
                               </div>
                               {canEditProducts && (
                                 <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                  <Link to={`/inventory/${item.id}`}>Restock</Link>
+                                  <Link to={`/products/${item.id}`}>Restock</Link>
                                 </Button>
                               )}
                             </div>

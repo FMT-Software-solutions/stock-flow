@@ -598,7 +598,7 @@ function ProductFormInner({
           <Button
             variant="outline"
             type="button"
-            onClick={() => navigate('/inventory')}
+            onClick={() => navigate('/products')}
           >
             Cancel
           </Button>

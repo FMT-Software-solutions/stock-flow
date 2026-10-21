@@ -101,7 +101,10 @@ export function ProductVariations({
       return combinations;
     };
 
-    const attributesList = generateCombinations(0, {});
+    // Types with no options selected yield {}, which is not a real variant.
+    const attributesList = generateCombinations(0, {}).filter(
+      (attrs) => Object.keys(attrs).length > 0
+    );
 
     // Now map attributes to variants, preserving existing edits if possible
     return attributesList.map((attrs) => {

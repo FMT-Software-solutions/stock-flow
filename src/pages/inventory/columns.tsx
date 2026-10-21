@@ -296,13 +296,15 @@ export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
   },
   {
     id: "effectivePrice",
-    accessorFn: (row) => row.priceOverride ?? row.productPrice,
+    accessorFn: (row) => row.priceOverride ?? row.variantPrice ?? row.productPrice,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Price" />
     ),
     cell: ({ row }) => {
-      const priceOverride = row.original.priceOverride
-      const displayPrice = priceOverride ?? row.original.productPrice
+      const displayPrice =
+        row.original.priceOverride ??
+        row.original.variantPrice ??
+        row.original.productPrice
 
       return (
         <div className="font-medium">

@@ -15,6 +15,7 @@ import { useCreateCategory } from '@/hooks/useInventoryQueries';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { cn } from '@/lib/utils';
 import type { Category } from '@/types/inventory';
+import { InlineCreateForm } from './InlineCreateForm';
 
 interface CategoryPickerProps {
   id?: string;
@@ -28,6 +29,7 @@ interface CategoryPickerProps {
 export function CategoryPicker({ id, value, onChange, categories, organizationId }: CategoryPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
   const createCategory = useCreateCategory();
   const { checkPermission } = useRoleCheck();
   const canCreate = checkPermission('product_categories', 'create');
@@ -36,12 +38,18 @@ export function CategoryPicker({ id, value, onChange, categories, organizationId
   const typed = search.trim();
   const exactMatch = categories.some((c) => c.name.toLowerCase() === typed.toLowerCase());
 
-  const handleCreate = async () => {
-    if (!organizationId || !typed) return;
+  const create = async (name: string) => {
+    if (!organizationId || !name) return;
+    const existing = categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      onChange(existing.id);
+      setOpen(false);
+      return;
+    }
     try {
-      const category = await createCategory.mutateAsync({ name: typed, organizationId });
+      const category = await createCategory.mutateAsync({ name, organizationId });
       onChange(category.id);
-      setSearch('');
+      toast.success(`Category “${category.name}” created`);
       setOpen(false);
     } catch (error) {
       console.error('Failed to create category:', error);
@@ -49,8 +57,16 @@ export function CategoryPicker({ id, value, onChange, categories, organizationId
     }
   };
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setSearch('');
+      setCreating(false);
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -66,7 +82,17 @@ export function CategoryPicker({ id, value, onChange, categories, organizationId
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-60 p-0" align="start">
+        {creating ? (
+          <InlineCreateForm
+            title="New category"
+            placeholder="Category name"
+            initialValue={typed}
+            pending={createCategory.isPending}
+            onCreate={create}
+            onCancel={() => setCreating(false)}
+          />
+        ) : (
         <Command>
           <CommandInput placeholder="Search or create…" value={search} onValueChange={setSearch} />
           <CommandList>
@@ -96,16 +122,22 @@ export function CategoryPicker({ id, value, onChange, categories, organizationId
                 </CommandItem>
               ))}
             </CommandGroup>
-            {canCreate && typed && !exactMatch && (
-              <CommandGroup forceMount>
-                <CommandItem value={`__create__${typed}`} onSelect={handleCreate} disabled={createCategory.isPending}>
+            {canCreate && (
+              <CommandGroup forceMount className="border-t">
+                <CommandItem
+                  forceMount
+                  value="__new_category__"
+                  onSelect={() => (typed && !exactMatch ? create(typed) : setCreating(true))}
+                  disabled={createCategory.isPending}
+                >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create “{typed}”
+                  {typed && !exactMatch ? `Create “${typed}”` : 'New category'}
                 </CommandItem>
               </CommandGroup>
             )}
           </CommandList>
         </Command>
+        )}
       </PopoverContent>
     </Popover>
   );

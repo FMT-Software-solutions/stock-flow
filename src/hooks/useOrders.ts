@@ -130,42 +130,27 @@ export function useCreateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreateOrderInput) => {
+    mutationFn: async ({ discountId, ...input }: CreateOrderInput & { discountId?: string }) => {
       const { items, ...orderData } = input;
 
-      // 1. Create Order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single();
+      // One transaction: stock is locked and checked, the order and its items
+      // are inserted together, and the discount use is counted. Any failure
+      // (e.g. not enough stock) leaves nothing behind.
+      const { data: order, error } = await supabase.rpc('create_order', {
+        p_order: orderData,
+        p_items: items,
+        p_discount_id: discountId ?? null,
+      });
 
-      if (orderError) throw orderError;
+      if (error) throw error;
       if (!order) throw new Error('Failed to create order');
 
-      // 2. Create Order Items
-      if (items.length > 0) {
-        const itemsWithIds = items.map(item => ({
-          ...item,
-          order_id: order.id,
-          organization_id: order.organization_id,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(itemsWithIds);
-
-        if (itemsError) {
-          // In a real app we might want to rollback the order here
-          console.error('Failed to create items', itemsError);
-          throw itemsError;
-        }
-      }
-
-      return order;
+      return order as Order;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
+      queryClient.invalidateQueries({ queryKey: ['discounts'] });
       // Invalidate inventory queries to reflect stock changes immediately (handled by DB trigger)
       queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });

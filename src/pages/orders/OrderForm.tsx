@@ -25,7 +25,7 @@ import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCustomer, useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
-import { useIncrementDiscountUsage, useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
+import { useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
 import { useInventoryEntries } from '@/hooks/useInventoryQueries';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
@@ -309,7 +309,6 @@ function OrderFormInner({
 
   const [discountCardOpen, setDiscountCardOpen] = useState(false);
 
-  const incrementUsage = useIncrementDiscountUsage();
   const validateDiscount = useValidateDiscountServerSide();
 
   const [isEditingSubtotal, setIsEditingSubtotal] = useState(false);
@@ -460,8 +459,10 @@ function OrderFormInner({
         toast.success('Sale updated successfully');
         navigate('/orders');
       } else {
-        const createdOrder = await createOrder.mutateAsync(orderData);
-        if (appliedDiscount) await incrementUsage.mutateAsync(appliedDiscount.discount.id);
+        const createdOrder = await createOrder.mutateAsync({
+          ...orderData,
+          discountId: appliedDiscount?.discount.id,
+        });
 
         toast.success('Sale created successfully');
 
@@ -542,7 +543,13 @@ function OrderFormInner({
       }
     } catch (error) {
       console.error(error);
-      toast.error('Failed to save sale');
+      // create_order explains stock and discount-limit failures itself.
+      const hint = (error as { hint?: string })?.hint;
+      toast.error(
+        hint === 'insufficient_stock' || hint === 'discount_limit'
+          ? (error as Error).message
+          : 'Failed to save sale'
+      );
     }
   }
   function handleSaveDraft() {

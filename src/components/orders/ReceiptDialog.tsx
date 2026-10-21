@@ -10,6 +10,7 @@ import { useReactToPrint } from 'react-to-print';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
+import { orderDiscountLines } from '@/lib/discounts';
 
 interface ReceiptDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function ReceiptDialog({
   const paidAmount = Number(order.paid_amount ?? 0);
   const totalAmount = Number(order.total_amount ?? 0);
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  const discountLines = orderDiscountLines(order);
   const customerName = order.customer
     ? `${order.customer.first_name || ''} ${
         order.customer.last_name || ''
@@ -141,6 +143,21 @@ export function ReceiptDialog({
           </div>
 
           <div className="border-t border-dashed border-gray-400 my-4" />
+
+          {discountLines.length > 0 && (
+            <div className="mb-2 space-y-1">
+              <div className="flex justify-between">
+                <span>SUBTOTAL:</span>
+                <span>{formatCurrency(order.subtotal)}</span>
+              </div>
+              {discountLines.map((d) => (
+                <div key={d.key} className="flex justify-between gap-2">
+                  <span>{d.label}</span>
+                  <span className="whitespace-nowrap">-{formatCurrency(d.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-between text-lg font-bold">
             <span>TOTAL:</span>

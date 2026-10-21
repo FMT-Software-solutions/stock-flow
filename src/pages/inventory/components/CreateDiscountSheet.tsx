@@ -1,49 +1,28 @@
-import { useMemo, useEffect, useState } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { format } from 'date-fns';
+import { Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from '@/components/ui/form';
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import MultipleSelector, { type Option } from '@/components/ui/multiselect';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { TimePicker } from '@/components/shared/TimePicker';
-import { format } from 'date-fns';
-
-import {
-  discountFormSchema,
-  type DiscountFormValues,
-} from '../form-schema/discount-form-schema';
-import { useManageInventoryDiscount } from '@/hooks/useDiscountQueries';
-import { useDiscountDetails } from '@/hooks/useDiscountDetails';
-import {
-  useCategories,
-  useProducts,
-  useInventoryEntries,
-} from '@/hooks/useInventoryQueries';
+import { discountFormSchema, type DiscountFormValues } from '../form-schema/discount-form-schema';
+import { MASKED_CODE, useSaveDiscount } from '@/hooks/useDiscountQueries';
+import { useCategories, useProducts } from '@/hooks/useInventoryQueries';
+import { useOrganizationVariants } from '@/hooks/useSellableProducts';
 import { useCustomers } from '@/hooks/useCustomerQueries';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import type { DiscountTarget, Discount } from '@/types/discounts';
-import { useAuth } from '@/contexts/AuthContext';
+import type { Discount, DiscountTargetRef } from '@/types/discounts';
 
 interface CreateDiscountSheetProps {
   open: boolean;
@@ -52,735 +31,504 @@ interface CreateDiscountSheetProps {
   discount?: Discount;
 }
 
-export function CreateDiscountSheet({
-  open,
-  onOpenChange,
-  onSuccess,
-  discount,
-}: CreateDiscountSheetProps) {
+const toDate = (iso?: string | null) => (iso ? format(new Date(iso), 'yyyy-MM-dd') : '');
+const toTime = (iso?: string | null, fallback = '') => (iso ? format(new Date(iso), 'HH:mm') : fallback);
+const toStr = (n?: number | null) => (n === null || n === undefined ? '' : String(n));
+
+function targetKey(t: DiscountTargetRef) {
+  if (t.categoryId) return t.categoryId;
+  return t.variantId ? `${t.productId}:${t.variantId}` : (t.productId as string);
+}
+
+function defaultsFor(discount?: Discount): DiscountFormValues {
+  return {
+    name: discount?.name ?? '',
+    method: discount?.method ?? 'automatic',
+    code: discount?.code ?? '',
+    target: discount?.target ?? 'items',
+    valueType: discount?.valueType ?? 'percentage',
+    value: discount?.value ?? 0,
+    oncePerOrder: discount?.oncePerOrder ?? false,
+    appliesTo: discount?.appliesTo ?? 'all',
+    targetIds: (discount?.targets ?? []).map(targetKey),
+    minSubtotal: toStr(discount?.minSubtotal),
+    minQuantity: toStr(discount?.minQuantity),
+    branchIds: discount?.branchIds ?? [],
+    customerIds: discount?.customerIds ?? [],
+    usageLimit: toStr(discount?.usageLimit),
+    usageLimitPerCustomer: toStr(discount?.usageLimitPerCustomer),
+    combinable: discount?.combinable ?? false,
+    startDate: toDate(discount?.startsAt),
+    startTime: toTime(discount?.startsAt, '00:00'),
+    endDate: toDate(discount?.endsAt),
+    endTime: toTime(discount?.endsAt, '23:59'),
+  };
+}
+
+function Hint({ children }: { children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Info className="h-3 w-3 text-muted-foreground" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{children}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <h3 className="text-sm font-medium">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function Multi({
+  options,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  groupBy,
+}: {
+  options: Option[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+  disabled?: boolean;
+  groupBy?: string;
+}) {
+  return (
+    <MultipleSelector
+      value={options.filter((o) => value.includes(o.value))}
+      defaultOptions={options}
+      options={options}
+      groupBy={groupBy}
+      triggerSearchOnFocus
+      onSearchSync={(term: string) => {
+        const t = term?.toLowerCase() ?? '';
+        return t ? options.filter((o) => o.label.toLowerCase().includes(t)) : options;
+      }}
+      onChange={(selected: Option[]) => onChange(selected.map((o) => o.value))}
+      placeholder={placeholder}
+      disabled={disabled}
+      hidePlaceholderWhenSelected
+      emptyIndicator={<p className="text-center text-sm text-muted-foreground">No results</p>}
+    />
+  );
+}
+
+export function CreateDiscountSheet({ open, onOpenChange, onSuccess, discount }: CreateDiscountSheetProps) {
   const { currentOrganization } = useOrganization();
   const { availableBranches, isOwner } = useBranchContext();
-  const { user } = useAuth();
-  const { data: categories } = useCategories(currentOrganization?.id);
-  const { data: products } = useProducts(currentOrganization?.id);
-  const { data: customers } = useCustomers(currentOrganization?.id);
-  const { mutate: manageDiscount, isPending } = useManageInventoryDiscount();
-  const { data: discountDetails } = useDiscountDetails(
-    currentOrganization?.id,
-    discount?.id
-  );
-
+  const orgId = currentOrganization?.id;
+  const { data: categories = [] } = useCategories(orgId);
+  const { data: products = [] } = useProducts(orgId);
+  const { data: variants = [] } = useOrganizationVariants(orgId);
+  const { data: customers = [] } = useCustomers(orgId);
+  const saveDiscount = useSaveDiscount();
   const isEditing = !!discount;
-  const [step, setStep] = useState<number>(0);
 
   const form = useForm<DiscountFormValues>({
-    resolver: zodResolver(discountFormSchema) as any,
-    defaultValues: {
-      name: discount?.name ?? '',
-      code: discount?.code ?? '',
-      description: discount?.description ?? '',
-      type: discount?.type ?? 'percentage',
-      value: discount?.value ?? 0,
-      usageMode: discount?.usageMode ?? 'manual',
-      usageLimit: discount?.usageLimit ?? null,
-      customerIds: (discount?.customerIds ?? []) as string[],
-      branchIds: (discount?.branchIds ??
-        (!isEditing && !isOwner && availableBranches.length === 1
-          ? [availableBranches[0].id]
-          : [])) as string[],
-      startAt: discount?.startAt ? format(new Date(discount.startAt), 'yyyy-MM-dd') : undefined,
-      startTime: discount?.startAt ? format(new Date(discount.startAt), 'HH:mm') : '00:00',
-      expiresAt: discount?.expiresAt ? format(new Date(discount.expiresAt), 'yyyy-MM-dd') : undefined,
-      endTime: discount?.expiresAt ? format(new Date(discount.expiresAt), 'HH:mm') : '23:59',
-      targetType: discount?.targetMode ?? 'all',
-      targetIds: [],
-      targetBranchIds: [],
-    },
+    resolver: zodResolver(discountFormSchema) as Resolver<DiscountFormValues>,
+    defaultValues: defaultsFor(discount),
   });
 
-  const watchedBranchIds = form.watch('branchIds') as string[] | undefined;
-  const inventoryBranchIds = useMemo(() => {
-    const selected = Array.isArray(watchedBranchIds) ? watchedBranchIds : [];
-    if (isOwner) {
-      return selected.length > 0 ? selected : undefined;
-    }
-    const effective =
-      selected.length > 0 ? selected : availableBranches.map((b) => b.id);
-    return effective.length > 0 ? effective : undefined;
-  }, [isOwner, watchedBranchIds, availableBranches]);
+  useEffect(() => {
+    if (open) form.reset(defaultsFor(discount));
+  }, [open, discount, form]);
 
-  const { data: inventoryEntries } = useInventoryEntries(
-    currentOrganization?.id,
-    inventoryBranchIds
-  );
+  const [method, target, valueType, appliesTo] = useWatch({
+    control: form.control,
+    name: ['method', 'target', 'valueType', 'appliesTo'],
+  });
 
   useEffect(() => {
-    if (discount && open) {
-      form.reset({
-        name: discount.name,
-        code: discount.code ?? '',
-        description: discount.description ?? '',
-        type: discount.type,
-        value: discount.value,
-        usageMode: discount.usageMode ?? 'manual',
-        usageLimit: discount.usageLimit ?? null,
-        customerIds: (discount.customerIds ?? []) as string[],
-        branchIds: (discount.branchIds ?? []) as string[],
-        startAt: discount.startAt ? format(new Date(discount.startAt), 'yyyy-MM-dd') : undefined,
-        startTime: discount.startAt ? format(new Date(discount.startAt), 'HH:mm') : '00:00',
-        expiresAt: discount.expiresAt ? format(new Date(discount.expiresAt), 'yyyy-MM-dd') : undefined,
-        endTime: discount.expiresAt ? format(new Date(discount.expiresAt), 'HH:mm') : '23:59',
-        targetType: discount.targetMode ?? 'all',
-        targetIds: [],
-        targetBranchIds: [],
-      } as any);
-      setStep(0);
-    }
-  }, [discount, open]);
+    if (target === 'order' && valueType === 'fixed_price') form.setValue('valueType', 'percentage');
+  }, [target, valueType, form]);
 
-  useEffect(() => {
-    if (
-      discountDetails?.inventories &&
-      discountDetails.inventories.length > 0 &&
-      form.getValues('targetType') === 'inventory'
-    ) {
-      const ids = discountDetails.inventories.map((i) => i.id);
-      const current = form.getValues('targetIds');
-      if (JSON.stringify(current) !== JSON.stringify(ids)) {
-        form.setValue('targetIds', ids);
+  const categoryOptions = useMemo<Option[]>(() => categories.map((c) => ({ label: c.name, value: c.id })), [categories]);
+
+  // A product, or one of its variants
+  const productOptions = useMemo<Option[]>(() => {
+    const out: Option[] = [];
+    for (const p of products) {
+      out.push({ label: p.name, value: p.id, group: p.name });
+      for (const v of variants.filter((x) => x.product_id === p.id)) {
+        const attrs = Object.values(v.attributes ?? {}).join(' / ');
+        out.push({ label: `${p.name} (${attrs || v.sku || 'variant'})`, value: `${p.id}:${v.id}`, group: p.name });
       }
     }
-  }, [discountDetails, form]);
+    return out;
+  }, [products, variants]);
 
-  useEffect(() => {
-    if (!open) setStep(0);
-  }, [open]);
-
-  useEffect(() => {
-    if (!isEditing && !isOwner && availableBranches.length === 1) {
-      const current = form.getValues('branchIds') || [];
-      if (current.length === 0) {
-        form.setValue('branchIds', [availableBranches[0].id]);
-      }
-    }
-  }, [isEditing, isOwner, availableBranches, form]);
-
-  const targetType = form.watch('targetType');
-
-  // Options for Selectors
-  const categoryOptions: Option[] = useMemo(
-    () =>
-      categories?.map((c) => ({
-        label: c.name,
-        value: c.id,
-      })) || [],
-    [categories]
+  const branchOptions = useMemo<Option[]>(
+    () => availableBranches.map((b) => ({ label: b.name, value: b.id })),
+    [availableBranches]
   );
-
-  const productOptions: Option[] = useMemo(
+  const customerOptions = useMemo<Option[]>(
     () =>
-      products?.map((p) => ({
-        label: p.name,
-        value: p.id,
-      })) || [],
-    [products]
-  );
-
-  const customerOptions: Option[] = useMemo(
-    () =>
-      customers?.map((c) => ({
-        label: `${c.firstName} ${c.lastName}`.trim(),
+      customers.map((c) => ({
+        label: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.phone || 'Customer',
         value: c.id,
-      })) || [],
+      })),
     [customers]
   );
 
-  const branchOptions: Option[] = useMemo(
-    () =>
-      availableBranches.map((b) => ({
-        label: b.name,
-        value: b.id,
-      })),
-    [availableBranches]
-  );
+  const combine = (date?: string, time?: string, fallback = '00:00') =>
+    date ? new Date(`${date}T${time || fallback}:00`).toISOString() : null;
 
-  const inventoryOptions: Option[] = useMemo(() => {
-    const opts =
-      inventoryEntries?.map((i) => ({
-        label: `${i.productName} - ${i.branchName || 'No Branch'} (${i.quantity})`,
-        value: i.id,
-      })) || [];
+  const onSubmit = (values: DiscountFormValues) => {
+    if (!orgId) return;
+    const targets: DiscountTargetRef[] =
+      values.target === 'order' || values.appliesTo === 'all'
+        ? []
+        : values.appliesTo === 'categories'
+          ? values.targetIds.map((id) => ({ categoryId: id }))
+          : values.targetIds.map((key) => {
+              const [productId, variantId] = key.split(':');
+              return { productId, variantId: variantId || null };
+            });
 
-    if (discountDetails?.inventories) {
-      const existingIds = new Set(opts.map((o) => o.value));
-      discountDetails.inventories.forEach((target) => {
-        if (!existingIds.has(target.id)) {
-          opts.push({
-            label: `${target.product_name} - ${target.branch_name || 'No Branch'} (${target.quantity})`,
-            value: target.id,
-          });
-        }
-      });
-    }
+    // Staff limited to some branches create discounts for those branches.
+    const branchIds =
+      !isOwner && values.branchIds.length === 0 ? availableBranches.map((b) => b.id) : values.branchIds;
 
-    return opts;
-  }, [inventoryEntries, discountDetails]);
-
-  const combineDateTimeToIso = (date?: string, time?: string) => {
-    if (!date) return undefined;
-    const t = time || '00:00';
-    const dateTime = new Date(`${date}T${t}:00`);
-    return dateTime.toISOString();
-  };
-
-  const onSubmit: SubmitHandler<DiscountFormValues> = (values) => {
-    if (!currentOrganization?.id) return;
-
-    const computedBranchIds =
-      isOwner
-        ? (values.branchIds || [])
-        : (values.branchIds && values.branchIds.length > 0
-            ? values.branchIds
-            : availableBranches.map((b) => b.id));
-
-    const targets: DiscountTarget & { apply_to_all?: boolean } = {
-      targetBranchIds: computedBranchIds,
-    };
-
-    if (values.targetType === 'all') {
-      targets.apply_to_all = true;
-    } else if (values.targetType === 'category') {
-      targets.categoryIds = values.targetIds;
-    } else if (values.targetType === 'product') {
-      targets.productIds = values.targetIds;
-    } else if (values.targetType === 'inventory') {
-      targets.inventoryIds = values.targetIds;
-    }
-
-    manageDiscount(
+    saveDiscount.mutate(
       {
-        organizationId: currentOrganization.id,
-        action: 'apply',
+        organizationId: orgId,
         discount: {
           id: discount?.id,
-          name: values.name,
-          code: values.code || undefined,
-          description: values.description || undefined,
-          type: values.type,
+          name: values.name.trim(),
+          method: values.method,
+          code: values.method === 'code' ? values.code?.trim() : null,
+          target: values.target,
+          valueType: values.valueType,
           value: values.value,
-          usageMode: values.usageMode,
-          usageLimit: values.usageLimit ?? null,
-          startAt: combineDateTimeToIso(values.startAt, values.startTime),
-          expiresAt: combineDateTimeToIso(values.expiresAt, values.endTime),
-          customerIds: values.customerIds || [],
-          branchIds: computedBranchIds,
-          createdBy: !isEditing ? user?.id : undefined,
+          oncePerOrder: values.target === 'items' && values.valueType === 'fixed_amount' && values.oncePerOrder,
+          appliesTo: values.target === 'order' ? 'all' : values.appliesTo,
+          targets,
+          minSubtotal: values.minSubtotal ? Number(values.minSubtotal) : null,
+          minQuantity: values.minQuantity ? Number(values.minQuantity) : null,
+          branchIds,
+          customerIds: values.customerIds,
+          usageLimit: values.usageLimit ? Number(values.usageLimit) : null,
+          usageLimitPerCustomer: values.usageLimitPerCustomer ? Number(values.usageLimitPerCustomer) : null,
+          combinable: values.combinable,
+          startsAt: combine(values.startDate, values.startTime, '00:00'),
+          endsAt: combine(values.endDate, values.endTime, '23:59'),
         },
-        targets: (targets as any),
       },
       {
         onSuccess: () => {
-          toast.success(isEditing ? 'Discount updated successfully' : 'Discount created and applied successfully');
-          form.reset();
+          toast.success(isEditing ? 'Discount updated' : 'Discount created');
           onOpenChange(false);
           onSuccess?.();
         },
-        onError: (error) => {
-          toast.error((isEditing ? 'Failed to update discount: ' : 'Failed to apply discount: ') + error.message);
-        },
+        onError: (error) => toast.error(error.message || 'Failed to save discount'),
       }
     );
   };
 
+  const errors = form.formState.errors;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0">
+        <SheetHeader className="border-b p-4">
           <SheetTitle>{isEditing ? 'Edit Discount' : 'Create Discount'}</SheetTitle>
-          <SheetDescription>
-            {isEditing ? 'Update discount details.' : 'Create a new discount rule and apply it to your inventory.'}
-          </SheetDescription>
         </SheetHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit as any)}
-            className="space-y-6 py-6"
-          >
-            {(
-              <div className="grid w-full grid-cols-2">
-                <div className={`text-center py-2 cursor-pointer ${step === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`} onClick={() => setStep(0)}>
-                  Details
-                </div>
-                <div
-                  className={`text-center py-2 ${step === 1 ?  'bg-primary text-primary-foreground' : 'bg-muted/50'} cursor-pointer`}
-                  onClick={async () => {
-                    const ok = await form.trigger(['name', 'type', 'value'] as any);
-                    if (ok) setStep(1);
-                  }}
-                >
-                  Application & Rules
-                </div>
-              </div>
-            )}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4">
+          <Field data-invalid={!!errors.name}>
+            <FieldLabel>Name</FieldLabel>
+            <Input {...form.register('name')} placeholder="e.g. Weekend sale" />
+            {errors.name && <FieldError>{errors.name.message}</FieldError>}
+          </Field>
 
-            {step === 0 && (
-              <div className="space-y-4 pt-4">
-                <FormField
-                  control={form.control as any}
-                  name="name"
+          <div className="grid grid-cols-2 gap-3">
+            <Field>
+              <FieldLabel className="flex items-center gap-1">
+                Method
+                <Hint>Automatic discounts apply by themselves at the till. Code discounts apply when the cashier enters the code.</Hint>
+              </FieldLabel>
+              <Controller
+                control={form.control}
+                name="method"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="automatic">Automatic</SelectItem>
+                      <SelectItem value="code">Code</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            {method === 'code' && (
+              <Field data-invalid={!!errors.code}>
+                <FieldLabel>Code</FieldLabel>
+                <Input
+                  {...form.register('code')}
+                  className="font-mono"
+                  placeholder="SAVE10"
+                  readOnly={discount?.code === MASKED_CODE}
+                />
+                {errors.code && <FieldError>{errors.code.message}</FieldError>}
+              </Field>
+            )}
+          </div>
+
+          <Section title="Discount">
+            <div className="grid grid-cols-3 gap-3">
+              <Field>
+                <FieldLabel className="flex items-center gap-1">
+                  On
+                  <Hint>Items: discounts the eligible lines. Whole sale: discounts the sale subtotal.</Hint>
+                </FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="target"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Summer Sale" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="items">Items</SelectItem>
+                        <SelectItem value="order">Whole sale</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control as any}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Code (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="SUMMER2025" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <FormField
-                      control={form.control as any}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Type</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="percentage">
-                                Percentage (%)
-                              </SelectItem>
-                              <SelectItem value="fixed">
-                                Fixed Amount
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control as any}
-                      name="value"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Value</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control as any}
-                    name="startAt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Date</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            date={field.value ? new Date(field.value) : undefined}
-                            setDate={(date) =>
-                              field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control as any}
-                    name="expiresAt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>End Date</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            date={field.value ? new Date(field.value) : undefined}
-                            setDate={(date) =>
-                              field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control as any}
-                    name="startTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Time</FormLabel>
-                        <FormControl>
-                          <TimePicker
-                            value={field.value}
-                            onChange={(val) => field.onChange(val)}
-                            placeholder="Pick time"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control as any}
-                    name="endTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>End Time</FormLabel>
-                        <FormControl>
-                          <TimePicker
-                            value={field.value}
-                            onChange={(val) => field.onChange(val)}
-                            placeholder="Pick time"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
+              </Field>
+              <Field data-invalid={!!errors.valueType}>
+                <FieldLabel className="flex items-center gap-1">
+                  Type
+                  <Hint>Fixed price sells each eligible item at the value.</Hint>
+                </FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="valueType"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentage">% off</SelectItem>
+                        <SelectItem value="fixed_amount">Amount off</SelectItem>
+                        {target === 'items' && <SelectItem value="fixed_price">Fixed price</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field data-invalid={!!errors.value}>
+                <FieldLabel>{valueType === 'percentage' ? 'Percent' : valueType === 'fixed_price' ? 'Price' : 'Amount'}</FieldLabel>
+                <Input type="number" step="0.01" min={0} {...form.register('value')} />
+                {errors.value && <FieldError>{errors.value.message}</FieldError>}
+              </Field>
+            </div>
+            {target === 'items' && valueType === 'fixed_amount' && (
+              <Controller
+                control={form.control}
+                name="oncePerOrder"
+                render={({ field }) => (
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={field.value} onCheckedChange={(v) => field.onChange(!!v)} />
+                    Once per sale
+                    <Hint>Off: the amount comes off every eligible item. On: once per sale, shared across eligible items.</Hint>
+                  </label>
+                )}
+              />
             )}
+          </Section>
 
-            {step === 1 && (
-              <div className="space-y-6 pt-4">
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                  <h3 className="font-medium text-sm">Eligibility Rules</h3>
-                  <FormField
-                    control={form.control as any}
-                    name="customerIds"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Limit to Specific Customers</FormLabel>
-                        <FormControl>
-                          <MultipleSelector
-                            value={customerOptions.filter((o) =>
-                              field.value?.includes(o.value)
-                            )}
-                            defaultOptions={customerOptions}
-                            triggerSearchOnFocus
-                            onSearchSync={(term: string) => {
-                              const t = term?.toLowerCase() ?? '';
-                              if (!t) return customerOptions;
-                              return customerOptions.filter((o) =>
-                                o.label.toLowerCase().includes(t)
-                              );
-                            }}
-                            onChange={(options: Option[]) =>
-                              field.onChange(options.map((o) => o.value))
-                            }
-                            placeholder="Select customers..."
-                            emptyIndicator={
-                              <p className="text-center text-sm text-gray-500">
-                                No customers found.
-                              </p>
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription className='text-xs'>
-                          Leave empty for all customers
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control as any}
-                    name="branchIds"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Valid Only in Branches</FormLabel>
-                      <MultipleSelector
-                        value={branchOptions.filter((o) =>
-                          field.value?.includes(o.value)
-                        )}
-                        defaultOptions={branchOptions}
-                        disabled={!isOwner && availableBranches.length === 1}
-                        triggerSearchOnFocus
-                        onSearchSync={(term: string) => {
-                          const t = term?.toLowerCase() ?? '';
-                          if (!t) return branchOptions;
-                          return branchOptions.filter((o) =>
-                              o.label.toLowerCase().includes(t)
-                            );
-                          }}
-                          onChange={(options: Option[]) =>
-                            field.onChange(options.map((o) => o.value))
-                          }
-                          placeholder="Select branches..."
-                          emptyIndicator={
-                            <p className="text-center text-sm text-gray-500">
-                              No branches found.
-                            </p>
-                          }
-                        />
-                      <FormDescription className='text-xs'>
-                         {isOwner ? 'Leave empty for all branches' : 'Leave empty to make valid in all your assigned branches.' } 
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <FormField
-                    control={form.control as any}
-                    name="usageMode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Usage Mode</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className='w-full'>
-                              <SelectValue placeholder="Select usage mode" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="automatic">Automatic</SelectItem>
-                            <SelectItem value="manual">Manual (Discount Code Required)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control as any}
-                    name="usageLimit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Usage Limit</FormLabel>
-                        <FormControl>
-                          <Input 
-                          type="number" 
-                          value={field.value ?? ''} 
-                          onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                          placeholder='Leave empty for unlimited usage'
-                          min={1}
-                          />
-                        </FormControl>
-                        
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                  <h3 className="font-medium text-sm">Apply To Inventory</h3>
-                  <FormField
-                    control={form.control as any}
-                    name="targetType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Targeting Mode</FormLabel>
-                        <FormControl>
-                          <Select
-                            onValueChange={(val) => {
-                                field.onChange(val);
-                                form.setValue('targetIds', []);
-                            }}
-                            defaultValue={field.value}
-                          >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select target..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Inventory (Storewide)</SelectItem>
-                                <SelectItem value="category">Specific Categories</SelectItem>
-                                <SelectItem value="product">Specific Products</SelectItem>
-                                <SelectItem value="inventory">Specific Inventory Items</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {targetType === 'category' && (
-                    <FormField
-                      control={form.control as any}
-                      name="targetIds"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Select Categories</FormLabel>
-                          <MultipleSelector
-                            value={categoryOptions.filter((o) =>
-                              field.value?.includes(o.value)
-                            )}
-                            defaultOptions={categoryOptions}
-                            triggerSearchOnFocus
-                            onSearchSync={(term: string) => {
-                              const t = term?.toLowerCase() ?? '';
-                              if (!t) return categoryOptions;
-                              return categoryOptions.filter((o) =>
-                                o.label.toLowerCase().includes(t)
-                              );
-                            }}
-                            onChange={(options: Option[]) =>
-                              field.onChange(options.map((o) => o.value))
-                            }
-                            placeholder="Select categories..."
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {targetType === 'product' && (
-                    <FormField
-                      control={form.control as any}
-                      name="targetIds"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Select Products</FormLabel>
-                          <MultipleSelector
-                            value={productOptions.filter((o) =>
-                              field.value?.includes(o.value)
-                            )}
-                            defaultOptions={productOptions}
-                            triggerSearchOnFocus
-                            onSearchSync={(term: string) => {
-                              const t = term?.toLowerCase() ?? '';
-                              if (!t) return productOptions;
-                              return productOptions.filter((o) =>
-                                o.label.toLowerCase().includes(t)
-                              );
-                            }}
-                            onChange={(options: Option[]) =>
-                              field.onChange(options.map((o) => o.value))
-                            }
-                            placeholder="Select products..."
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {targetType === 'inventory' && (
-                    <FormField
-                      control={form.control as any}
-                      name="targetIds"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Select Inventory Items</FormLabel>
-                          <MultipleSelector
-                            value={inventoryOptions.filter((o) =>
-                              field.value?.includes(o.value)
-                            )}
-                            options={inventoryOptions}
-                            triggerSearchOnFocus
-                            onSearchSync={(term: string) => {
-                              const t = term?.toLowerCase() ?? '';
-                              if (!t) return inventoryOptions;
-                              return inventoryOptions.filter((o) =>
-                                o.label.toLowerCase().includes(t)
-                              );
-                            }}
-                            onChange={(options: Option[]) =>
-                              field.onChange(options.map((o) => o.value))
-                            }
-                            placeholder="Select inventory..."
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  
-                </div>
-              </div>
-            )}
-
-            <SheetFooter>
-              <div className="flex gap-2 justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-                {step === 0 ? (
-                  <Button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await form.trigger(['name', 'type', 'value'] as any);
-                      if (ok) setStep(1);
+          {target === 'items' && (
+            <Section title="Applies to">
+              <Controller
+                control={form.control}
+                name="appliesTo"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      form.setValue('targetIds', []);
                     }}
                   >
-                    Continue
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setStep(0)}
-                    >
-                      Back
-                    </Button>
-                    {isEditing ? (
-                      <Button type="submit" disabled={isPending}>
-                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Changes
-                      </Button>
-                    ) : (
-                      <Button type="submit" disabled={isPending}>
-                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create & Apply
-                      </Button>
-                    )}
-                  </>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All products</SelectItem>
+                      <SelectItem value="categories">Categories</SelectItem>
+                      <SelectItem value="products">Products</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
-              </div>
-            </SheetFooter>
-          </form>
-        </Form>
+              />
+              {appliesTo !== 'all' && (
+                <Field data-invalid={!!errors.targetIds}>
+                  <Controller
+                    control={form.control}
+                    name="targetIds"
+                    render={({ field }) => (
+                      <Multi
+                        key={appliesTo}
+                        options={appliesTo === 'categories' ? categoryOptions : productOptions}
+                        groupBy={appliesTo === 'products' ? 'group' : undefined}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder={appliesTo === 'categories' ? 'Pick categories' : 'Pick products or variants'}
+                      />
+                    )}
+                  />
+                  {errors.targetIds && <FieldError>{errors.targetIds.message}</FieldError>}
+                </Field>
+              )}
+            </Section>
+          )}
+
+          <Section title="Requirements">
+            <div className="grid grid-cols-2 gap-3">
+              <Field data-invalid={!!errors.minSubtotal}>
+                <FieldLabel className="flex items-center gap-1">
+                  Minimum spend
+                  <Hint>{target === 'order' ? 'Sale subtotal before discounts.' : 'Total of the eligible items before discounts.'}</Hint>
+                </FieldLabel>
+                <Input type="number" step="0.01" min={0} placeholder="None" {...form.register('minSubtotal')} />
+                {errors.minSubtotal && <FieldError>{errors.minSubtotal.message}</FieldError>}
+              </Field>
+              <Field data-invalid={!!errors.minQuantity}>
+                <FieldLabel>Minimum items</FieldLabel>
+                <Input type="number" min={0} placeholder="None" {...form.register('minQuantity')} />
+                {errors.minQuantity && <FieldError>{errors.minQuantity.message}</FieldError>}
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>Branches</FieldLabel>
+              <Controller
+                control={form.control}
+                name="branchIds"
+                render={({ field }) => (
+                  <Multi
+                    options={branchOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder={isOwner ? 'All branches' : 'All my branches'}
+                  />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel className="flex items-center gap-1">
+                Customers
+                <Hint>When set, the sale needs one of these customers selected.</Hint>
+              </FieldLabel>
+              <Controller
+                control={form.control}
+                name="customerIds"
+                render={({ field }) => (
+                  <Multi options={customerOptions} value={field.value} onChange={field.onChange} placeholder="Anyone" />
+                )}
+              />
+            </Field>
+          </Section>
+
+          <Section title="Limits">
+            <div className="grid grid-cols-2 gap-3">
+              <Field data-invalid={!!errors.usageLimit}>
+                <FieldLabel className="flex items-center gap-1">
+                  Total uses
+                  <Hint>Sales that can use it. Deleting a sale gives its use back.</Hint>
+                </FieldLabel>
+                <Input type="number" min={1} placeholder="Unlimited" {...form.register('usageLimit')} />
+                {errors.usageLimit && <FieldError>{errors.usageLimit.message}</FieldError>}
+              </Field>
+              <Field data-invalid={!!errors.usageLimitPerCustomer}>
+                <FieldLabel className="flex items-center gap-1">
+                  Per customer
+                  <Hint>When set, the sale needs a customer selected.</Hint>
+                </FieldLabel>
+                <Input type="number" min={1} placeholder="Unlimited" {...form.register('usageLimitPerCustomer')} />
+                {errors.usageLimitPerCustomer && <FieldError>{errors.usageLimitPerCustomer.message}</FieldError>}
+              </Field>
+            </div>
+            <Controller
+              control={form.control}
+              name="combinable"
+              render={({ field }) => (
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  Combines with other discounts
+                  <Hint>
+                    Each item gets at most one item discount and each sale at most one sale discount. Item and sale
+                    discounts only stack when both combine; otherwise the bigger saving wins.
+                  </Hint>
+                </label>
+              )}
+            />
+          </Section>
+
+          <Section title="Schedule">
+            <div className="grid grid-cols-2 gap-3">
+              <Controller
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <DatePicker
+                    label="Starts"
+                    placeholder="Now"
+                    date={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
+                    setDate={(d) => field.onChange(d ? format(d, 'yyyy-MM-dd') : '')}
+                  />
+                )}
+              />
+              <Controller
+                control={form.control}
+                name="startTime"
+                render={({ field }) => <TimePicker label="Time" value={field.value} onChange={field.onChange} />}
+              />
+              <Field data-invalid={!!errors.endDate}>
+                <Controller
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <DatePicker
+                      label="Ends"
+                      placeholder="Never"
+                      date={field.value ? new Date(`${field.value}T00:00:00`) : undefined}
+                      setDate={(d) => field.onChange(d ? format(d, 'yyyy-MM-dd') : '')}
+                    />
+                  )}
+                />
+                {errors.endDate && <FieldError>{errors.endDate.message}</FieldError>}
+              </Field>
+              <Controller
+                control={form.control}
+                name="endTime"
+                render={({ field }) => <TimePicker label="Time" value={field.value} onChange={field.onChange} />}
+              />
+            </div>
+          </Section>
+
+          <SheetFooter className="flex-row justify-end gap-2 p-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saveDiscount.isPending}>
+              {saveDiscount.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? 'Save' : 'Create'}
+            </Button>
+          </SheetFooter>
+        </form>
       </SheetContent>
     </Sheet>
   );

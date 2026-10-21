@@ -104,7 +104,6 @@ export interface Order {
   items: OrderItem[];
 }
 
-import type { Discount } from './discounts';
 
 export interface InventoryEntry {
   id: string;
@@ -131,8 +130,6 @@ export interface InventoryEntry {
   productImage?: string;
   categoryName?: string;
   isDeleted?: boolean;
-  discountId?: string;
-  discount?: Discount;
 }
 
 export interface InventoryEntryInput {

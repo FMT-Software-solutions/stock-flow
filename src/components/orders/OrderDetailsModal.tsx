@@ -13,6 +13,7 @@ import { UserInfo } from '@/components/shared/UserInfo';
 import { Banknote } from 'lucide-react';
 import { useState } from 'react';
 import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
+import { orderDiscountLines } from '@/lib/discounts';
 
 interface OrderDetailsModalProps {
   open: boolean;
@@ -148,33 +149,16 @@ export function OrderDetailsModal({
                     )}
                   </div>
                   <div className="col-span-2 text-right text-muted-foreground">
-                    {(() => {
-                      const quantity = Number(item.quantity ?? 0);
-                      const unitPrice = Number(item.unit_price ?? 0);
-                      const grossTotal = Number(item.total_price ?? 0);
-                      const discountAmount = Number(item.discount_amount ?? 0);
-                      const netTotalCandidate = grossTotal - discountAmount;
-                      const netTotal =
-                        discountAmount > 0 && netTotalCandidate >= 0
-                          ? netTotalCandidate
-                          : grossTotal;
-                      const netUnit =
-                        quantity > 0 ? netTotal / quantity : unitPrice;
-                      return formatCurrency(netUnit);
-                    })()}
+                    {formatCurrency(Number(item.unit_price ?? 0))}
                   </div>
                   <div className="col-span-2 text-right">{item.quantity}</div>
                   <div className="col-span-2 text-right font-medium">
-                    {(() => {
-                      const grossTotal = Number(item.total_price ?? 0);
-                      const discountAmount = Number(item.discount_amount ?? 0);
-                      const netTotalCandidate = grossTotal - discountAmount;
-                      const netTotal =
-                        discountAmount > 0 && netTotalCandidate >= 0
-                          ? netTotalCandidate
-                          : grossTotal;
-                      return formatCurrency(netTotal);
-                    })()}
+                    {formatCurrency(Number(item.total_price ?? 0))}
+                    {Number(item.discount_amount ?? 0) > 0 && (
+                      <div className="text-xs font-normal text-green-600">
+                        -{formatCurrency(Number(item.discount_amount))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -191,12 +175,12 @@ export function OrderDetailsModal({
                   <span>{formatCurrency(order.tax)}</span>
                 </div>
               )}
-              {order.discount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Discount</span>
-                  <span>-{formatCurrency(order.discount)}</span>
+              {orderDiscountLines(order).map((d) => (
+                <div key={d.key} className="flex justify-between text-sm text-green-600">
+                  <span>{d.label}</span>
+                  <span>-{formatCurrency(d.amount)}</span>
                 </div>
-              )}
+              ))}
               <div className="flex justify-between font-bold text-lg pt-2 border-t">
                 <span>Total</span>
                 <span>{formatCurrency(order.total_amount)}</span>

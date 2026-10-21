@@ -36,6 +36,19 @@ export const useOrderForm = ({ id }: UseOrderFormProps) => {
         paymentMethod: (order.payment_method as string)?.toLowerCase() as any || 'cash',
         notes: order.notes || '',
         paidAmount: order.paid_amount,
+        // The sale keeps its discounts unless the cashier removes them.
+        discountCodes: (order.discounts ?? []).filter((d) => d.kind === 'code' && d.code).map((d) => d.code as string),
+        skippedDiscountIds: [],
+        manualDiscount: (() => {
+          const manual = order.discounts?.find((d) => d.kind === 'manual');
+          return manual
+            ? {
+                valueType: manual.value_type === 'percentage' ? ('percentage' as const) : ('fixed_amount' as const),
+                value: Number(manual.value),
+                reason: manual.reason ?? undefined,
+              }
+            : null;
+        })(),
         items:
           formattedItems.length > 0
             ? formattedItems

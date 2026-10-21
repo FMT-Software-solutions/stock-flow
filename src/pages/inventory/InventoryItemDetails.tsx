@@ -21,7 +21,9 @@ import { Check, X, Pencil } from 'lucide-react';
 import { useUpdateInventoryEntry } from '@/hooks/useInventoryQueries';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { useValidInventoryDiscounts } from '@/hooks/useDiscountQueries';
+import { useDiscounts } from '@/hooks/useDiscountQueries';
+import { useCurrency } from '@/hooks/useCurrency';
+import { DISCOUNT_STATUS_LABEL, describeDiscountScope, describeDiscountValue, discountCoversStock } from '@/lib/discounts';
 import { Badge as UiBadge } from '@/components/ui/badge';
 
 export function InventoryItemDetails() {
@@ -37,12 +39,11 @@ export function InventoryItemDetails() {
   const updateInventory = useUpdateInventoryEntry();
   const { checkPermission } = useRoleCheck();
   const { currentOrganization } = useOrganization();
-  const {
-    data: validDiscounts = [],
-    isLoading: isLoadingValidDiscounts,
-  } = useValidInventoryDiscounts(
+  const { formatCurrency } = useCurrency();
+  const canViewDiscounts = checkPermission('discounts');
+  const { data: discounts = [], isLoading: isLoadingValidDiscounts } = useDiscounts(
     currentOrganization?.id,
-    inventory?.branchId ? [inventory.branchId] : undefined
+    canViewDiscounts
   );
 
   const canEditInventory = checkPermission('inventory', 'edit');
@@ -165,8 +166,16 @@ export function InventoryItemDetails() {
   }
 
   const branch = availableBranches.find((b) => b.id === inventory.branchId);
-  const itemDiscounts =
-    validDiscounts.find((r) => r.inventoryId === inventory.id)?.discounts || [];
+  const itemDiscounts = discounts.filter(
+    (d) =>
+      (d.status === 'active' || d.status === 'scheduled') &&
+      discountCoversStock(d, {
+        productId: inventory.productId,
+        variantId: inventory.variantId,
+        branchId: inventory.branchId,
+        categoryName: inventory.categoryName,
+      })
+  );
 
   return (
     <div className="space-y-6">
@@ -469,62 +478,36 @@ export function InventoryItemDetails() {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">
-          Active Discounts
-        </h2>
-        {isLoadingValidDiscounts ? (
-          <div className="h-20 w-full bg-muted animate-pulse rounded" />
-        ) : itemDiscounts.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No active discounts
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {itemDiscounts.map((d) => {
-              const start = d.startAt
-                ? `${format(new Date(d.startAt), 'MMM dd, yyyy')} ${format(
-                  new Date(d.startAt),
-                  'h:mm a'
-                )}`
-                : 'Any';
-              const end = d.expiresAt
-                ? `${format(new Date(d.expiresAt), 'MMM dd, yyyy')} ${format(
-                  new Date(d.expiresAt),
-                  'h:mm a'
-                )}`
-                : 'Forever';
-              return (
+      {canViewDiscounts && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold tracking-tight">Discounts</h2>
+          {isLoadingValidDiscounts ? (
+            <div className="h-20 w-full bg-muted animate-pulse rounded" />
+          ) : itemDiscounts.length === 0 ? (
+            <div className="text-sm text-muted-foreground">None</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {itemDiscounts.map((d) => (
                 <Card key={d.id} className="border-muted">
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-semibold">{d.name}</div>
                       <UiBadge variant="outline">
-                        {d.usageMode === 'automatic' ? 'Automatic' : 'Manual'}
+                        {d.method === 'code' ? d.code ?? 'Code' : 'Automatic'}
                       </UiBadge>
                     </div>
-                    {d.code && (
-                      <div className="text-xs font-mono text-muted-foreground">
-                        {d.code}
-                      </div>
-                    )}
-                    <div className="text-sm font-medium">
-                      {d.type === 'percentage' ? (
-                        <span>{d.value}%</span>
-                      ) : (
-                        <CurrencyDisplay amount={d.value} />
-                      )}
-                    </div>
+                    <div className="text-sm font-medium">{describeDiscountValue(d, formatCurrency)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {start} - {end}
+                      {describeDiscountScope(d)} · {DISCOUNT_STATUS_LABEL[d.status]}
+                      {d.endsAt ? ` · until ${format(new Date(d.endsAt), 'MMM dd, yyyy h:mm a')}` : ''}
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Purchase History */}
       <div className="space-y-4">

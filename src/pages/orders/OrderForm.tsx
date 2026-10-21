@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Input } from '@/components/ui/input';
@@ -25,21 +24,22 @@ import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCustomer, useCustomerDebtSummary } from '@/hooks/useCustomerQueries';
-import { useValidateDiscountServerSide } from '@/hooks/useDiscountQueries';
 import { useSellableProducts } from '@/hooks/useSellableProducts';
 import { isUntrackedLine, parseLineKey, untrackedLineKey } from '@/lib/saleLines';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useOrderDiscounts } from '@/hooks/useOrderDiscounts';
 import { useOrderForm } from '@/hooks/useOrderForm';
-import { useCreateOrder, useUpdateOrder } from '@/hooks/useOrders';
-import { computeDiscountAmount, distributeDiscount, type DiscountOrderItem } from '@/lib/discount-utils';
+import { useCreateOrder, useEditOrder } from '@/hooks/useOrders';
+import { useSalePricing } from '@/hooks/useSalePricing';
+import { SaleDiscountsCard } from '@/components/orders/SaleDiscountsCard';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import type { ManualDiscount, SaleDiscountRequest } from '@/types/discounts';
 import { useCreateCommunicationHistory } from '@/shared-packages/communication/hooks/useCommunicationHistory';
 import { useCommunicationTemplates, useCreateTemplate } from '@/shared-packages/communication/hooks/useCommunicationTemplates';
 import { sendSmsMessage } from '@/shared-packages/communication/services/sms.service';
 import type { Order } from '@/types/orders';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format, formatDistanceToNow } from 'date-fns';
-import { ChevronDown, ChevronLeft, ChevronUp, FolderOpen, Loader2, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { ChevronLeft, FolderOpen, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
@@ -96,7 +96,9 @@ function OrderFormInner({
   const { availableBranches } = useBranchContext();
 
   const createOrder = useCreateOrder();
-  const updateOrder = useUpdateOrder();
+  const updateOrder = useEditOrder();
+  const { checkPermission, isOwner } = useRoleCheck();
+  const canGiveDiscount = checkPermission('orders', 'give_discount') || isOwner();
 
   // Initialize selectedBranchId from defaultValues
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
@@ -270,95 +272,87 @@ function OrderFormInner({
 
   const createHistoryMutation = useCreateCommunicationHistory();
 
-  const orderItems: DiscountOrderItem[] = useMemo(() => {
-    return items
+  // order_items payloads, in form order. Preview and save send the same list,
+  // so the server prices exactly what the cashier sees.
+  const buildOrderItems = (formItems: OrderFormValues['items']) =>
+    formItems
+      .filter((item) => (item?.inventoryId || '').trim().length > 0)
       .map((item) => {
         const option = optionByKey.get(item.inventoryId);
-        if (!option) return null;
-        // Untracked lines carry their product key here; storewide discounts
-        // apply to them, inventory-targeted ones can't match.
+        const line = parseLineKey(item.inventoryId);
+        // When editing, a line may no longer be sellable (e.g. product
+        // archived); keep what the order already recorded for it.
+        const original = existingOrder?.items?.find(
+          (i) => (i.inventory_id ?? untrackedLineKey(i.product_id ?? '', i.variant_id)) === item.inventoryId
+        );
+        const quantity = Number(item.quantity) || 0;
+        const unitPrice = Number(item.unitPrice) || 0;
         return {
-          inventoryId: option.key,
-          productId: option.productId,
-          branchId: selectedBranchId || undefined,
-          unitPrice: Number(item.unitPrice || option.price || 0),
-          quantity: Number(item.quantity || 0),
-        } as DiscountOrderItem;
-      })
-      .filter(Boolean) as DiscountOrderItem[];
-  }, [items, optionByKey, selectedBranchId]);
+          // Untracked products have no stock row; stock triggers skip null.
+          inventory_id: line.inventoryId,
+          product_id: option?.productId ?? line.productId ?? original?.product_id ?? null,
+          variant_id: option?.variantId ?? line.variantId ?? original?.variant_id ?? null,
+          product_name:
+            option?.lineName || item.productName || original?.product_name || 'Unknown Product',
+          sku: option?.sku ?? original?.sku,
+          quantity,
+          unit_price: unitPrice,
+          original_price: item.originalPrice !== undefined ? item.originalPrice : unitPrice,
+          total_price: quantity * unitPrice,
+        };
+      });
 
-  const {
-    discountCode, setDiscountCode,
-    setSelectedAutoId,
-    appliedDiscount, autoOptions,
-    resetState,
-    clearDiscount,
-    setManuallyCleared,
-    discountEligibleMap,
-    validateCode
-  } = useOrderDiscounts(currentOrganization?.id, selectedBranchId, orderItems, customerId);
+  const orderItemPayloads = buildOrderItems(items);
+  const pricedLines = orderItemPayloads.map((i) => ({
+    inventory_id: i.inventory_id,
+    product_id: i.product_id,
+    variant_id: i.variant_id,
+    quantity: i.quantity,
+    unit_price: i.unit_price,
+  }));
+
+  const discountCodes = useWatch({ control: form.control, name: 'discountCodes' }) ?? [];
+  const skippedDiscountIds = useWatch({ control: form.control, name: 'skippedDiscountIds' }) ?? [];
+  const manualDiscount = (useWatch({ control: form.control, name: 'manualDiscount' }) ?? null) as ManualDiscount | null;
+  // Names of automatic discounts the cashier removed, for the undo list
+  const [skippedNames, setSkippedNames] = useState<Record<string, string>>({});
+
+  const discountRequest: SaleDiscountRequest = {
+    codes: discountCodes,
+    skip: skippedDiscountIds,
+    manual: manualDiscount && manualDiscount.value > 0 ? manualDiscount : null,
+  };
+
+  const { pricing, isPending: isPricing, refetch: refetchPricing } = useSalePricing({
+    organizationId: currentOrganization?.id,
+    branchId: selectedBranchId || undefined,
+    customerId: customerId || undefined,
+    lines: pricedLines,
+    request: discountRequest,
+    orderId: isEditing ? id : undefined,
+  });
 
   const prevBranchIdRef = useRef(selectedBranchId);
   useEffect(() => {
     if (prevBranchIdRef.current !== selectedBranchId) {
       form.setValue('items', []);
-      resetState();
+      form.setValue('discountCodes', []);
+      form.setValue('skippedDiscountIds', []);
+      form.setValue('manualDiscount', null);
+      setSkippedNames({});
       prevBranchIdRef.current = selectedBranchId;
     }
-  }, [selectedBranchId, form, resetState]);
+  }, [selectedBranchId, form]);
 
-  const [discountCardOpen, setDiscountCardOpen] = useState(false);
-
-  const validateDiscount = useValidateDiscountServerSide();
-
-  const [isEditingSubtotal, setIsEditingSubtotal] = useState(false);
-  const [customSubtotalStr, setCustomSubtotalStr] = useState<string>('');
-
-  const calculatedTotalAmount = items.reduce((sum, item) => {
+  const totalAmount = items.reduce((sum, item) => {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unitPrice) || 0;
     return sum + qty * price;
   }, 0);
 
-  // Clear custom subtotal if items change
-  useEffect(() => {
-    setIsEditingSubtotal(false);
-    setCustomSubtotalStr('');
-  }, [calculatedTotalAmount]);
-
-  const totalAmount = isEditingSubtotal && customSubtotalStr !== '' && !isNaN(Number(customSubtotalStr))
-    ? Number(customSubtotalStr)
-    : calculatedTotalAmount;
-
-  // Distribute custom subtotal proportionally across items to keep DB consistent
-  const distributeSubtotal = (itemsToDistribute: any[], targetTotal: number) => {
-    if (calculatedTotalAmount === 0 || targetTotal === calculatedTotalAmount) return itemsToDistribute;
-    const ratio = targetTotal / calculatedTotalAmount;
-
-    let runningTotal = 0;
-    return itemsToDistribute.map((item, index) => {
-      const qty = Number(item.quantity) || 1;
-
-      if (index === itemsToDistribute.length - 1) {
-        // Last item absorbs the rounding difference
-        const remainder = targetTotal - runningTotal;
-        return {
-          ...item,
-          unitPrice: Number((remainder / qty).toFixed(2))
-        };
-      }
-
-      const newUnitPrice = Number((item.unitPrice * ratio).toFixed(2));
-      runningTotal += newUnitPrice * qty;
-      return {
-        ...item,
-        unitPrice: newUnitPrice
-      };
-    });
-  };
-
-  const effectiveTotal = Math.max(0, totalAmount - (appliedDiscount?.amount ?? 0));
+  const discountTotal = pricing?.discountTotal ?? 0;
+  const effectiveTotal = Math.max(0, pricing ? pricing.total : totalAmount);
+  const lineDiscounts = new Map((pricing?.lines ?? []).map((l) => [l.i, l.discount]));
 
   // Auto-fill paid amount based on status logic
   useEffect(() => {
@@ -377,53 +371,26 @@ function OrderFormInner({
   async function onSubmit(values: OrderFormValues) {
     if (!currentOrganization?.id) return;
 
+    if (!pricing || isPricing) {
+      toast.error('Still working out discounts, try again');
+      return;
+    }
+
     try {
-      if (appliedDiscount) {
-        await validateDiscount.mutateAsync(appliedDiscount.discount.id);
-      }
+      const enrichedItems = buildOrderItems(values.items);
 
-      // Calculate discount distribution if any
-      let discountDistribution: Record<string, number> = {};
-      if (appliedDiscount) {
-        discountDistribution = distributeDiscount(
-          appliedDiscount.discount,
-          orderItems,
-          discountEligibleMap
-        );
-      }
+      // Only what applied: codes the preview rejected are left out. The server
+      // re-prices with the same rules and refuses if the total moved.
+      const appliedCodes = new Set(
+        pricing.discounts.filter((d) => d.kind === 'code' && d.code).map((d) => (d.code as string).toLowerCase())
+      );
+      const discounts: SaleDiscountRequest = {
+        codes: (values.discountCodes ?? []).filter((c) => appliedCodes.has(c.toLowerCase())),
+        skip: values.skippedDiscountIds ?? [],
+        manual: pricing.discounts.some((d) => d.kind === 'manual') ? discountRequest.manual : null,
+      };
+      const saleTotal = pricing.total;
 
-      // Distribute any subtotal changes first
-      const distributedItems = isEditingSubtotal && customSubtotalStr !== '' && !isNaN(Number(customSubtotalStr))
-        ? distributeSubtotal(values.items, Number(customSubtotalStr))
-        : values.items;
-
-      // Enrich items with product details (snapshot)
-      const enrichedItems = distributedItems.map((item) => {
-        const option = optionByKey.get(item.inventoryId);
-        const line = parseLineKey(item.inventoryId);
-        // When editing, a line may no longer be sellable (e.g. product
-        // archived); keep what the order already recorded for it.
-        const original = existingOrder?.items?.find(
-          (i) => (i.inventory_id ?? untrackedLineKey(i.product_id ?? '', i.variant_id)) === item.inventoryId
-        );
-        const discountAmount = discountDistribution[item.inventoryId] || 0;
-        return {
-          // Untracked products have no stock row; stock triggers skip null.
-          inventory_id: line.inventoryId,
-          product_id: option?.productId ?? line.productId ?? original?.product_id,
-          variant_id: option?.variantId ?? line.variantId ?? original?.variant_id,
-          product_name:
-            option?.lineName || item.productName || original?.product_name || 'Unknown Product',
-          sku: option?.sku ?? original?.sku,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          original_price: item.originalPrice !== undefined ? item.originalPrice : item.unitPrice,
-          total_price: item.quantity * item.unitPrice,
-          discount_amount: discountAmount,
-        };
-      });
-
-      const orderDiscountAmount = appliedDiscount?.amount ?? 0;
       const orderData = {
         organization_id: currentOrganization.id,
         branch_id: values.branchId,
@@ -431,11 +398,8 @@ function OrderFormInner({
         status: values.status,
         payment_status: values.paymentStatus,
         payment_method: values.paymentMethod,
-        total_amount: Math.max(0, totalAmount - orderDiscountAmount),
-        paid_amount: values.paidAmount ?? (values.paymentStatus === 'paid' ? Math.max(0, totalAmount - orderDiscountAmount) : 0),
-        subtotal: totalAmount,
+        paid_amount: values.paidAmount ?? (values.paymentStatus === 'paid' ? saleTotal : 0),
         tax: 0,
-        discount: orderDiscountAmount,
         notes: values.notes,
         items: enrichedItems,
       };
@@ -446,13 +410,13 @@ function OrderFormInner({
         orderData.paid_amount = 0;
       }
       if (orderData.payment_status === 'unpaid' && orderData.paid_amount > 0) {
-        if (orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) orderData.payment_status = 'paid';
+        if (orderData.paid_amount >= saleTotal) orderData.payment_status = 'paid';
         else orderData.payment_status = 'partial';
       }
-      if (orderData.payment_status === 'paid' && orderData.paid_amount < Math.max(0, totalAmount - orderDiscountAmount)) {
+      if (orderData.payment_status === 'paid' && orderData.paid_amount < saleTotal) {
         orderData.payment_status = 'partial';
       }
-      if (orderData.payment_status === 'partial' && orderData.paid_amount >= Math.max(0, totalAmount - orderDiscountAmount)) {
+      if (orderData.payment_status === 'partial' && orderData.paid_amount >= saleTotal) {
         orderData.payment_status = 'paid';
       }
       if (orderData.payment_status === 'partial' && orderData.paid_amount <= 0) {
@@ -460,16 +424,26 @@ function OrderFormInner({
       }
 
       if (isEditing && id) {
+        // Payments are managed from the sales list, not here.
         await updateOrder.mutateAsync({
           id,
-          ...orderData,
+          branch_id: orderData.branch_id,
+          customer_id: orderData.customer_id,
+          status: orderData.status,
+          payment_method: orderData.payment_method,
+          notes: orderData.notes,
+          items: orderData.items,
+          ...(orderData.payment_status === 'refunded' ? { payment_status: 'refunded' as const } : {}),
+          discounts,
+          expectedTotal: saleTotal,
         });
         toast.success('Sale updated successfully');
         navigate('/orders');
       } else {
         const createdOrder = await createOrder.mutateAsync({
           ...orderData,
-          discountId: appliedDiscount?.discount.id,
+          discounts,
+          expectedTotal: saleTotal,
         });
 
         toast.success('Sale created successfully');
@@ -487,8 +461,11 @@ function OrderFormInner({
           paidAmount: 0,
           notes: '',
           items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
+          discountCodes: [],
+          skippedDiscountIds: [],
+          manualDiscount: null,
         });
-        resetState();
+        setSkippedNames({});
 
         if (sendSms && customer?.phone && smsMessage.trim()) {
           try {
@@ -551,10 +528,11 @@ function OrderFormInner({
       }
     } catch (error) {
       console.error(error);
-      // create_order explains stock and discount-limit failures itself.
+      // create_order / update_order explain stock and discount failures themselves.
       const hint = (error as { hint?: string })?.hint;
+      if (hint === 'discount_changed') refetchPricing();
       toast.error(
-        hint === 'insufficient_stock' || hint === 'discount_limit'
+        hint === 'insufficient_stock' || hint === 'discount_changed' || hint === 'below_paid'
           ? (error as Error).message
           : 'Failed to save sale'
       );
@@ -588,13 +566,18 @@ function OrderFormInner({
       paidAmount: 0,
       notes: '',
       items: [{ inventoryId: '', quantity: 1, unitPrice: 0 }],
+      discountCodes: [],
+      skippedDiscountIds: [],
+      manualDiscount: null,
     });
+    setSkippedNames({});
     setCurrentDraftId(null);
   }
   function handleLoadDraft(draftId: string) {
     const d = drafts.find((x) => x.id === draftId);
     if (!d) return;
     form.reset(d.values);
+    setSkippedNames({});
     setSelectedBranchId(d.values.branchId || '');
     setCurrentDraftId(draftId);
     toast.success('Draft loaded');
@@ -698,6 +681,9 @@ function OrderFormInner({
                   const currentQty = Number(item?.quantity) || 0;
                   const simulatedStock = maxQty - currentQty;
 
+                  // Position among the lines sent for pricing (empty rows are skipped)
+                  const pricedIndex = items.slice(0, index + 1).filter((it) => (it?.inventoryId || '').trim()).length;
+                  const lineDiscount = item?.inventoryId ? lineDiscounts.get(pricedIndex) ?? 0 : 0;
                   const originalPrice = form.watch(`items.${index}.originalPrice`);
                   const isChanged = originalPrice !== undefined && Number(item?.unitPrice) !== Number(originalPrice);
 
@@ -797,6 +783,11 @@ function OrderFormInner({
                                 {isChanged && (
                                   <div className="text-[10px] text-muted-foreground">
                                     Original: {formatCurrency(Number(originalPrice))}
+                                  </div>
+                                )}
+                                {lineDiscount > 0 && (
+                                  <div className="text-[10px] text-green-600">
+                                    -{formatCurrency(lineDiscount)}
                                   </div>
                                 )}
                               </Field>
@@ -1029,140 +1020,21 @@ function OrderFormInner({
               </CardContent>
             </Card>
 
-            <Card className={discountCardOpen ? 'py-4' : 'py-2'}>
-              <Collapsible open={discountCardOpen} onOpenChange={setDiscountCardOpen}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Discounts</CardTitle>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-9 p-0">
-                        {discountCardOpen ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                        <span className="sr-only">Toggle</span>
-                      </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  {!discountCardOpen && appliedDiscount && (
-                    <div className="mt-2 text-sm text-muted-foreground flex items-center justify-between">
-                      <span>Applied: {appliedDiscount.discount.code || appliedDiscount.discount.name}</span>
-                      <span className="font-medium text-green-600">-{formatCurrency(appliedDiscount.amount)}</span>
-                    </div>
-                  )}
-                </CardHeader>
-                <CollapsibleContent>
-                  <CardContent className="space-y-3 pt-0">
-                    <div className="space-y-2">
-                      <Field>
-                        <FieldLabel>Discount Code</FieldLabel>
-                        <div className="flex gap-1">
-                          <Input
-                            value={discountCode}
-                            onChange={(e) => {
-                              setDiscountCode(e.target.value);
-                              setSelectedAutoId(undefined);
-                            }}
-                            placeholder="Enter discount code"
-                            disabled={orderItems.length === 0}
-                          />
-                          <Button
-                            type="button"
-                            variant="default"
-                            onClick={() => {
-                              const trimmed = discountCode.trim();
-                              setDiscountCode(trimmed);
-                              setSelectedAutoId(undefined);
-                              setManuallyCleared(false);
-
-                              // Check validation
-                              if (trimmed) {
-                                const error = validateCode(trimmed);
-                                if (error) {
-                                  toast.error(error);
-                                }
-                              }
-                            }}
-                            disabled={!discountCode.trim() || orderItems.length === 0}
-                          >
-                            Apply
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={clearDiscount}
-                            disabled={!discountCode.trim() || orderItems.length === 0}
-                          >
-                            <X />
-                          </Button>
-                        </div>
-                      </Field>
-                    </div>
-                    {appliedDiscount && (
-                      <div className="flex items-center justify-between border rounded-md p-2">
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            {appliedDiscount.discount.code ? (
-                              <span title={appliedDiscount.discount.name}>{appliedDiscount.discount.code}</span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="text-sm font-medium">
-                          {formatCurrency(appliedDiscount.amount)}
-                        </div>
-                        <div className='flex items-center'>
-                          <span className='text-[10px] text-green-500 italic'>Applied</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearDiscount}
-                          >
-                            <X />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {autoOptions.length > 0 && (
-                      <div className="space-y-2">
-                        <FieldLabel>Other Available Discounts</FieldLabel>
-                        <div className="flex flex-col gap-2">
-                          {autoOptions.map((d) => {
-                            const amount = computeDiscountAmount(d, orderItems, discountEligibleMap);
-                            const isSelected = appliedDiscount?.discount.id === d.id;
-                            return (
-                              <div key={d.id} className="flex items-center justify-between border rounded-md p-2">
-
-                                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                  {d.code ? <span>{d.code}</span> : null}
-                                </div>
-                                <div className="text-sm font-medium">{formatCurrency(amount)}</div>
-                                <Button
-                                  type="button"
-                                  variant={isSelected ? 'secondary' : 'outline'}
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedAutoId(d.id);
-                                    setDiscountCode((d.code ?? '').trim());
-                                    setManuallyCleared(false);
-                                  }}
-                                >
-                                  {isSelected ? 'Applied' : 'Use'}
-                                </Button>
-
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-
-
+            <SaleDiscountsCard
+              pricing={pricing}
+              isPending={isPricing}
+              codes={discountCodes}
+              onCodesChange={(codes) => form.setValue('discountCodes', codes)}
+              skipped={skippedDiscountIds.map((sid) => ({ id: sid, name: skippedNames[sid] ?? 'Discount' }))}
+              onSkippedChange={(next) => {
+                form.setValue('skippedDiscountIds', next.map((x) => x.id));
+                setSkippedNames((prev) => ({ ...prev, ...Object.fromEntries(next.map((x) => [x.id, x.name])) }));
+              }}
+              manual={manualDiscount}
+              onManualChange={(manual) => form.setValue('manualDiscount', manual)}
+              canGiveDiscount={canGiveDiscount}
+              disabled={orderItemPayloads.length === 0}
+            />
 
             {!isEditing && customer && customer.phone && (
               <Card className="bg-primary/5 border-primary/20">
@@ -1403,44 +1275,15 @@ function OrderFormInner({
         <div className="sticky bottom-0 z-40 bg-background/95 backdrop-blur border px-4 sm:px-8 py-4 mt-8 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.1)]">
           <div className="flex flex-wrap items-center gap-4 sm:gap-8 w-full lg:w-auto">
             <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                Subtotal
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditingSubtotal) {
-                      setIsEditingSubtotal(false);
-                      setCustomSubtotalStr('');
-                    } else {
-                      setIsEditingSubtotal(true);
-                      setCustomSubtotalStr(calculatedTotalAmount.toString());
-                    }
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                  title={isEditingSubtotal ? "Cancel edit" : "Edit subtotal"}
-                >
-                  {isEditingSubtotal ? <X className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-                </button>
-              </span>
-              {isEditingSubtotal ? (
-                <Input
-                  type="number"
-                  step="0.01"
-                  className="h-7 w-24 text-sm px-2 py-1 mt-0.5"
-                  value={customSubtotalStr}
-                  onChange={(e) => setCustomSubtotalStr(e.target.value)}
-                  autoFocus
-                />
-              ) : (
-                <span className="font-medium">{formatCurrency(totalAmount)}</span>
-              )}
+              <span className="text-xs text-muted-foreground">Subtotal</span>
+              <span className="font-medium">{formatCurrency(totalAmount)}</span>
             </div>
-            {appliedDiscount?.amount ? (
+            {discountTotal > 0 && (
               <div className="flex flex-col text-green-600">
                 <span className="text-xs">Discount</span>
-                <span className="font-medium">-{formatCurrency(appliedDiscount.amount)}</span>
+                <span className="font-medium">-{formatCurrency(discountTotal)}</span>
               </div>
-            ) : null}
+            )}
             <div className="flex flex-col">
               <span className="text-xs text-muted-foreground">Total</span>
               <span className={`text-xl font-bold ${isEditing && paidAmount !== undefined && effectiveTotal < paidAmount ? 'text-destructive' : ''}`}>
@@ -1531,6 +1374,7 @@ function OrderFormInner({
                   !selectedBranchId ||
                   createOrder.isPending ||
                   updateOrder.isPending ||
+                  (orderItemPayloads.length > 0 && (isPricing || !pricing)) ||
                   (isEditing && paidAmount !== undefined && effectiveTotal < paidAmount)
                 }
               >

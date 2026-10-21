@@ -380,7 +380,7 @@ function DatePickerWithRangeInner({
               ) : (
                 format(date.from, 'MMM dd, yyyy')
               )
-            ) : (
+            ) : displayLabel ? null : (
               <span>{placeholder}</span>
             )}
             {date && (

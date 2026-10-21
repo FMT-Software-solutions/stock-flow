@@ -45,7 +45,7 @@ export const getProductStatsGroups = (_formatCurrency: (amount: number) => strin
         label: "Out of Stock",
         icon: XCircle,
         calculate: (data) => ({
-          value: data.filter(p => (p.quantity || 0) <= 0).length
+          value: data.filter(p => p.trackStock && (p.quantity || 0) <= 0).length
         }),
         className: "text-red-600"
       }

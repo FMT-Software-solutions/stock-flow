@@ -25,6 +25,7 @@ import {
 import { getProductStatsGroups } from './inventory/fields/productStats';
 import { cn } from '@/lib/utils';
 import { InventoryTabs } from './inventory/components/InventoryTabs';
+import { productStatusLabel } from './inventory/product-editor/productHelpers';
 
 export function Products() {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ export function Products() {
 
   const statuses = Array.from(new Set(products.map((p) => p.status))).map(
     (status) => ({
-      label: status.charAt(0).toUpperCase() + status.slice(1),
+      label: productStatusLabel(status),
       value: status,
     })
   );

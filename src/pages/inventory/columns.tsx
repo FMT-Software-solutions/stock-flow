@@ -11,6 +11,7 @@ import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import { ImagePreview } from "@/components/shared/ImagePreview"
 import { isDateInRange } from "@/lib/utils"
+import { productStatusLabel } from "./product-editor/productHelpers"
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -114,8 +115,8 @@ export const columns: ColumnDef<Product>[] = [
     cell: ({ row }) => {
       const status = row.getValue("status") as string
       return (
-        <Badge variant="outline" className="capitalize">
-          {status}
+        <Badge variant="outline">
+          {productStatusLabel(status)}
         </Badge>
       )
     },
@@ -148,6 +149,10 @@ export const columns: ColumnDef<Product>[] = [
     cell: ({ row }) => {
       const quantity = row.getValue("quantity") as number
       const minStock = row.original.minStockLevel
+
+      if (!row.original.trackStock) {
+        return <span className="text-muted-foreground">—</span>
+      }
 
       let color = "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
       if (quantity <= 0) {

@@ -27,6 +27,8 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   hasVariations?: boolean;
+  /** False for products sold without stock (food, services). */
+  trackStock: boolean;
   variants?: ProductVariant[];
   organizationId?: string;
   createdByName?: string;
@@ -72,7 +74,8 @@ export interface ProductVariant {
   id: string;
   productId: string;
   sku: string;
-  price: number;
+  /** Null when the variant uses the product's selling price. */
+  price: number | null;
   attributes: Record<string, string>;
   organizationId: string;
   quantity?: number;

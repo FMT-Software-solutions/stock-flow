@@ -1,302 +1,191 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useProduct, useUpdateProduct } from '@/hooks/useInventoryQueries';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Edit, Loader2, Package, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, Edit, Loader2, AlertCircle } from 'lucide-react';
-import { ProductVariations, type GeneratedVariant } from './components/ProductVariations';
-import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { Separator } from '@/components/ui/separator';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
-import { ProductInventoryManager } from './product-details/ProductInventoryManager';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useProduct } from '@/hooks/useInventoryQueries';
+import { useProductStock } from '@/hooks/useProductStock';
+import { cn } from '@/lib/utils';
+import { AddStockDialog } from './product-details/AddStockDialog';
+import { StockGrid } from './product-details/StockGrid';
+import { StockHistory } from './product-details/StockHistory';
+import { productStatusLabel } from './product-editor/productHelpers';
 
 export function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentOrganization } = useOrganization();
   const { data: product, isLoading } = useProduct(id);
-  const updateProduct = useUpdateProduct();
+  const { data: stockRows = [] } = useProductStock(id);
+  const { availableBranches, selectedBranchIds } = useBranchContext();
   const { checkPermission } = useRoleCheck();
-  const canEditProducts = checkPermission('products', 'edit');
-
-  const [hasVariations, setHasVariations] = useState(false);
-  const [variants, setVariants] = useState<GeneratedVariant[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (product) {
-      setHasVariations(!!product.hasVariations);
-      setSelectedImage(product.imageUrl);
-      if (product.variants) {
-        // Map product variants to GeneratedVariant type if needed
-        const mappedVariants: GeneratedVariant[] = product.variants.map((v) => ({
-          id: v.id,
-          sku: v.sku,
-          price: v.price,
-          quantity: v.quantity || 0,
-          attributes: v.attributes,
-        }));
-        setVariants(mappedVariants);
-      }
-    }
-  }, [product]);
-
-  const handleSaveVariations = async () => {
-    if (!canEditProducts) return;
-    if (!product || !currentOrganization) return;
-
-    if (hasVariations && variants.length === 0) {
-      toast.error('Please configure at least one variation or disable variations');
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      await updateProduct.mutateAsync({
-        id: product.id,
-        updates: {
-          hasVariations,
-          variants: hasVariations ? variants as any : [], // Cast to any to match expected input if types are slightly off
-          organizationId: currentOrganization.id,
-        },
-      });
-
-      if (!hasVariations) {
-        setVariants([]);
-      }
-
-      toast.success('Variations updated successfully');
-    } catch (error) {
-      console.error('Failed to update variations:', error);
-      toast.error('Failed to update variations');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const canEditProduct = checkPermission('products', 'edit');
+  const canAdjustStock = checkPermission('inventory', 'edit') || checkPermission('inventory', 'create');
+  const [addStockOpen, setAddStockOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | undefined>();
 
   if (isLoading) {
-    return <div className="p-8 text-center">Loading...</div>;
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   if (!product) {
-    return <div className="p-8 text-center">Product not found</div>;
+    return <div className="p-8 text-center text-muted-foreground">Product not found</div>;
   }
 
-  const allImages = [product.imageUrl, ...(product.additionalImages || [])].filter(Boolean) as string[];
-
-  const projectedProfit = product.sellingPrice - product.costPrice;
+  const activeRows = stockRows.filter((r) => !r.isDeleted && r.branchId);
+  const totalStock = activeRows
+    .filter((r) => availableBranches.some((b) => b.id === r.branchId))
+    .reduce((sum, r) => sum + r.quantity, 0);
+  const images = [product.imageUrl, ...(product.additionalImages ?? [])].filter(Boolean) as string[];
+  const shownImage = selectedImage ?? images[0];
+  const profit = product.sellingPrice - (product.costPrice || 0);
 
   return (
-    <div className="space-y-6 w-full">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/products')}
-          >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/products')} aria-label="Back to products">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex-1">
-            <h1 className="md:text-3xl font-bold tracking-tight">{product.name}</h1>
-            <p className="text-xs md:text-base text-muted-foreground">{product.sku}</p>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+            {product.imageUrl ? (
+              <img src={product.imageUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <Package className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-xl font-bold tracking-tight">{product.name}</h1>
+              <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
+                {productStatusLabel(product.status)}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <CurrencyDisplay amount={product.sellingPrice} />
+              <span>·</span>
+              <span>{product.trackStock ? `${totalStock} ${product.unit || ''} in stock` : 'Stock not tracked'}</span>
+              {product.sku && (
+                <>
+                  <span>·</span>
+                  <span>{product.sku}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-        {canEditProducts && (
-          <Button
-            variant="outline"
-            onClick={() => navigate(`/products/${product.id}/edit`)}
-          >
-            <Edit className="md:mr-2 h-4 w-4" /> <span className="hidden md:inline-block">Edit Product</span>
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canEditProduct && (
+            <Button variant="outline" onClick={() => navigate(`/products/${product.id}/edit`)}>
+              <Edit className="mr-2 h-4 w-4" /> Edit
+            </Button>
+          )}
+          {product.trackStock && canAdjustStock && (
+            <Button onClick={() => setAddStockOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add stock
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 w-full">
-        {/* Left Column: Product Details */}
-        <div className="space-y-6 md:col-span-1">
+      <Tabs defaultValue={product.trackStock ? 'stock' : 'details'} className="space-y-4">
+        <TabsList>
+          {product.trackStock && <TabsTrigger value="stock">Stock</TabsTrigger>}
+          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="details">Details</TabsTrigger>
+        </TabsList>
+
+        {product.trackStock && (
+          <TabsContent value="stock">
+            <StockGrid
+              product={product}
+              branches={availableBranches}
+              stockRows={stockRows}
+              canAdjust={canAdjustStock}
+            />
+          </TabsContent>
+        )}
+
+        <TabsContent value="history">
+          <StockHistory product={product} stockRows={stockRows} />
+        </TabsContent>
+
+        <TabsContent value="details">
           <Card>
-            <CardHeader >
-              <div className='flex justify-between items-center'>
-                <CardTitle>Details</CardTitle>
-                <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
-                  {product.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
-                  {selectedImage ? (
-                    <img
-                      src={selectedImage}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
+            <CardContent className="grid gap-6 pt-6 md:grid-cols-[minmax(0,240px)_1fr]">
+              <div className="space-y-2">
+                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border bg-muted">
+                  {shownImage ? (
+                    <img src={shownImage} alt={product.name} className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                      No Image
-                    </div>
+                    <Package className="h-8 w-8 text-muted-foreground" />
                   )}
                 </div>
-                {allImages.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {allImages.map((img, idx) => (
+                {images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {images.map((img) => (
                       <button
-                        key={idx}
-                        className={cn(
-                          "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border",
-                          selectedImage === img && "ring-2 ring-primary"
-                        )}
+                        key={img}
+                        type="button"
                         onClick={() => setSelectedImage(img)}
+                        className={cn(
+                          'h-12 w-12 shrink-0 overflow-hidden rounded border',
+                          shownImage === img && 'ring-2 ring-primary'
+                        )}
                       >
-                        <img
-                          src={img}
-                          alt={`Thumbnail ${idx}`}
-                          className="h-full w-full object-cover"
-                        />
+                        <img src={img} alt="" className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="font-medium text-muted-foreground">Price</div>
-                <div className='font-bold'><CurrencyDisplay amount={product.sellingPrice} /></div>
-
-                <div className="font-medium text-muted-foreground">Cost</div>
-                <div className='font-bold'><CurrencyDisplay amount={product.costPrice} /></div>
-
-                <div className="font-medium text-muted-foreground">Projected Profit</div>
-                <div className='font-bold'><CurrencyDisplay className={cn(projectedProfit > 0 ? 'text-primary' : 'text-red-500')} amount={projectedProfit} /></div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="font-medium text-muted-foreground">Category</div>
-                <div>{product.category?.name || '-'}</div>
-
-                <div className="font-medium text-muted-foreground">Supplier</div>
-                <div>{product.supplier?.name || '-'}</div>
-              </div>
-
-
-              {product.description && (
-                <div className="pt-4 border-t">
-                  <h4 className="text-sm font-medium mb-2">Description</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {product.description}
-                  </p>
-                </div>
-              )}
+              <dl className="grid grid-cols-[auto_1fr] content-start gap-x-6 gap-y-2 text-sm">
+                <dt className="text-muted-foreground">Price</dt>
+                <dd><CurrencyDisplay amount={product.sellingPrice} /></dd>
+                <dt className="text-muted-foreground">Cost</dt>
+                <dd><CurrencyDisplay amount={product.costPrice || 0} /></dd>
+                <dt className="text-muted-foreground">Profit</dt>
+                <dd>
+                  <CurrencyDisplay amount={profit} className={profit >= 0 ? 'text-primary' : 'text-destructive'} />
+                </dd>
+                <dt className="text-muted-foreground">Category</dt>
+                <dd>{product.category?.name ?? '—'}</dd>
+                <dt className="text-muted-foreground">Supplier</dt>
+                <dd>{product.supplier?.name ?? '—'}</dd>
+                <dt className="text-muted-foreground">Unit</dt>
+                <dd>{product.unit || '—'}</dd>
+                <dt className="text-muted-foreground">Barcode</dt>
+                <dd>{product.barcode || '—'}</dd>
+                {product.description && (
+                  <>
+                    <dt className="text-muted-foreground">Description</dt>
+                    <dd className="whitespace-pre-line">{product.description}</dd>
+                  </>
+                )}
+              </dl>
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
+      </Tabs>
 
-        {/* Right Column: Variations & Inventory */}
-        <div className="space-y-6 md:col-span-2">
-          {product.status === 'published' ? (
-            <Tabs defaultValue="inventory" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                <TabsTrigger value="variants">Variants</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="variants" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Variant Configuration</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="has-variations"
-                        checked={hasVariations}
-                        onCheckedChange={setHasVariations}
-                        disabled={!canEditProducts}
-                      />
-                      <Label htmlFor="has-variations">This product has variations</Label>
-                    </div>
-
-                    {hasVariations ? (
-                      <ProductVariations
-                        basePrice={product.sellingPrice}
-                        baseSku={product.sku}
-                        onChange={setVariants}
-                        initialVariants={variants}
-                      />
-                    ) : (
-                      <div className="rounded-md border p-4 text-center text-sm text-muted-foreground">
-                        Variations are disabled for this product.
-                        <br />
-                        Enable them to configure attributes like Color, Size, etc.
-                      </div>
-                    )}
-
-                    <div className="flex justify-end mt-4">
-                      <Button
-                        onClick={handleSaveVariations}
-                        disabled={!canEditProducts || isSaving || updateProduct.isPending}
-                      >
-                        {(isSaving || updateProduct.isPending) && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        {hasVariations ? 'Save Variations' : 'Update Status (No Variations)'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="inventory" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Inventory Management</CardTitle>
-                    <CardDescription>
-                      Manage stock levels for each branch.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductInventoryManager
-                      product={product}
-                      variants={hasVariations ? variants : []}
-                      currentOrganizationId={currentOrganization?.id || ''}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <Card className="h-full border-dashed">
-              <CardContent className="flex flex-col items-center justify-center h-full py-12 space-y-4">
-                <div className="p-3 bg-muted rounded-full">
-                  <AlertCircle className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="text-center space-y-2">
-                  <h3 className="text-lg font-semibold">Inventory Management Unavailable</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    This product is currently in <strong>{product.status}</strong> status.
-                    You must publish this product to manage its inventory and variations.
-                  </p>
-                </div>
-                <Button variant="outline" onClick={() => navigate(`/products/${product.id}/edit`)}>
-                  Edit Product Status
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+      {product.trackStock && (
+        <AddStockDialog
+          open={addStockOpen}
+          onOpenChange={setAddStockOpen}
+          product={product}
+          branches={availableBranches}
+          stockRows={stockRows}
+          defaultBranchId={selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined}
+        />
+      )}
     </div>
   );
 }

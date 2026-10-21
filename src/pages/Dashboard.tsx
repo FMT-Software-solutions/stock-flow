@@ -460,6 +460,7 @@ export function Dashboard() {
   const lowStockProducts = useMemo(() => {
     return allProducts
       .filter(p => {
+        if (!p.trackStock) return false;
         const threshold = Number(p.minStockLevel ?? 0);
         return p.quantity <= 0 || p.quantity <= threshold;
       })

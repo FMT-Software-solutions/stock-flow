@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.6] - 2026-10-21
+
+### Bug Fixes
+- Editing a product no longer changes its stock quantities in your branches
+- Saving variations no longer resets variant stock to zero or removes other stock for the product
+- Removing a variation now archives it, so its stock records and past sales stay intact
+- Stock added without a price now follows the product or variant price when you change it later
+- The Restock button on the dashboard's low-stock products list now opens the product
+
+
 ## [1.1.4] - 2026-05-20
 
 ### Added

@@ -8,15 +8,15 @@
 
 module.exports = {
   // Version information
-  version: "1.1.5",
+  version: "1.1.6",
 
   // Release notes in markdown format
-  releaseNotes: `### Added
-  
-### Improved / Changed
-- Sales features enhancements
-
-### Bug Fixes
+  releaseNotes: `### Bug Fixes
+- Editing a product no longer changes its stock quantities in your branches
+- Saving variations no longer resets variant stock to zero or removes other stock for the product
+- Removing a variation now archives it, so its stock records and past sales stay intact
+- Stock added without a price now follows the product or variant price when you change it later
+- The Restock button on the dashboard's low-stock products list now opens the product
 `,
 
 
@@ -87,7 +87,7 @@ module.exports = {
     createCommit: true,
     createTag: true,
     pushChanges: true, // Set to true to automatically push
-    commitMessage: "Release v1.0.0"
+    commitMessage: "Release v{version}"
   },
 
   // Validation rules

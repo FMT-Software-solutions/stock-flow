@@ -359,6 +359,8 @@ export function CreateDiscountSheet({ open, onOpenChange, onSuccess, discount }:
                   <Select
                     value={field.value}
                     onValueChange={(v) => {
+                      // Radix can re-emit the current value when the form resets
+                      if (!v || v === field.value) return;
                       field.onChange(v);
                       form.setValue('targetIds', []);
                     }}

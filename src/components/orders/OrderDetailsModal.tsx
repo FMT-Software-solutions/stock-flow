@@ -155,7 +155,7 @@ export function OrderDetailsModal({
                   <div className="col-span-2 text-right font-medium">
                     {formatCurrency(Number(item.total_price ?? 0))}
                     {Number(item.discount_amount ?? 0) > 0 && (
-                      <div className="text-xs font-normal text-green-600">
+                      <div className="text-xs font-normal text-green-600 whitespace-nowrap">
                         -{formatCurrency(Number(item.discount_amount))}
                       </div>
                     )}

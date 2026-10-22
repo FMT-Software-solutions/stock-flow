@@ -106,11 +106,6 @@ function Multi({
       defaultOptions={options}
       options={options}
       groupBy={groupBy}
-      triggerSearchOnFocus
-      onSearchSync={(term: string) => {
-        const t = term?.toLowerCase() ?? '';
-        return t ? options.filter((o) => o.label.toLowerCase().includes(t)) : options;
-      }}
       onChange={(selected: Option[]) => onChange(selected.map((o) => o.value))}
       placeholder={placeholder}
       disabled={disabled}

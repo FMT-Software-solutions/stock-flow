@@ -688,10 +688,8 @@ function OrderFormInner({
                   const isChanged = originalPrice !== undefined && Number(item?.unitPrice) !== Number(originalPrice);
 
                   return (
-                    <div
-                      key={field.id}
-                      className="flex flex-wrap sm:flex-nowrap gap-4 items-end border-b pb-4 last:border-0 last:pb-0"
-                    >
+                    <div key={field.id} className="border-b pb-4 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-4 items-end">
                       <div className="w-full sm:w-auto sm:flex-1 min-w-50">
                         <Controller
                           control={form.control}
@@ -720,9 +718,6 @@ function OrderFormInner({
                                 <FieldError>
                                   {fieldState.error.message}
                                 </FieldError>
-                              )}
-                              {isChanged && (
-                                <div className="h-[10px]"></div>
                               )}
                             </Field>
                           )}
@@ -754,9 +749,6 @@ function OrderFormInner({
                                   }}
                                   value={(field.value as number) ?? ''}
                                 />
-                                {isChanged && (
-                                  <div className="h-[15px]"></div>
-                                )}
                               </Field>
                             );
                           }}
@@ -780,16 +772,6 @@ function OrderFormInner({
                                     field.onChange(val);
                                   }}
                                 />
-                                {isChanged && (
-                                  <div className="text-[10px] text-muted-foreground">
-                                    Original: {formatCurrency(Number(originalPrice))}
-                                  </div>
-                                )}
-                                {lineDiscount > 0 && (
-                                  <div className="text-[10px] text-green-600">
-                                    -{formatCurrency(lineDiscount)}
-                                  </div>
-                                )}
                               </Field>
                             );
                           }}
@@ -807,10 +789,23 @@ function OrderFormInner({
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                      </div>
+                    </div>
+                    {/* Notes sit on their own line so they never shift the inputs */}
+                    {(isChanged || lineDiscount > 0) && (
+                      <div className="mt-1 flex justify-end gap-3 pr-13 text-xs whitespace-nowrap">
                         {isChanged && (
-                          <div className="h-[15px]"></div>
+                          <span className="text-muted-foreground">
+                            Original {formatCurrency(Number(originalPrice))}
+                          </span>
+                        )}
+                        {lineDiscount > 0 && (
+                          <span className="text-green-600 dark:text-green-400">
+                            -{formatCurrency(lineDiscount)}
+                          </span>
                         )}
                       </div>
+                    )}
                     </div>
                   );
                 })}
@@ -1303,7 +1298,7 @@ function OrderFormInner({
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap items-center gap-4 w-full lg:w-auto">
             <div className="flex items-center gap-3 bg-muted/50 p-2 px-3 rounded-lg w-full sm:w-auto border">
               <FieldLabel className="mb-0 whitespace-nowrap font-medium">Paid Amount</FieldLabel>
               <Controller
@@ -1348,7 +1343,7 @@ function OrderFormInner({
               />
             </div>
 
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
               <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => navigate('/orders')}>
                 Cancel
               </Button>

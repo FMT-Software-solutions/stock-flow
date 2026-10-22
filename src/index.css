@@ -161,14 +161,13 @@ body {
   background: oklch(0.75 0 0);
 }
 
-/* Dark-theme scrollbar */
-@custom-variant dark {
-  ::-webkit-scrollbar-thumb {
-    background: oklch(0.2 0 0);
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.3 0 0);
-  }
+/* Dark-theme scrollbar. Plain selectors: an @custom-variant block here would
+   redefine the dark: variant and break every dark: utility in the app. */
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.2 0 0);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.3 0 0);
 }
 
 /* Firefox */
@@ -177,8 +176,7 @@ body {
   scrollbar-color: oklch(0.85 0 0) transparent;
 }
 
-@custom-variant dark {
-  * {
-    scrollbar-color: oklch(0.2 0 0) transparent;
-  }
+.dark,
+.dark * {
+  scrollbar-color: oklch(0.2 0 0) transparent;
 }

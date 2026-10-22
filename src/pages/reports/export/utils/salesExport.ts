@@ -59,6 +59,7 @@ export function buildSalesWorkbook({
         const ps = String(o.payment_status || '').toLowerCase();
         const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
         acc.gross += total;
+        acc.discounts += Number(o.discount || 0);
 
         if (o.payments && o.payments.length > 0) {
           acc.revenue += o.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
@@ -70,11 +71,12 @@ export function buildSalesWorkbook({
         if (ps === 'refunded') acc.refunds += total;
         return acc;
       },
-      { revenue: 0, gross: 0, owings: 0, refunds: 0 }
+      { revenue: 0, gross: 0, discounts: 0, owings: 0, refunds: 0 }
     );
     const body: (string | number)[][] = [
       ['Total Orders', orders.length],
       ['Gross Sales', formatCurrency ? formatCurrency(totals.gross) : totals.gross],
+      ['Discounts', formatCurrency ? formatCurrency(totals.discounts) : totals.discounts],
       ['Revenue Collected', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
       ['Owings', formatCurrency ? formatCurrency(totals.owings) : totals.owings],
       ['Refunds', formatCurrency ? formatCurrency(totals.refunds) : totals.refunds],
@@ -108,7 +110,7 @@ export function buildSalesWorkbook({
     ]);
     meta.push([]);
     meta.push([]);
-    const header = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Sale Amount', 'Collected in Period', 'Total Paid', 'Due'];
+    const header = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Discount', 'Sale Amount', 'Collected in Period', 'Total Paid', 'Due'];
     const body: (string | number)[][] = orders.map((o: any) => {
       const d = new Date(o.date || o.created_at);
       const dateStr = format(d, 'MMM, dd yyyy');
@@ -132,6 +134,7 @@ export function buildSalesWorkbook({
         itemsStr,
         o.branch?.name || '-',
         status,
+        Number(o.discount || 0),
         total,
         periodPaid,
         paid,
@@ -177,14 +180,14 @@ export function buildSalesWorkbook({
     const aoa = [...meta, header, ...body];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const headerRowIndex = meta.length;
-    setColumnWidths(ws, [20, 12, 24, 30, 18, 20, 16, 14, 14, 14]);
+    setColumnWidths(ws, [20, 12, 24, 30, 18, 20, 14, 16, 14, 14, 14]);
     styleHeaderRowAt(ws, header, headerRowIndex);
     {
       const ref = (ws as any)['!ref'];
       if (ref) {
         const range = XLSX.utils.decode_range(ref);
         for (let r = headerRowIndex + 1; r <= range.e.r; r++) {
-          const addr = XLSX.utils.encode_cell({ r, c: 9 });
+          const addr = XLSX.utils.encode_cell({ r, c: 10 });
           if (ws[addr]) {
             ws[addr].s = {
               ...(ws[addr].s || {}),
@@ -759,6 +762,7 @@ export function buildSalesPdfDoc({
         const ps = String(o.payment_status || '').toLowerCase();
         const due = ps === 'refunded' ? 0 : Math.max(0, total - paid);
         acc.gross += total;
+        acc.discounts += Number(o.discount || 0);
 
         if (o.payments && o.payments.length > 0) {
           acc.revenue += o.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
@@ -770,11 +774,12 @@ export function buildSalesPdfDoc({
         if (ps === 'refunded') acc.refunds += total;
         return acc;
       },
-      { revenue: 0, gross: 0, owings: 0, refunds: 0 }
+      { revenue: 0, gross: 0, discounts: 0, owings: 0, refunds: 0 }
     );
     const rows: (string | number)[][] = [
       ['Total Orders', orders.length],
       ['Gross Sales', formatCurrency ? formatCurrency(totals.gross) : totals.gross],
+      ['Discounts', formatCurrency ? formatCurrency(totals.discounts) : totals.discounts],
       ['Revenue Collected', formatCurrency ? formatCurrency(totals.revenue) : totals.revenue],
       ['Owings', formatCurrency ? formatCurrency(totals.owings) : totals.owings],
       ['Refunds', formatCurrency ? formatCurrency(totals.refunds) : totals.refunds],
@@ -784,7 +789,7 @@ export function buildSalesPdfDoc({
   }
 
   if (includeData && template === 'detailed') {
-    const head = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Sale Amount', 'Collected in Period', 'Total Paid'];
+    const head = ['Date', 'Order #', 'Customer', 'Items', 'Branch', 'Status', 'Discount', 'Sale Amount', 'Collected in Period', 'Total Paid'];
     const rows: (string | number)[][] = orders.map((o: any) => {
       const d = new Date(o.date || o.created_at);
       const dateStr = format(d, 'MMM, dd yyyy');
@@ -807,6 +812,7 @@ export function buildSalesPdfDoc({
         itemsStr,
         o.branch?.name || '-',
         status,
+        formatCurrency ? formatCurrency(Number(o.discount || 0)) : Number(o.discount || 0),
         formatCurrency ? formatCurrency(total) : total,
         formatCurrency ? formatCurrency(periodPaid) : periodPaid,
         formatCurrency ? formatCurrency(paid) : paid,

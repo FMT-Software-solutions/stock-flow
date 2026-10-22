@@ -20,6 +20,8 @@ type ProductsReport = {
   total_products: number;
   active_products: number;
   inactive_products: number;
+  draft_products?: number;
+  archived_products?: number;
   low_stock_products: number;
   out_of_stock_products: number;
   category_distribution: { category: string; count: number }[];
@@ -78,8 +80,11 @@ export function ProductsSection({
     <>
       <div className="mb-4">
         <div className='flex flex-col gap-1'>
-          <span className="text-sm font-medium">
-            Filter products by when they were added
+          <span
+            className="text-sm font-medium"
+            title="Counts and categories cover products added in this period. Stock lists always show current stock."
+          >
+            Added between
           </span>
           <div className="flex items-center gap-2">
             <DatePickerWithRange
@@ -104,9 +109,11 @@ export function ProductsSection({
           </div>
           </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatCard title="Total Products" value={data?.total_products ?? 0} />
         <StatCard title="Active" value={data?.active_products ?? 0} />
+        <StatCard title="Draft" value={data?.draft_products ?? 0} />
+        <StatCard title="Archived" value={data?.archived_products ?? 0} />
         <StatCard title="Low Stock" value={data?.low_stock_products ?? 0} valueClassName="text-orange-500" />
         <StatCard title="Out of Stock" value={data?.out_of_stock_products ?? 0} valueClassName="text-red-500" />
       </div>

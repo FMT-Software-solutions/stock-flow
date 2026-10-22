@@ -1,6 +1,7 @@
 import { XLSX, setColumnWidths, styleHeaderRowAt, rightAlignNumbers } from './styles';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { stockItemVariant, type StockListItem } from '../../stockItems';
 
 type SectionKey = 'stats' | 'category' | 'value' | 'low' | 'out';
 
@@ -10,24 +11,22 @@ type InventoryReport = {
   out_of_stock_items: number;
   stock_by_category: { category: string; quantity: number }[];
   total_revenue?: number;
+  total_cost?: number;
   inventory_value_by_category?: { category: string; value: number }[];
-  low_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-  out_of_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
+  low_stock_list?: StockListItem[];
+  out_of_stock_list?: StockListItem[];
 };
+
+const STOCK_HEAD = ['Product', 'Variant', 'Branch', 'SKU', 'Category', 'Qty', 'Min'];
+const stockRow = (p: StockListItem): (string | number)[] => [
+  p.name,
+  stockItemVariant(p),
+  p.branch_name || '',
+  p.sku || '',
+  p.category_name || 'Uncategorized',
+  Number(p.quantity ?? 0),
+  Number(p.min_stock_level ?? 0),
+];
 
 interface WorkbookParams {
   data: InventoryReport;
@@ -51,10 +50,11 @@ export function buildInventoryWorkbook({
   if (sections.includes('stats')) {
     const header = ['Metric', 'Value'];
     const body = [
-      ['Total Items', data.total_items || 0],
+      ['Stock Items', data.total_items || 0],
       ['Low Stock', data.low_stock_items || 0],
       ['Out of Stock', data.out_of_stock_items || 0],
-      ['Revenue', formatCurrency ? formatCurrency(Number(data.total_revenue || 0)) : Number(data.total_revenue || 0)],
+      ['Value at Price', formatCurrency ? formatCurrency(Number(data.total_revenue || 0)) : Number(data.total_revenue || 0)],
+      ['Value at Cost', formatCurrency ? formatCurrency(Number(data.total_cost || 0)) : Number(data.total_cost || 0)],
     ];
     const meta: (string | number)[][] = [];
     if (organizationName) meta.push([organizationName]);
@@ -131,15 +131,9 @@ export function buildInventoryWorkbook({
   }
 
   if (sections.includes('low')) {
-    const header = ['Product', 'SKU', 'Category', 'Qty', 'Min'];
+    const header = STOCK_HEAD;
     const bodyRows: (string | number)[][] =
-      (data.low_stock_list || []).map((p) => [
-        p.name,
-        p.sku || '',
-        p.category_name || 'Uncategorized',
-        Number(p.quantity ?? 0),
-        Number(p.min_stock_level ?? 0),
-      ]);
+      (data.low_stock_list || []).map(stockRow);
     const meta: (string | number)[][] = [];
     if (organizationName) meta.push([organizationName]);
     meta.push(['Inventory Report']);
@@ -154,22 +148,16 @@ export function buildInventoryWorkbook({
     const aoa = [...meta, header, ...bodyRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const headerRowIndex = meta.length;
-    setColumnWidths(ws, [28, 16, 22, 10, 10]);
+    setColumnWidths(ws, [28, 18, 18, 16, 22, 10, 10]);
     styleHeaderRowAt(ws, header, headerRowIndex);
-    rightAlignNumbers(ws, headerRowIndex + 1, 3, 4, false);
+    rightAlignNumbers(ws, headerRowIndex + 1, 5, 6, false);
     XLSX.utils.book_append_sheet(wb, ws, 'Low Stock');
   }
 
   if (sections.includes('out')) {
-    const header = ['Product', 'SKU', 'Category', 'Qty', 'Min'];
+    const header = STOCK_HEAD;
     const bodyRows: (string | number)[][] =
-      (data.out_of_stock_list || []).map((p) => [
-        p.name,
-        p.sku || '',
-        p.category_name || 'Uncategorized',
-        Number(p.quantity ?? 0),
-        Number(p.min_stock_level ?? 0),
-      ]);
+      (data.out_of_stock_list || []).map(stockRow);
     const meta: (string | number)[][] = [];
     if (organizationName) meta.push([organizationName]);
     meta.push(['Inventory Report']);
@@ -184,9 +172,9 @@ export function buildInventoryWorkbook({
     const aoa = [...meta, header, ...bodyRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const headerRowIndex = meta.length;
-    setColumnWidths(ws, [28, 16, 22, 10, 10]);
+    setColumnWidths(ws, [28, 18, 18, 16, 22, 10, 10]);
     styleHeaderRowAt(ws, header, headerRowIndex);
-    rightAlignNumbers(ws, headerRowIndex + 1, 3, 4, false);
+    rightAlignNumbers(ws, headerRowIndex + 1, 5, 6, false);
     XLSX.utils.book_append_sheet(wb, ws, 'Out of Stock');
   }
 
@@ -264,10 +252,11 @@ export function buildInventoryPdfDoc({
     y += 6;
     const head = ['Metric', 'Value'];
     const body = [
-      ['Total Items', data.total_items || 0],
+      ['Stock Items', data.total_items || 0],
       ['Low Stock', data.low_stock_items || 0],
       ['Out of Stock', data.out_of_stock_items || 0],
-      ['Revenue', formatCurrency ? formatCurrency(Number(data.total_revenue || 0)) : Number(data.total_revenue || 0)],
+      ['Value at Price', formatCurrency ? formatCurrency(Number(data.total_revenue || 0)) : Number(data.total_revenue || 0)],
+      ['Value at Cost', formatCurrency ? formatCurrency(Number(data.total_cost || 0)) : Number(data.total_cost || 0)],
     ];
     y = drawTable(head, body, y);
     y += 8;
@@ -306,15 +295,9 @@ export function buildInventoryPdfDoc({
     doc.setTextColor(0);
     doc.text('Low Stock Items', 14, y);
     y += 6;
-    const head = ['Product', 'SKU', 'Category', 'Qty', 'Min'];
-    const rows = (data.low_stock_list || []).map((p) => [
-      p.name,
-      p.sku || '',
-      p.category_name || 'Uncategorized',
-      Number(p.quantity ?? 0),
-      Number(p.min_stock_level ?? 0),
-    ]);
-    const tables = splitIfWide(head, rows, 6);
+    const head = STOCK_HEAD;
+    const rows = (data.low_stock_list || []).map(stockRow);
+    const tables = splitIfWide(head, rows, 7);
     for (const t of tables) {
       y = drawTable(t.head, t.rows, y);
       y += 6;
@@ -327,15 +310,9 @@ export function buildInventoryPdfDoc({
     doc.setTextColor(0);
     doc.text('Out of Stock Items', 14, y);
     y += 6;
-    const head = ['Product', 'SKU', 'Category', 'Qty', 'Min'];
-    const rows = (data.out_of_stock_list || []).map((p) => [
-      p.name,
-      p.sku || '',
-      p.category_name || 'Uncategorized',
-      Number(p.quantity ?? 0),
-      Number(p.min_stock_level ?? 0),
-    ]);
-    const tables = splitIfWide(head, rows, 6);
+    const head = STOCK_HEAD;
+    const rows = (data.out_of_stock_list || []).map(stockRow);
+    const tables = splitIfWide(head, rows, 7);
     for (const t of tables) {
       y = drawTable(t.head, t.rows, y);
       y += 6;

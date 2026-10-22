@@ -19,6 +19,8 @@ type ProductsReport = {
   total_products: number;
   active_products: number;
   inactive_products: number;
+  draft_products?: number;
+  archived_products?: number;
   low_stock_products: number;
   out_of_stock_products: number;
   category_distribution: { category: string; count: number }[];

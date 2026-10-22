@@ -24,11 +24,17 @@ import { InventorySection } from './reports/InventorySection';
 import { ProductsSection } from './reports/ProductsSection';
 import { SalesSection } from './reports/SalesSection';
 import { SuppliersSection } from './reports/SuppliersSection';
+import { ProductSalesSection } from './reports/ProductSalesSection';
+import { StockActivitySection } from './reports/StockActivitySection';
+import { DiscountsSection } from './reports/DiscountsSection';
+import type { InventoryReport } from './reports/InventorySection';
 
 type ProductsReport = {
   total_products: number;
   active_products: number;
   inactive_products: number;
+  draft_products?: number;
+  archived_products?: number;
   low_stock_products: number;
   out_of_stock_products: number;
   category_distribution: { category: string; count: number }[];
@@ -41,31 +47,6 @@ type ProductsReport = {
     min_stock_level: number;
   }[];
   out_of_stock_list: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-};
-
-type InventoryReport = {
-  total_items: number;
-  low_stock_items: number;
-  out_of_stock_items: number;
-  stock_by_category: { category: string; quantity: number }[];
-  total_revenue?: number;
-  inventory_value_by_category?: { category: string; value: number }[];
-  low_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-  out_of_stock_list?: {
     id: string;
     name: string;
     sku: string | null;
@@ -114,8 +95,27 @@ export function Reports() {
   const { selectedBranchIds: globalBranchIds } = useBranchContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  type TabType = 'products' | 'inventory' | 'sales_orders' | 'expenses' | 'customers' | 'suppliers';
-  const availableTabs: TabType[] = ['products', 'inventory', 'sales_orders', 'expenses', 'customers', 'suppliers'];
+  type TabType =
+    | 'products'
+    | 'inventory'
+    | 'stock_activity'
+    | 'sales_orders'
+    | 'product_sales'
+    | 'discounts'
+    | 'expenses'
+    | 'customers'
+    | 'suppliers';
+  const availableTabs: TabType[] = [
+    'products',
+    'inventory',
+    'stock_activity',
+    'sales_orders',
+    'product_sales',
+    'discounts',
+    'expenses',
+    'customers',
+    'suppliers',
+  ];
 
   const tabFromUrl = searchParams.get('tab') as TabType | null;
 
@@ -148,12 +148,6 @@ export function Reports() {
   const [productsDateApplied, setProductsDateApplied] = useState<
     DateRange | undefined
   >(undefined);
-  const [inventoryDateDraft, setInventoryDateDraft] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [inventoryDateApplied, setInventoryDateApplied] = useState<
-    DateRange | undefined
-  >(undefined);
   const [customersDateDraft, setCustomersDateDraft] = useState<
     DateRange | undefined
   >(undefined);
@@ -181,12 +175,6 @@ export function Reports() {
   const productsEndIso = productsDateApplied?.to
     ? new Date(productsDateApplied.to).toISOString()
     : null;
-  const inventoryStartIso = inventoryDateApplied?.from
-    ? new Date(inventoryDateApplied.from).toISOString()
-    : null;
-  const inventoryEndIso = inventoryDateApplied?.to
-    ? new Date(inventoryDateApplied.to).toISOString()
-    : null;
   const customersStartIso = customersDateApplied?.from
     ? new Date(customersDateApplied.from).toISOString()
     : null;
@@ -195,12 +183,32 @@ export function Reports() {
     : null;
 
   const isBranchScoped = (tab: typeof activeTab) => {
-    return tab === 'inventory' || tab === 'sales_orders' || tab === 'expenses';
+    return (
+      tab === 'inventory' ||
+      tab === 'stock_activity' ||
+      tab === 'sales_orders' ||
+      tab === 'product_sales' ||
+      tab === 'discounts' ||
+      tab === 'expenses'
+    );
   };
 
+  // Reports over a period share the general date range.
   const hasGeneralFilters = (tab: typeof activeTab) => {
-    return tab === 'sales_orders' || tab === 'expenses';
+    return (
+      tab === 'sales_orders' ||
+      tab === 'expenses' ||
+      tab === 'product_sales' ||
+      tab === 'stock_activity' ||
+      tab === 'discounts'
+    );
   };
+
+  const hasTemplates = (tab: typeof activeTab) => tab === 'sales_orders' || tab === 'expenses';
+
+  // These reports export from their own tables.
+  const hasExportDialog = (tab: typeof activeTab) =>
+    tab !== 'product_sales' && tab !== 'stock_activity' && tab !== 'discounts';
 
   const productsReport = useQuery({
     queryKey: ['reports', 'products', orgId, productsStartIso, productsEndIso],
@@ -228,20 +236,12 @@ export function Reports() {
   });
 
   const inventoryReport = useQuery({
-    queryKey: [
-      'reports',
-      'inventory',
-      orgId,
-      normalizedBranchIds,
-      inventoryStartIso,
-      inventoryEndIso,
-    ],
+    queryKey: ['reports', 'inventory', orgId, normalizedBranchIds],
     queryFn: async () => {
+      // Current stock: the report takes no date range.
       const { data, error } = await supabase.rpc('get_inventory_report', {
         p_organization_id: orgId,
         p_branch_ids: normalizedBranchIds,
-        p_start_date: inventoryStartIso,
-        p_end_date: inventoryEndIso,
       });
       if (error) throw error;
       return data as InventoryReport;
@@ -254,6 +254,7 @@ export function Reports() {
         out_of_stock_items: 0,
         stock_by_category: [],
         total_revenue: 0,
+        total_cost: 0,
         inventory_value_by_category: [],
         low_stock_list: [],
         out_of_stock_list: [],
@@ -307,30 +308,26 @@ export function Reports() {
   });
 
   const periodLabel = useMemo(() => {
+    if (activeTab === 'inventory') return 'Current stock';
     const range =
       activeTab === 'products'
         ? productsDateApplied
-        : activeTab === 'inventory'
-          ? inventoryDateApplied
-          : activeTab === 'customers'
-            ? customersDateApplied
-            : generalDateRange;
+        : activeTab === 'customers'
+          ? customersDateApplied
+          : generalDateRange;
     if (!range?.from && !range?.to) return 'All Time';
     const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
     const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
     return `${from} — ${to}`;
-  }, [
-    activeTab,
-    productsDateApplied,
-    inventoryDateApplied,
-    customersDateApplied,
-    generalDateRange,
-  ]);
+  }, [activeTab, productsDateApplied, customersDateApplied, generalDateRange]);
 
   const tabOptions = [
     { value: 'products', label: 'Products' },
     { value: 'inventory', label: 'Inventory' },
+    { value: 'stock_activity', label: 'Stock Activity' },
     { value: 'sales_orders', label: 'Sales & Orders' },
+    { value: 'product_sales', label: 'Product Sales' },
+    { value: 'discounts', label: 'Discounts' },
     { value: 'expenses', label: 'Expenses' },
     { value: 'customers', label: 'Customers' },
     { value: 'suppliers', label: 'Suppliers' },
@@ -400,13 +397,15 @@ export function Reports() {
             </TabsList>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setExportOpen(true)}
-          >
-            Export
-          </Button>
+          {hasExportDialog(activeTab) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setExportOpen(true)}
+            >
+              Export
+            </Button>
+          )}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-2">
@@ -419,7 +418,7 @@ export function Reports() {
               />
             )}
           </div>
-          {hasGeneralFilters(activeTab) && (
+          {hasTemplates(activeTab) && (
             <div className="flex items-center gap-2">
               <Select
                 value={template}
@@ -468,14 +467,28 @@ export function Reports() {
             data={inventoryReport.data}
             branchIds={branchIds}
             setBranchIds={setBranchIds}
-            inventoryDateDraft={inventoryDateDraft}
-            setInventoryDateDraft={setInventoryDateDraft}
-            inventoryDateApplied={inventoryDateApplied}
-            setInventoryDateApplied={setInventoryDateApplied}
             organizationName={currentOrganization?.name}
             exportOpen={exportOpen && activeTab === 'inventory'}
             onExportClose={() => setExportOpen(false)}
           />
+        </TabsContent>
+
+        <TabsContent value="stock_activity" className="space-y-4">
+          {activeTab === 'stock_activity' && (
+            <StockActivitySection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="product_sales" className="space-y-4">
+          {activeTab === 'product_sales' && (
+            <ProductSalesSection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="discounts" className="space-y-4">
+          {activeTab === 'discounts' && (
+            <DiscountsSection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
+          )}
         </TabsContent>
 
         <TabsContent value="sales_orders" className="space-y-4">

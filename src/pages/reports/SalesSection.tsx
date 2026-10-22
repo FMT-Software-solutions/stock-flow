@@ -827,6 +827,7 @@ export function SalesSection({
                     <th className="p-3 font-medium">Customer</th>
                     <th className="p-3 font-medium">Branch</th>
                     <th className="p-3 font-medium max-w-[200px]">Items</th>
+                    <th className="p-3 font-medium text-right">Discount</th>
                     <th className="p-3 font-medium text-right">Sale Amount</th>
                     <th className="p-3 font-medium text-right">Collected in Period</th>
                     <th className="p-3 font-medium text-right">Total Paid</th>
@@ -837,7 +838,7 @@ export function SalesSection({
                 <tbody>
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={11} className="p-8 text-center text-muted-foreground">
                         No sales data for the selected filters.
                       </td>
                     </tr>
@@ -880,6 +881,18 @@ export function SalesSection({
                             <div className="max-w-[200px] truncate" title={items.join(', ')}>
                               {items.join(', ')}
                             </div>
+                          </td>
+                          <td
+                            className="p-3 text-right"
+                            title={(o.discounts || []).map((d) => `${d.name}${d.code ? ` (${d.code})` : ''}`).join(', ')}
+                          >
+                            {Number(o.discount || 0) > 0 ? (
+                              <span className="text-orange-500">
+                                <CurrencyDisplay amount={Number(o.discount)} />
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </td>
                           <td className="p-3 text-right font-medium">
                             <CurrencyDisplay amount={o.total_amount || 0} />

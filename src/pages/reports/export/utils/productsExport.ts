@@ -8,6 +8,8 @@ type ProductsReport = {
   total_products: number;
   active_products: number;
   inactive_products: number;
+  draft_products?: number;
+  archived_products?: number;
   low_stock_products: number;
   out_of_stock_products: number;
   category_distribution: { category: string; count: number }[];
@@ -43,7 +45,8 @@ export function buildProductsWorkbook(args: {
     const bodyRows: (string | number)[][] = [
       ['Total Products', data.total_products || 0],
       ['Active', data.active_products || 0],
-      ['Inactive', data.inactive_products || 0],
+      ['Draft', data.draft_products ?? 0],
+      ['Archived', data.archived_products ?? data.inactive_products ?? 0],
       ['Low Stock', data.low_stock_products || 0],
       ['Out of Stock', data.out_of_stock_products || 0],
     ];
@@ -195,7 +198,8 @@ export function buildProductsPdfDoc(args: {
     const body = [
       ['Total Products', data.total_products || 0],
       ['Active', data.active_products || 0],
-      ['Inactive', data.inactive_products || 0],
+      ['Draft', data.draft_products ?? 0],
+      ['Archived', data.archived_products ?? data.inactive_products ?? 0],
       ['Low Stock', data.low_stock_products || 0],
       ['Out of Stock', data.out_of_stock_products || 0],
     ];

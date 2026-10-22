@@ -15,33 +15,10 @@ import {
 } from './utils/inventoryExport';
 import { XLSX } from './utils/styles';
 import { useCurrency } from '@/hooks/useCurrency';
+import type { InventoryReport } from '../InventorySection';
 
 type SectionKey = 'stats' | 'category' | 'value' | 'low' | 'out';
 
-type InventoryReport = {
-  total_items: number;
-  low_stock_items: number;
-  out_of_stock_items: number;
-  stock_by_category: { category: string; quantity: number }[];
-  total_revenue?: number;
-  inventory_value_by_category?: { category: string; value: number }[];
-  low_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-  out_of_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-};
 
 interface InventoryExportDialogProps {
   data: InventoryReport;

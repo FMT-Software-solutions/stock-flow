@@ -16,6 +16,10 @@ export interface LedgerOrder {
   date: string;
   created_at: string;
   updated_at: string;
+  /** before discounts */
+  subtotal?: number;
+  /** all discounts on the sale */
+  discount?: number;
   total_amount: number;
   paid_amount: number;
   status: string;
@@ -35,6 +39,13 @@ export interface LedgerOrder {
     product_name: string;
     quantity: number;
     unit_price: number;
+    discount_amount?: number;
+  }[];
+  discounts?: {
+    name: string;
+    kind: 'automatic' | 'code' | 'manual';
+    code: string | null;
+    amount: number;
   }[];
   period_collected: number;
   payments: LedgerPayment[];

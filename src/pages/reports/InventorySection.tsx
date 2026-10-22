@@ -1,52 +1,35 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { BranchMultiSelector } from '@/components/shared/BranchMultiSelector';
-import { DatePickerWithRange } from '@/components/shared/date-range-picker';
 import { Switch } from '@/components/ui/switch';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { PieChart, Pie, Cell } from 'recharts';
-import type { DateRange } from 'react-day-picker';
 import { useState } from 'react';
 import { LowStockTable } from './LowStockTable';
+import type { StockListItem } from './stockItems';
 import { OutOfStockTable } from './OutOfStockTable';
 import { InventoryExportDialog } from './export/InventoryExportDialog';
 import { StatCard } from './components/StatCard';
 import { useBranchContext } from '@/contexts/BranchContext';
 
-type InventoryReport = {
+export type InventoryReport = {
   total_items: number;
   low_stock_items: number;
   out_of_stock_items: number;
   stock_by_category: { category: string; quantity: number }[];
+  /** stock value at selling price */
   total_revenue?: number;
+  /** stock value at cost price */
+  total_cost?: number;
   inventory_value_by_category?: { category: string; value: number }[];
-  low_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-  out_of_stock_list?: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
+  low_stock_list?: StockListItem[];
+  out_of_stock_list?: StockListItem[];
 };
 
 interface InventorySectionProps {
   data?: InventoryReport;
   branchIds: string[];
   setBranchIds: (ids: string[]) => void;
-  inventoryDateDraft?: DateRange;
-  setInventoryDateDraft?: (d: DateRange | undefined) => void;
-  inventoryDateApplied?: DateRange;
-  setInventoryDateApplied?: (d: DateRange | undefined) => void;
   organizationName?: string;
   exportOpen: boolean;
   onExportClose: () => void;
@@ -56,10 +39,6 @@ export function InventorySection({
   data,
   branchIds,
   setBranchIds,
-  inventoryDateDraft,
-  setInventoryDateDraft,
-  setInventoryDateApplied,
-  inventoryDateApplied,
   organizationName,
   exportOpen,
   onExportClose,
@@ -92,49 +71,22 @@ export function InventorySection({
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Filter inventory by last updated date</span>
-          <div className="flex items-center gap-2">
-            <DatePickerWithRange
-              date={inventoryDateDraft}
-              setDate={(val) => {
-                setInventoryDateDraft?.(val);
-                setInventoryDateApplied?.(val);
-              }}
-              placeholder="Filter by last updated inventories"
-              className="w-full"
-            />
-
-             <div className="flex items-center gap-2 flex-none">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setInventoryDateDraft?.(undefined);
-                setInventoryDateApplied?.(undefined);
-              }}
-            >
-              Reset
-          </Button>
-          </div>
-          </div>
-        </div>
-        <div className="flex items-end justify-between gap-1">
-          <div className="flex-1 min-w-0">
-            <BranchMultiSelector
-              value={branchIds}
-              onChange={setBranchIds}
-              placeholder="Select branches"
-            />
-          </div>
-        </div>
+      {/* Stock is a current figure, so this report has no date range; stock
+          over time is in Stock Activity. */}
+      <div className="flex-1 min-w-0">
+        <BranchMultiSelector
+          value={branchIds}
+          onChange={setBranchIds}
+          placeholder="Select branches"
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Items" value={data?.total_items ?? 0} />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <StatCard title="Stock Items" value={data?.total_items ?? 0} />
         <StatCard title="Low Stock" value={data?.low_stock_items ?? 0} valueClassName="text-orange-500" />
         <StatCard title="Out of Stock" value={data?.out_of_stock_items ?? 0} valueClassName="text-red-500" />
-        <StatCard title="Revenue" value={<CurrencyDisplay amount={Number(data?.total_revenue ?? 0)} />} />
+        <StatCard title="Value at Price" value={<CurrencyDisplay amount={Number(data?.total_revenue ?? 0)} />} />
+        <StatCard title="Value at Cost" value={<CurrencyDisplay amount={Number(data?.total_cost ?? 0)} />} />
       </div>
 
       <Card>
@@ -271,7 +223,6 @@ export function InventorySection({
           open={exportOpen}
           onClose={onExportClose}
           organizationName={organizationName}
-          dateRange={inventoryDateApplied}
           defaultSections={defaultSections}
           branchNames={exportBranchNames}
         />

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { compactAxisNumber } from './stockItems';
 import { useSalesLedgerReport } from '@/hooks/useSalesLedgerReport';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,11 +50,20 @@ import {
 
 
 
+/**
+ * overview: headline figures and charts · list: every sale ·
+ * payments: money received in the period · breakdown: grouped table
+ */
+export type SalesView = 'overview' | 'list' | 'payments' | 'breakdown';
+
+/** Breakdown rows: by period (summary) or by one of the pivot row groups. */
+type BreakdownBy = 'period' | RowGroup;
+
 interface SalesSectionProps {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
-  template: 'detailed' | 'pivot' | 'summary';
+  view: SalesView;
   exportOpen: boolean;
   onExportClose: () => void;
 }
@@ -63,7 +72,7 @@ export function SalesSection({
   orgId,
   branchIds,
   dateRange,
-  template,
+  view,
   exportOpen,
   onExportClose,
 }: SalesSectionProps) {
@@ -82,7 +91,17 @@ export function SalesSection({
   );
 
   const [groupUnit, setGroupUnit] = useState<GroupUnit>('month');
-  const [rowGroup, setRowGroup] = useState<RowGroup>('order');
+  const [breakdownBy, setBreakdownBy] = useState<BreakdownBy>('period');
+  const rowGroup: RowGroup = breakdownBy === 'period' ? 'order' : breakdownBy;
+  // The export builders still speak in templates.
+  const template: 'detailed' | 'pivot' | 'summary' =
+    view === 'breakdown'
+      ? breakdownBy === 'period'
+        ? 'summary'
+        : 'pivot'
+      : view === 'overview'
+        ? 'summary'
+        : 'detailed';
   const [selectedCustomers, setSelectedCustomers] = useState<Option[]>([]);
   const { availableBranches } = useBranchContext();
   const exportBranchNames =
@@ -345,8 +364,63 @@ export function SalesSection({
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+      {view === 'breakdown' && (
         <Card>
+          <CardContent className="grid grid-cols-1 [&>*]:min-w-0 gap-4 pt-6 md:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Group by</span>
+              <Select value={breakdownBy} onValueChange={(v) => setBreakdownBy(v as BreakdownBy)}>
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="period">Period</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="branch">Branch</SelectItem>
+                  <SelectItem value="payment_status">Payment status</SelectItem>
+                  <SelectItem value="payment_method">Payment method</SelectItem>
+                  <SelectItem value="status">Sale status</SelectItem>
+                  <SelectItem value="order">Sale</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                {breakdownBy === 'period' ? 'Period' : 'Columns'}
+              </span>
+              <Select value={groupUnit} onValueChange={(v) => setGroupUnit(v as GroupUnit)}>
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Daily</SelectItem>
+                  <SelectItem value="week">Weekly</SelectItem>
+                  <SelectItem value="month">Monthly</SelectItem>
+                  <SelectItem value="quarter">Quarterly</SelectItem>
+                  <SelectItem value="year">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {breakdownBy !== 'period' && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Customers</span>
+                <MultipleSelector
+                  value={selectedCustomers}
+                  options={customerOptions}
+                  onChange={setSelectedCustomers}
+                  placeholder="All customers"
+                  hideClearAllButton
+                  className="w-full"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {view === 'overview' && (
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Sales Count</CardTitle>
           </CardHeader>
@@ -372,7 +446,7 @@ export function SalesSection({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Revenue Collected</CardTitle>
           </CardHeader>
@@ -414,91 +488,7 @@ export function SalesSection({
           </CardContent>
         </Card>
 
-        {template === 'pivot' && (
-          <Card className="md:col-span-3 lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Pivot Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Time Group</span>
-                    <Select value={groupUnit} onValueChange={(v) => setGroupUnit(v as GroupUnit)}>
-                      <SelectTrigger className="h-8 w-full">
-                        <SelectValue placeholder="Group by time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Daily</SelectItem>
-                        <SelectItem value="week">Weekly</SelectItem>
-                        <SelectItem value="month">Monthly</SelectItem>
-                        <SelectItem value="quarter">Quarterly</SelectItem>
-                        <SelectItem value="year">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Row Group</span>
-                    <Select value={rowGroup} onValueChange={(v) => setRowGroup(v as RowGroup)}>
-                      <SelectTrigger className="h-8 w-full">
-                        <SelectValue placeholder="Group rows" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="order">By Order</SelectItem>
-                        <SelectItem value="customer">By Customer</SelectItem>
-                        <SelectItem value="branch">By Branch</SelectItem>
-                        <SelectItem value="payment_status">By Payment Status</SelectItem>
-                        <SelectItem value="payment_method">By Payment Method</SelectItem>
-                        <SelectItem value="status">By Order Status</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Filter Customers</span>
-                  <MultipleSelector
-                    value={selectedCustomers}
-                    options={customerOptions}
-                    onChange={setSelectedCustomers}
-                    placeholder="Select customers"
-                    hideClearAllButton
-                    className="w-full"
-                  />
-                </div>
-
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {template === 'summary' && (
-          <Card className="md:col-span-3 lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Summary Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Time Group</span>
-                  <Select value={groupUnit} onValueChange={(v) => setGroupUnit(v as GroupUnit)}>
-                    <SelectTrigger className="h-8 w-full">
-                      <SelectValue placeholder="Group by time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">Daily</SelectItem>
-                      <SelectItem value="week">Weekly</SelectItem>
-                      <SelectItem value="month">Monthly</SelectItem>
-                      <SelectItem value="quarter">Quarterly</SelectItem>
-                      <SelectItem value="year">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className="md:col-span-3 lg:col-span-4">
+        <Card className="sm:col-span-2 xl:col-span-4">
           <CardHeader>
             <CardTitle>Revenue & Gross Sales Trend</CardTitle>
           </CardHeader>
@@ -516,7 +506,7 @@ export function SalesSection({
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => formatCurrency(Number(v))}
+                    tickFormatter={(v) => compactAxisNumber(Number(v))}
                   />
                   <ChartTooltip
                     cursor={false}
@@ -550,7 +540,7 @@ export function SalesSection({
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 lg:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Sales Trend</CardTitle>
           </CardHeader>
@@ -585,13 +575,13 @@ export function SalesSection({
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-1 lg:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Payment Status Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
             {paymentBreakdownData.length ? (
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid grid-cols-1 [&>*]:min-w-0 gap-6 lg:grid-cols-2">
                 <div className="space-y-3">
                   {paymentBreakdownData.map((s, i) => (
                     <div
@@ -657,8 +647,9 @@ export function SalesSection({
         </Card>
 
       </div>
+      )}
 
-      {template === 'pivot' && (
+      {view === 'breakdown' && template === 'pivot' && (
         <Card className='bg-card/20'>
           <CardHeader>
             <CardTitle>Sales Pivot</CardTitle>
@@ -806,18 +797,13 @@ export function SalesSection({
         </Card>
       )}
 
-      {template === 'summary' && (
+      {view === 'breakdown' && template === 'summary' && (
         <SalesSummary orders={filteredOrders} groupUnit={groupUnit} dateRange={dateRange} />
       )}
 
-      {template === 'detailed' && (
-        <Tabs defaultValue="overview" className="mt-8">
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Sales Overview</TabsTrigger>
-            <TabsTrigger value="ledger">Payment Ledger</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
+      {view === 'list' && (
+        <Card>
+          <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
@@ -926,9 +912,13 @@ export function SalesSection({
                 </tbody>
               </table>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
+      )}
 
-          <TabsContent value="ledger">
+      {view === 'payments' && (
+        <Card>
+          <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
@@ -1042,8 +1032,8 @@ export function SalesSection({
                 </tbody>
               </table>
             </div>
-          </TabsContent>
-        </Tabs>
+          </CardContent>
+        </Card>
       )}
       <SalesExportDialog
         template={template}

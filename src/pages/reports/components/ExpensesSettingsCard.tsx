@@ -9,6 +9,9 @@ interface ExpensesSettingsCardProps {
   setGroupUnit: (v: GroupUnit) => void;
   groupBy: 'category' | 'type';
   setGroupBy?: (v: 'category' | 'type') => void;
+  /** by period (summary) or category/type × period (pivot) */
+  layout?: 'summary' | 'pivot';
+  setLayout?: (v: 'summary' | 'pivot') => void;
   className?: string;
 }
 
@@ -18,6 +21,8 @@ export function ExpensesSettingsCard({
   setGroupUnit,
   groupBy,
   setGroupBy,
+  layout,
+  setLayout,
   className,
 }: ExpensesSettingsCardProps) {
   return (
@@ -27,6 +32,20 @@ export function ExpensesSettingsCard({
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
+          {layout && setLayout && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Layout</span>
+              <Select value={layout} onValueChange={(v) => setLayout(v as 'summary' | 'pivot')}>
+                <SelectTrigger className="h-8 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="summary">By period</SelectItem>
+                  <SelectItem value="pivot">Pivot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Time Group</span>
             <Select value={groupUnit} onValueChange={(v) => setGroupUnit(v as GroupUnit)}>

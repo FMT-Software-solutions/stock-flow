@@ -1,70 +1,39 @@
-import { BranchMultiSelector } from '@/components/shared/BranchMultiSelector';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import type { DateRange } from 'react-day-picker';
+import { endOfDay, startOfDay } from 'date-fns';
+import { Download } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/shared/date-range-picker';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { useCurrency } from '@/hooks/useCurrency';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/utils/supabase';
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { useMemo, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import type { DateRange } from 'react-day-picker';
 import { CustomersSection } from './reports/CustomersSection';
-import { ExpensesSection } from './reports/ExpensesSection';
-import { InventorySection } from './reports/InventorySection';
-import { ProductsSection } from './reports/ProductsSection';
-import { SalesSection } from './reports/SalesSection';
-import { SuppliersSection } from './reports/SuppliersSection';
-import { ProductSalesSection } from './reports/ProductSalesSection';
-import { StockActivitySection } from './reports/StockActivitySection';
 import { DiscountsSection } from './reports/DiscountsSection';
-import type { InventoryReport } from './reports/InventorySection';
-
-type ProductsReport = {
-  total_products: number;
-  active_products: number;
-  inactive_products: number;
-  draft_products?: number;
-  archived_products?: number;
-  low_stock_products: number;
-  out_of_stock_products: number;
-  category_distribution: { category: string; count: number }[];
-  low_stock_list: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-  out_of_stock_list: {
-    id: string;
-    name: string;
-    sku: string | null;
-    category_name: string | null;
-    quantity: number;
-    min_stock_level: number;
-  }[];
-};
+import { ExpensesSection } from './reports/ExpensesSection';
+import { ProductSalesSection } from './reports/ProductSalesSection';
+import { SalesSection } from './reports/SalesSection';
+import { StockActivitySection } from './reports/StockActivitySection';
+import { StockOnHandSection } from './reports/StockOnHandSection';
+import { SuppliersSection } from './reports/SuppliersSection';
+import { BranchFilter } from './reports/components/BranchFilter';
+import {
+  LEGACY_TABS,
+  REPORT_GROUPS,
+  REPORTS,
+  reportById,
+  type ReportDef,
+  type ReportId,
+} from './reports/registry';
 
 type CustomersReport = {
   total_customers: number;
   new_this_month: number;
-  top_customers: {
-    customer_id: string;
-    name: string;
-    total_spent: number;
-    orders_count: number;
-  }[];
+  top_customers: { customer_id: string; name: string; total_spent: number; orders_count: number }[];
   customers_owing: {
     customer_id: string;
     name: string;
@@ -81,463 +50,200 @@ type SuppliersReport = {
   top_suppliers: { supplier_id: string; name: string; product_count: number }[];
 };
 
-const chartColors = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-];
-
 export function Reports() {
   const { formatCurrency } = useCurrency();
   const { currentOrganization } = useOrganization();
-  const { selectedBranchIds: globalBranchIds } = useBranchContext();
+  const { selectedBranchIds: globalBranchIds, availableBranches } = useBranchContext();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  type TabType =
-    | 'products'
-    | 'inventory'
-    | 'stock_activity'
-    | 'sales_orders'
-    | 'product_sales'
-    | 'discounts'
-    | 'expenses'
-    | 'customers'
-    | 'suppliers';
-  const availableTabs: TabType[] = [
-    'products',
-    'inventory',
-    'stock_activity',
-    'sales_orders',
-    'product_sales',
-    'discounts',
-    'expenses',
-    'customers',
-    'suppliers',
-  ];
-
-  const tabFromUrl = searchParams.get('tab') as TabType | null;
-
-  const [activeTab, setActiveTab] = useState<TabType>(
-    tabFromUrl && availableTabs.includes(tabFromUrl) ? tabFromUrl : 'products'
-  );
-
-  useEffect(() => {
-    if (tabFromUrl && availableTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl);
-    } else if (!availableTabs.includes(activeTab)) {
-      setActiveTab('products');
-      if (tabFromUrl) {
-        setSearchParams({ tab: 'products' }, { replace: true });
-      }
-    }
-  }, [tabFromUrl, activeTab, availableTabs, setSearchParams]);
-
-  const handleTabChange = (value: string) => {
-    const newTab = value as TabType;
-    setActiveTab(newTab);
-    setSearchParams({ tab: newTab }, { replace: true });
-  };
-  const [generalDateRange, setGeneralDateRange] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [productsDateDraft, setProductsDateDraft] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [productsDateApplied, setProductsDateApplied] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [customersDateDraft, setCustomersDateDraft] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [customersDateApplied, setCustomersDateApplied] = useState<
-    DateRange | undefined
-  >(undefined);
-  const [branchIds, setBranchIds] = useState<string[]>(globalBranchIds);
-  const [template, setTemplate] = useState<'detailed' | 'pivot' | 'summary'>(
-    'detailed'
-  );
-  const [expensesGroupBy, setExpensesGroupBy] = useState<'category' | 'type'>(
-    'category'
-  );
-  const [exportOpen, setExportOpen] = useState(false);
-
   const orgId = currentOrganization?.id;
 
-  const normalizedBranchIds = useMemo(() => {
-    return branchIds && branchIds.length > 0 ? branchIds : null;
-  }, [branchIds]);
+  // Which report: the URL wins (links, refresh), then the last one used here.
+  const [lastReport, setLastReport] = useOrgPreference<ReportId>(orgId, 'reports.last', 'sales_overview');
+  const fromUrl = searchParams.get('report') ?? LEGACY_TABS[searchParams.get('tab') ?? ''];
+  const report: ReportDef = reportById(fromUrl) ?? reportById(lastReport) ?? REPORTS[0];
 
-  const productsStartIso = productsDateApplied?.from
-    ? new Date(productsDateApplied.from).toISOString()
-    : null;
-  const productsEndIso = productsDateApplied?.to
-    ? new Date(productsDateApplied.to).toISOString()
-    : null;
-  const customersStartIso = customersDateApplied?.from
-    ? new Date(customersDateApplied.from).toISOString()
-    : null;
-  const customersEndIso = customersDateApplied?.to
-    ? new Date(customersDateApplied.to).toISOString()
-    : null;
-
-  const isBranchScoped = (tab: typeof activeTab) => {
-    return (
-      tab === 'inventory' ||
-      tab === 'stock_activity' ||
-      tab === 'sales_orders' ||
-      tab === 'product_sales' ||
-      tab === 'discounts' ||
-      tab === 'expenses'
-    );
+  const openReport = (id: string) => {
+    setSearchParams({ report: id }, { replace: true });
+    setLastReport(id as ReportId);
+    setExportOpen(false);
   };
 
-  // Reports over a period share the general date range.
-  const hasGeneralFilters = (tab: typeof activeTab) => {
-    return (
-      tab === 'sales_orders' ||
-      tab === 'expenses' ||
-      tab === 'product_sales' ||
-      tab === 'stock_activity' ||
-      tab === 'discounts'
-    );
-  };
+  // One period and one branch selection shared by every report. Branches are
+  // remembered; the period starts at All time.
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [savedBranchIds, setSavedBranchIds] = useOrgPreference<string[] | null>(orgId, 'reports.branches', null);
+  const branchIds = useMemo(
+    () =>
+      (savedBranchIds ?? globalBranchIds).filter((id) => availableBranches.some((b) => b.id === id)),
+    [savedBranchIds, globalBranchIds, availableBranches]
+  );
 
-  const hasTemplates = (tab: typeof activeTab) => tab === 'sales_orders' || tab === 'expenses';
+  const [exportOpen, setExportOpen] = useState(false);
+  const [expensesGroupBy, setExpensesGroupBy] = useState<'category' | 'type'>('category');
 
-  // These reports export from their own tables.
-  const hasExportDialog = (tab: typeof activeTab) =>
-    tab !== 'product_sales' && tab !== 'stock_activity' && tab !== 'discounts';
-
-  const productsReport = useQuery({
-    queryKey: ['reports', 'products', orgId, productsStartIso, productsEndIso],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_products_report', {
-        p_organization_id: orgId,
-        p_start_date: productsStartIso,
-        p_end_date: productsEndIso,
-      });
-      if (error) throw error;
-      return data as ProductsReport;
-    },
-    enabled: !!orgId && activeTab === 'products',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_products: 0,
-        active_products: 0,
-        inactive_products: 0,
-        low_stock_products: 0,
-        out_of_stock_products: 0,
-        category_distribution: [],
-        low_stock_list: [],
-        out_of_stock_list: [],
-      },
-  });
-
-  const inventoryReport = useQuery({
-    queryKey: ['reports', 'inventory', orgId, normalizedBranchIds],
-    queryFn: async () => {
-      // Current stock: the report takes no date range.
-      const { data, error } = await supabase.rpc('get_inventory_report', {
-        p_organization_id: orgId,
-        p_branch_ids: normalizedBranchIds,
-      });
-      if (error) throw error;
-      return data as InventoryReport;
-    },
-    enabled: !!orgId && activeTab === 'inventory',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_items: 0,
-        low_stock_items: 0,
-        out_of_stock_items: 0,
-        stock_by_category: [],
-        total_revenue: 0,
-        total_cost: 0,
-        inventory_value_by_category: [],
-        low_stock_list: [],
-        out_of_stock_list: [],
-      },
-  });
+  const startIso = dateRange?.from ? startOfDay(dateRange.from).toISOString() : null;
+  const endIso = dateRange?.to
+    ? endOfDay(dateRange.to).toISOString()
+    : dateRange?.from
+      ? endOfDay(dateRange.from).toISOString()
+      : null;
 
   const customersReport = useQuery({
-    queryKey: [
-      'reports',
-      'customers',
-      orgId,
-      customersStartIso,
-      customersEndIso,
-    ],
+    queryKey: ['reports', 'customers', orgId, startIso, endIso],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_customers_report', {
         p_organization_id: orgId,
-        p_start_date: customersStartIso,
-        p_end_date: customersEndIso,
+        p_start_date: startIso,
+        p_end_date: endIso,
       });
       if (error) throw error;
       return data as CustomersReport;
     },
-    enabled: !!orgId && activeTab === 'customers',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_customers: 0,
-        new_this_month: 0,
-        top_customers: [],
-        customers_owing: [],
-      },
+    enabled: !!orgId && report.id === 'customers',
   });
 
   const suppliersReport = useQuery({
     queryKey: ['reports', 'suppliers', orgId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_suppliers_report', {
-        p_organization_id: orgId,
-      });
+      const { data, error } = await supabase.rpc('get_suppliers_report', { p_organization_id: orgId });
       if (error) throw error;
       return data as SuppliersReport;
     },
-    enabled: !!orgId && activeTab === 'suppliers',
-    placeholderData: (prev) =>
-      prev ?? {
-        total_suppliers: 0,
-        new_this_month: 0,
-        new_suppliers: [],
-        top_suppliers: [],
-      },
+    enabled: !!orgId && report.id === 'suppliers',
   });
 
-  const periodLabel = useMemo(() => {
-    if (activeTab === 'inventory') return 'Current stock';
-    const range =
-      activeTab === 'products'
-        ? productsDateApplied
-        : activeTab === 'customers'
-          ? customersDateApplied
-          : generalDateRange;
-    if (!range?.from && !range?.to) return 'All Time';
-    const from = range?.from ? format(range.from, 'MMMM dd, yyyy') : 'Start';
-    const to = range?.to ? format(range.to, 'MMMM dd, yyyy') : 'Today';
-    return `${from} — ${to}`;
-  }, [activeTab, productsDateApplied, customersDateApplied, generalDateRange]);
+  const exportProps = { exportOpen, onExportClose: () => setExportOpen(false) };
+  const periodProps = { orgId, branchIds, dateRange };
 
-  const tabOptions = [
-    { value: 'products', label: 'Products' },
-    { value: 'inventory', label: 'Inventory' },
-    { value: 'stock_activity', label: 'Stock Activity' },
-    { value: 'sales_orders', label: 'Sales & Orders' },
-    { value: 'product_sales', label: 'Product Sales' },
-    { value: 'discounts', label: 'Discounts' },
-    { value: 'expenses', label: 'Expenses' },
-    { value: 'customers', label: 'Customers' },
-    { value: 'suppliers', label: 'Suppliers' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground">Generate and review reports</p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Period: {periodLabel}
-        </div>
-        {isBranchScoped(activeTab) && (
-          <div className="text-sm text-muted-foreground">
-            Branches: {branchIds.length > 0 ? branchIds.length : 'All'}
-          </div>
-        )}
-      </div>
-
-      <Tabs
-        value={activeTab}
-        onValueChange={(v) => {
-          handleTabChange(v);
-          setExportOpen(false);
-        }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between gap-4">
-          {/* Mobile View - Select */}
-          <div className="md:hidden w-full">
-            <Select
-              value={activeTab}
-              onValueChange={(v) => {
-                setActiveTab(v as typeof activeTab);
-                setExportOpen(false);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select report">
-                  {tabOptions.find((t) => t.value === activeTab)?.label}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {tabOptions.map((tab) => (
-                  <SelectItem key={tab.value} value={tab.value}>
-                    {tab.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Desktop View - TabsList */}
-          <div className="hidden md:block">
-            <TabsList>
-              {tabOptions.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          {hasExportDialog(activeTab) && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setExportOpen(true)}
-            >
-              Export
-            </Button>
-          )}
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            {hasGeneralFilters(activeTab) && (
-              <DatePickerWithRange
-                date={generalDateRange}
-                setDate={setGeneralDateRange}
-                placeholder="Select date range"
-                className="w-full"
-              />
-            )}
-          </div>
-          {hasTemplates(activeTab) && (
-            <div className="flex items-center gap-2">
-              <Select
-                value={template}
-                onValueChange={(v) =>
-                  setTemplate(v as 'detailed' | 'pivot' | 'summary')
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select template" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="detailed">Detailed</SelectItem>
-                  <SelectItem value="pivot">Pivot</SelectItem>
-                  <SelectItem value="summary">Summary</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {isBranchScoped(activeTab) && activeTab !== 'inventory' && (
-            <div className="flex items-center">
-              <BranchMultiSelector
-                value={branchIds}
-                onChange={setBranchIds}
-                placeholder="Select branches"
-              />
-            </div>
-          )}
-        </div>
-
-        <TabsContent value="products" className="space-y-4">
-          <ProductsSection
-            data={productsReport.data}
-            colors={chartColors}
-            organizationName={currentOrganization?.name}
-            dateRange={productsDateApplied}
-            productsDateDraft={productsDateDraft}
-            setProductsDateDraft={setProductsDateDraft}
-            setProductsDateApplied={setProductsDateApplied}
-            exportOpen={exportOpen && activeTab === 'products'}
-            onExportClose={() => setExportOpen(false)}
-          />
-        </TabsContent>
-
-        <TabsContent value="inventory" className="space-y-4">
-          <InventorySection
-            data={inventoryReport.data}
-            branchIds={branchIds}
-            setBranchIds={setBranchIds}
-            organizationName={currentOrganization?.name}
-            exportOpen={exportOpen && activeTab === 'inventory'}
-            onExportClose={() => setExportOpen(false)}
-          />
-        </TabsContent>
-
-        <TabsContent value="stock_activity" className="space-y-4">
-          {activeTab === 'stock_activity' && (
-            <StockActivitySection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="product_sales" className="space-y-4">
-          {activeTab === 'product_sales' && (
-            <ProductSalesSection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="discounts" className="space-y-4">
-          {activeTab === 'discounts' && (
-            <DiscountsSection orgId={orgId} branchIds={branchIds} dateRange={generalDateRange} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="sales_orders" className="space-y-4">
-          <SalesSection
+  const renderReport = () => {
+    switch (report.id) {
+      case 'sales_overview':
+        return <SalesSection {...periodProps} {...exportProps} view="overview" />;
+      case 'product_sales':
+        return <ProductSalesSection {...periodProps} {...exportProps} />;
+      case 'sales_list':
+        return <SalesSection {...periodProps} {...exportProps} view="list" />;
+      case 'payments':
+        return <SalesSection {...periodProps} {...exportProps} view="payments" />;
+      case 'sales_breakdown':
+        return <SalesSection {...periodProps} {...exportProps} view="breakdown" />;
+      case 'discounts':
+        return <DiscountsSection {...periodProps} {...exportProps} />;
+      case 'stock_on_hand':
+        return (
+          <StockOnHandSection
             orgId={orgId}
             branchIds={branchIds}
-            dateRange={generalDateRange}
-            template={template}
-            exportOpen={exportOpen && activeTab === 'sales_orders'}
-            onExportClose={() => setExportOpen(false)}
+            organizationName={currentOrganization?.name}
+            {...exportProps}
           />
-        </TabsContent>
-
-        <TabsContent value="expenses" className="space-y-4">
+        );
+      case 'stock_activity':
+        return <StockActivitySection {...periodProps} {...exportProps} />;
+      case 'expenses':
+      case 'expenses_breakdown':
+        return (
           <ExpensesSection
-            orgId={orgId}
-            branchIds={branchIds}
-            dateRange={generalDateRange}
-            template={template}
+            {...periodProps}
+            {...exportProps}
+            view={report.id === 'expenses' ? 'overview' : 'breakdown'}
             groupBy={expensesGroupBy}
             setGroupBy={setExpensesGroupBy}
-            exportOpen={exportOpen && activeTab === 'expenses'}
-            onExportClose={() => setExportOpen(false)}
           />
-        </TabsContent>
-
-        <TabsContent value="customers" className="space-y-4">
+        );
+      case 'customers':
+        return (
           <CustomersSection
             data={customersReport.data}
             formatCurrency={formatCurrency}
             organizationName={currentOrganization?.name}
-            dateRange={customersDateApplied}
-            customersDateDraft={customersDateDraft}
-            setCustomersDateDraft={setCustomersDateDraft}
-            setCustomersDateApplied={setCustomersDateApplied}
-            exportOpen={exportOpen && activeTab === 'customers'}
-            onExportClose={() => setExportOpen(false)}
+            dateRange={dateRange}
+            {...exportProps}
           />
-        </TabsContent>
-
-        <TabsContent value="suppliers" className="space-y-4">
+        );
+      case 'suppliers':
+        return (
           <SuppliersSection
             data={suppliersReport.data}
             organizationName={currentOrganization?.name}
-            exportOpen={exportOpen && activeTab === 'suppliers'}
-            onExportClose={() => setExportOpen(false)}
+            {...exportProps}
           />
-        </TabsContent>
-      </Tabs>
+        );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight">Reports</h1>
+
+      {/* Report menu: area tabs, then that area's reports. Both rows scroll
+          sideways when narrow, so the reports keep the full page width. */}
+      <div className="space-y-2">
+        <nav aria-label="Report areas" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden border-b px-1">
+          {REPORT_GROUPS.map((group) => (
+            <button
+              key={group}
+              type="button"
+              onClick={() => openReport(REPORTS.find((r) => r.group === group)!.id)}
+              aria-current={group === report.group ? 'true' : undefined}
+              className={cn(
+                '-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+                group === report.group
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {group}
+            </button>
+          ))}
+        </nav>
+        <nav aria-label="Reports" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden px-1 pb-1">
+          {REPORTS.filter((r) => r.group === report.group).map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              title={r.hint}
+              onClick={() => openReport(r.id)}
+              aria-current={r.id === report.id ? 'page' : undefined}
+              className={cn(
+                'shrink-0 rounded-full px-3 py-1 text-sm transition-colors',
+                r.id === report.id
+                  ? 'bg-primary/15 font-medium text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* One filter bar for every report; each shows what applies to it. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {report.period && (
+          <DatePickerWithRange
+            date={dateRange}
+            setDate={setDateRange}
+            placeholder="All time"
+            className="w-full sm:w-64"
+          />
+        )}
+        {report.branches && availableBranches.length > 1 && (
+          <BranchFilter
+            branches={availableBranches}
+            value={branchIds}
+            onChange={setSavedBranchIds}
+            className="w-full sm:w-48"
+          />
+        )}
+        <Button variant="outline" className="sm:ml-auto" onClick={() => setExportOpen(true)}>
+          <Download className="mr-2 h-4 w-4" /> Export
+        </Button>
+      </div>
+
+      <div key={report.id} className="space-y-4">
+        {renderReport()}
+      </div>
     </div>
   );
 }

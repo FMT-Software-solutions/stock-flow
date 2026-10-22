@@ -89,27 +89,31 @@ export function GlobalSearch() {
                     <>
                         <CommandSeparator />
                         <CommandGroup heading="Reports">
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=products')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=stock_on_hand')} className="flex items-center gap-2">
                                 <Package className="h-4 w-4" />
-                                <span>Products Report</span>
+                                <span>Stock on Hand</span>
                             </CommandItem>
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=inventory')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=stock_activity')} className="flex items-center gap-2">
                                 <Layers className="h-4 w-4" />
-                                <span>Inventory Report</span>
+                                <span>Stock Activity</span>
                             </CommandItem>
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=sales_orders')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=sales_overview')} className="flex items-center gap-2">
                                 <ShoppingCart className="h-4 w-4" />
-                                <span>Sales & Orders Report</span>
+                                <span>Sales Report</span>
                             </CommandItem>
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=expenses')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=product_sales')} className="flex items-center gap-2">
+                                <ShoppingCart className="h-4 w-4" />
+                                <span>Product Sales Report</span>
+                            </CommandItem>
+                            <CommandItem onSelect={() => handleSelect('/reports?report=expenses')} className="flex items-center gap-2">
                                 <DollarSign className="h-4 w-4" />
                                 <span>Expenses Report</span>
                             </CommandItem>
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=customers')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=customers')} className="flex items-center gap-2">
                                 <Users className="h-4 w-4" />
                                 <span>Customers Report</span>
                             </CommandItem>
-                            <CommandItem onSelect={() => handleSelect('/reports?tab=suppliers')} className="flex items-center gap-2">
+                            <CommandItem onSelect={() => handleSelect('/reports?report=suppliers')} className="flex items-center gap-2">
                                 <Truck className="h-4 w-4" />
                                 <span>Suppliers Report</span>
                             </CommandItem>

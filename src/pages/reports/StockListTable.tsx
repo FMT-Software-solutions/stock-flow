@@ -82,7 +82,3 @@ export function StockListTable({ products, groupByCategory, emptyText }: StockLi
     </Accordion>
   );
 }
-
-export function LowStockTable(props: Omit<StockListTableProps, 'emptyText'>) {
-  return <StockListTable {...props} emptyText="No low stock products." />;
-}

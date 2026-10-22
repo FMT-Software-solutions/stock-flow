@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/shared/data-table/data-table';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import type { ColumnDef } from '@tanstack/react-table';
 import { StatCard } from './components/StatCard';
@@ -150,10 +151,14 @@ export function StockActivitySection({
   orgId,
   branchIds,
   dateRange,
+  exportOpen,
+  onExportClose,
 }: {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }) {
   const { data, isLoading } = useReportRpc<StockActivityReport>(
     'get_stock_activity_report',
@@ -166,7 +171,7 @@ export function StockActivitySection({
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <StatCard title="Received" value={sum('opening', 'received')} valueClassName="text-green-600" />
         <StatCard title="Sold" value={-sum('sale', 'sale_reversal')} />
         <StatCard title="Returned" value={sum('return')} />
@@ -190,6 +195,7 @@ export function StockActivitySection({
               storageKey="reports-stock-activity-items"
               defaultColumnVisibility={{ searchable: false }}
               orgId={orgId}
+              canExport={false}
             />
           )}
         </CardContent>
@@ -209,10 +215,18 @@ export function StockActivitySection({
               storageKey="reports-stock-activity-changes"
               defaultColumnVisibility={{ searchable: false }}
               orgId={orgId}
+              canExport={false}
             />
           )}
         </CardContent>
       </Card>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={(open) => !open && onExportClose()}
+        data={data?.items ?? []}
+        fields={itemExportFields}
+        defaultFilename="stock-activity"
+      />
     </>
   );
 }

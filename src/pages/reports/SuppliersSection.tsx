@@ -60,7 +60,7 @@ export function SuppliersSection({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Suppliers" value={data?.total_suppliers ?? 0} />
         <StatCard title="New This Month" value={data?.new_this_month ?? 0} />
         <StatCard
@@ -107,7 +107,7 @@ export function SuppliersSection({
           <CardTitle>Top 10 Suppliers by Products</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 [&>*]:min-w-0 gap-6 lg:grid-cols-2">
             <div className="space-y-3">
               {(data?.top_suppliers || []).slice(0, 10).map((s, i) => (
                 <div

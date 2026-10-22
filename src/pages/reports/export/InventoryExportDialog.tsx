@@ -15,7 +15,7 @@ import {
 } from './utils/inventoryExport';
 import { XLSX } from './utils/styles';
 import { useCurrency } from '@/hooks/useCurrency';
-import type { InventoryReport } from '../InventorySection';
+import type { InventoryReport } from '../StockOnHandSection';
 
 type SectionKey = 'stats' | 'category' | 'value' | 'low' | 'out';
 

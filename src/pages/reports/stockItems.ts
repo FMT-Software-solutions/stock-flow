@@ -14,3 +14,7 @@ export type StockListItem = {
 
 /** "Black · Used" */
 export const stockItemVariant = (p: StockListItem) => [p.variant, p.label].filter(Boolean).join(' · ');
+
+/** Chart axis labels: 80000 → "80K", 1250000 → "1.3M" (tooltips keep full amounts). */
+export const compactAxisNumber = (value: number) =>
+  new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);

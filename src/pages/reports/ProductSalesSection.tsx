@@ -1,6 +1,7 @@
 import type { DateRange } from 'react-day-picker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/shared/data-table/data-table';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { StatCard } from './components/StatCard';
 import { useReportRpc } from './useReportRpc';
@@ -56,10 +57,14 @@ export function ProductSalesSection({
   orgId,
   branchIds,
   dateRange,
+  exportOpen,
+  onExportClose,
 }: {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }) {
   const { data, isLoading } = useReportRpc<ProductSalesReport>(
     'get_product_sales_report',
@@ -71,7 +76,7 @@ export function ProductSalesSection({
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <StatCard title="Items Sold" value={Number(totals?.quantity ?? 0)} />
         <StatCard title="Sales" value={Number(totals?.orders ?? 0)} />
         <StatCard title="Gross" value={<CurrencyDisplay amount={Number(totals?.gross ?? 0)} />} />
@@ -99,6 +104,7 @@ export function ProductSalesSection({
               storageKey="reports-product-sales"
               defaultColumnVisibility={{ searchable: false }}
               orgId={orgId}
+              canExport={false}
             />
           )}
         </CardContent>
@@ -125,6 +131,13 @@ export function ProductSalesSection({
           </div>
         </CardContent>
       </Card>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={(open) => !open && onExportClose()}
+        data={data?.products ?? []}
+        fields={exportFields}
+        defaultFilename="product-sales"
+      />
     </>
   );
 }

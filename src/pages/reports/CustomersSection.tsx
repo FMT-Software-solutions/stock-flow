@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { DatePickerWithRange } from '@/components/shared/date-range-picker';
+import { compactAxisNumber } from './stockItems';
 import type { DateRange } from 'react-day-picker';
 import { useMemo } from 'react';
 import {
@@ -43,10 +42,8 @@ interface CustomersSectionProps {
   data?: CustomersReport;
   formatCurrency: (value: number) => string;
   organizationName?: string;
+  /** leaderboard period (from the report filter bar) */
   dateRange?: DateRange;
-  customersDateDraft?: DateRange;
-  setCustomersDateDraft?: (d: DateRange | undefined) => void;
-  setCustomersDateApplied?: (d: DateRange | undefined) => void;
   exportOpen: boolean;
   onExportClose: () => void;
 }
@@ -56,9 +53,6 @@ export function CustomersSection({
   formatCurrency,
   organizationName,
   dateRange,
-  customersDateDraft,
-  setCustomersDateDraft,
-  setCustomersDateApplied,
   exportOpen,
   onExportClose,
 }: CustomersSectionProps) {
@@ -94,35 +88,7 @@ export function CustomersSection({
 
   return (
     <>
-      <div className="flex items-end justify-between mb-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">
-            Filter customer leaderboard by order date
-          </span>
-          <div className="flex items-center gap-2">
-            <DatePickerWithRange
-              date={customersDateDraft}
-              setDate={(d) => {
-                setCustomersDateDraft?.(d);
-                setCustomersDateApplied?.(d);
-              }}
-              placeholder="Select order date range"
-              className="w-full"
-            />
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCustomersDateDraft?.(undefined);
-                setCustomersDateApplied?.(undefined);
-              }}
-            >
-              Reset
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Customers" value={data?.total_customers ?? 0} />
         <StatCard title="New This Month" value={data?.new_this_month ?? 0} />
         <StatCard
@@ -141,7 +107,7 @@ export function CustomersSection({
           <CardTitle>Top 10 Customers by Spend</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 [&>*]:min-w-0 gap-6 lg:grid-cols-2">
             <div className="space-y-3 max-h-75 overflow-auto px-4">
               {topCustomers.map((c, i) => (
                 <div
@@ -186,7 +152,7 @@ export function CustomersSection({
                     type="number"
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => formatCurrency(Number(v))}
+                    tickFormatter={(v) => compactAxisNumber(Number(v))}
                   />
                   <ChartTooltip
                     cursor={false}
@@ -211,7 +177,7 @@ export function CustomersSection({
           <CardTitle>Customers Owing Us</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 [&>*]:min-w-0 gap-6 lg:grid-cols-2">
             <div className="space-y-3">
               {(data?.customers_owing || []).map((c, i) => {
                 const lastOwingDate = c.last_owing_date
@@ -268,7 +234,7 @@ export function CustomersSection({
                     type="number"
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => formatCurrency(Number(v))}
+                    tickFormatter={(v) => compactAxisNumber(Number(v))}
                   />
                   <ChartTooltip
                     cursor={false}

@@ -33,6 +33,9 @@ interface ExportDialogProps {
   trigger?: React.ReactNode;
   defaultFilename?: string;
   printRef?: React.RefObject<HTMLDivElement | null>; // For printing a specific component
+  /** Controlled mode: opened from elsewhere (e.g. a report's Export button); no trigger is rendered. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ExportDialog({
@@ -41,8 +44,13 @@ export function ExportDialog({
   trigger,
   defaultFilename = 'export',
   printRef,
+  open: controlledOpen,
+  onOpenChange,
 }: ExportDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => (isControlled ? onOpenChange?.(next) : setInternalOpen(next));
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [format, setFormat] = useState<ExportFormat>('excel');
   const [filename, setFilename] = useState(defaultFilename);
@@ -144,14 +152,16 @@ export function ExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm" className="ml-auto hidden h-8 lg:flex">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        )}
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button variant="outline" size="sm" className="ml-auto hidden h-8 lg:flex">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Export Data</DialogTitle>

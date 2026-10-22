@@ -4,6 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/shared/data-table/data-table';
+import { ExportDialog } from '@/components/shared/export/ExportDialog';
 import { DataTableColumnHeader } from '@/components/shared/data-table/data-table-column-header';
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay';
 import { StatCard } from './components/StatCard';
@@ -77,17 +78,21 @@ export function DiscountsSection({
   orgId,
   branchIds,
   dateRange,
+  exportOpen,
+  onExportClose,
 }: {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
+  exportOpen: boolean;
+  onExportClose: () => void;
 }) {
   const { data, isLoading } = useReportRpc<DiscountsReport>('get_discounts_report', orgId, branchIds, dateRange);
   const totals = data?.totals;
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <StatCard
           title="Discounts Given"
           value={<CurrencyDisplay amount={Number(totals?.amount ?? 0)} />}
@@ -115,10 +120,18 @@ export function DiscountsSection({
               storageKey="reports-discounts"
               defaultColumnVisibility={{ searchable: false }}
               orgId={orgId}
+              canExport={false}
             />
           )}
         </CardContent>
       </Card>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={(open) => !open && onExportClose()}
+        data={data?.discounts ?? []}
+        fields={exportFields}
+        defaultFilename="discounts"
+      />
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { compactAxisNumber } from './stockItems';
 import { useExpenses } from '@/hooks/useExpenseQueries';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
@@ -63,7 +64,8 @@ interface ExpensesSectionProps {
   orgId?: string;
   branchIds: string[];
   dateRange?: DateRange;
-  template: 'detailed' | 'pivot' | 'summary';
+  /** overview: figures, charts and the list · breakdown: grouped table */
+  view: 'overview' | 'breakdown';
   groupBy: 'category' | 'type';
   setGroupBy?: (v: 'category' | 'type') => void;
   exportOpen: boolean;
@@ -74,12 +76,15 @@ export function ExpensesSection({
   orgId,
   branchIds,
   dateRange,
-  template,
+  view,
   groupBy,
   setGroupBy,
   exportOpen,
   onExportClose,
 }: ExpensesSectionProps) {
+  const [layout, setLayout] = useState<'summary' | 'pivot'>('summary');
+  // The export builders still speak in templates.
+  const template: 'detailed' | 'pivot' | 'summary' = view === 'overview' ? 'detailed' : layout;
   const { formatCurrency } = useCurrency();
   const normalizedBranchIds =
     branchIds && branchIds.length > 0 ? branchIds : undefined;
@@ -347,7 +352,7 @@ export function ExpensesSection({
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle>Total Records</CardTitle>
@@ -382,28 +387,20 @@ export function ExpensesSection({
           </CardContent>
         </Card>
 
-        {template === 'pivot' && (
+        {view === 'breakdown' && (
           <ExpensesSettingsCard
-            title="Pivot Settings"
+            title="Breakdown"
             groupUnit={groupUnit}
             setGroupUnit={setGroupUnit}
             groupBy={groupBy}
             setGroupBy={setGroupBy}
-          />
-        )}
-
-        {template === 'summary' && (
-          <ExpensesSettingsCard
-            title="Summary Settings"
-            groupUnit={groupUnit}
-            setGroupUnit={setGroupUnit}
-            groupBy={groupBy}
-            setGroupBy={setGroupBy}
+            layout={layout}
+            setLayout={setLayout}
           />
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 [&>*]:min-w-0 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Expenditure Trend</CardTitle>
@@ -422,7 +419,7 @@ export function ExpensesSection({
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => formatCurrency(Number(v))}
+                    tickFormatter={(v) => compactAxisNumber(Number(v))}
                   />
                   <ChartTooltip
                     cursor={false}
@@ -457,7 +454,7 @@ export function ExpensesSection({
           </CardHeader>
           <CardContent>
             {breakdownData.length ? (
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid grid-cols-1 [&>*]:min-w-0 gap-6 lg:grid-cols-2">
                 <div className="space-y-3">
                   {breakdownData.map((s, i) => (
                     <div
@@ -553,7 +550,7 @@ export function ExpensesSection({
                   type="number"
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v) => formatCurrency(Number(v))}
+                  tickFormatter={(v) => compactAxisNumber(Number(v))}
                 />
                 <ChartTooltip
                   cursor={false}

@@ -13,6 +13,7 @@ import { UserInfo } from '@/components/shared/UserInfo';
 import { Banknote } from 'lucide-react';
 import { useState } from 'react';
 import { AddPaymentDialog } from '@/components/orders/AddPaymentDialog';
+import { orderDiscountLines } from '@/lib/discounts';
 
 interface OrderDetailsModalProps {
   open: boolean;
@@ -37,15 +38,15 @@ export function OrderDetailsModal({
     'Customer'
     : 'Walk-in Customer';
   const getPaymentStatusStyles = (status: string) => {
-    let className = 'bg-gray-100 text-gray-800 border-gray-200';
+    let className = 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800/60 dark:text-gray-200 dark:border-gray-700';
     if (status === 'paid')
-      className = 'bg-green-100 text-green-800 border-green-200';
+      className = 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800';
     if (status === 'partial')
-      className = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      className = 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800';
     if (status === 'unpaid')
-      className = 'bg-red-100 text-red-800 border-red-200';
+      className = 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800';
     if (status === 'refunded')
-      className = 'bg-purple-100 text-purple-800 border-purple-200';
+      className = 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
     return className;
   };
 
@@ -98,7 +99,7 @@ export function OrderDetailsModal({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-full hover:bg-yellow-100 text-yellow-700"
+                    className="h-6 w-6 rounded-full hover:bg-yellow-100 text-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-900/40"
                     title="Add Payment"
                     onClick={() => setShowPaymentDialog(true)}
                   >
@@ -148,33 +149,16 @@ export function OrderDetailsModal({
                     )}
                   </div>
                   <div className="col-span-2 text-right text-muted-foreground">
-                    {(() => {
-                      const quantity = Number(item.quantity ?? 0);
-                      const unitPrice = Number(item.unit_price ?? 0);
-                      const grossTotal = Number(item.total_price ?? 0);
-                      const discountAmount = Number(item.discount_amount ?? 0);
-                      const netTotalCandidate = grossTotal - discountAmount;
-                      const netTotal =
-                        discountAmount > 0 && netTotalCandidate >= 0
-                          ? netTotalCandidate
-                          : grossTotal;
-                      const netUnit =
-                        quantity > 0 ? netTotal / quantity : unitPrice;
-                      return formatCurrency(netUnit);
-                    })()}
+                    {formatCurrency(Number(item.unit_price ?? 0))}
                   </div>
                   <div className="col-span-2 text-right">{item.quantity}</div>
                   <div className="col-span-2 text-right font-medium">
-                    {(() => {
-                      const grossTotal = Number(item.total_price ?? 0);
-                      const discountAmount = Number(item.discount_amount ?? 0);
-                      const netTotalCandidate = grossTotal - discountAmount;
-                      const netTotal =
-                        discountAmount > 0 && netTotalCandidate >= 0
-                          ? netTotalCandidate
-                          : grossTotal;
-                      return formatCurrency(netTotal);
-                    })()}
+                    {formatCurrency(Number(item.total_price ?? 0))}
+                    {Number(item.discount_amount ?? 0) > 0 && (
+                      <div className="text-xs font-normal text-green-600 whitespace-nowrap">
+                        -{formatCurrency(Number(item.discount_amount))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -191,12 +175,12 @@ export function OrderDetailsModal({
                   <span>{formatCurrency(order.tax)}</span>
                 </div>
               )}
-              {order.discount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Discount</span>
-                  <span>-{formatCurrency(order.discount)}</span>
+              {orderDiscountLines(order).map((d) => (
+                <div key={d.key} className="flex justify-between text-sm text-green-600">
+                  <span>{d.label}</span>
+                  <span>-{formatCurrency(d.amount)}</span>
                 </div>
-              )}
+              ))}
               <div className="flex justify-between font-bold text-lg pt-2 border-t">
                 <span>Total</span>
                 <span>{formatCurrency(order.total_amount)}</span>

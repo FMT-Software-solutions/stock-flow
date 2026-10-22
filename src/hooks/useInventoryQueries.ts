@@ -100,27 +100,6 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     productImage: data.product?.image_url || undefined,
     categoryName: categoryData?.name,
     isDeleted: data.is_deleted,
-    discountId: data.discount_id,
-    discount: data.discount ? {
-      id: data.discount.id,
-      organizationId: data.discount.organization_id,
-      name: data.discount.name,
-      code: data.discount.code,
-      description: data.discount.description,
-      type: data.discount.type,
-      value: Number(data.discount.value),
-      startAt: data.discount.start_at,
-      expiresAt: data.discount.expires_at,
-      customerIds: data.discount.customer_ids,
-      branchIds: data.discount.branch_ids,
-      targetMode: data.discount.target_mode as 'all' | 'category' | 'product' | 'inventory' | undefined,
-      usageMode: data.discount.usage_mode as 'automatic' | 'manual' | undefined,
-      usageLimit: data.discount.usage_limit ?? null,
-      timesUsed: typeof data.discount.times_used === 'number' ? data.discount.times_used : 0,
-      isActive: data.discount.is_active,
-      createdAt: data.discount.created_at,
-      updatedAt: data.discount.updated_at,
-    } : undefined,
   };
 };
 
@@ -823,9 +802,6 @@ export function useInventoryEntries(organizationId?: string, branchIds?: string[
           creator:profiles!inventory_created_by_fkey2 (
             first_name,
             last_name
-          ),
-          discount:discounts (
-            *
           )
         `)
         .eq('organization_id', organizationId)

@@ -71,7 +71,9 @@ export function OrderActions({ order }: OrderActionsProps) {
     toast.success('Order number copied to clipboard');
   };
 
-  const totalItemsToRestore = order.items?.reduce((sum, item) => sum + Number(item.quantity), 0) || 0;
+  // Lines of products that don't track stock have no stock row to restore.
+  const totalItemsToRestore =
+    order.items?.reduce((sum, item) => sum + (item.inventory_id ? Number(item.quantity) : 0), 0) || 0;
   const shouldShowRestoreNote = totalItemsToRestore > 0 && order.status !== 'cancelled' && order.status !== 'refunded';
 
   const handleDelete = () => {

@@ -424,8 +424,9 @@ export function Dashboard() {
   }, [defaultDateRange, maxLookback.unit, minDate]);
 
   const handleGlobalDateChange = (next: DateRange | undefined) => {
+    // The picker's "All Time" preset sends no range; clearing goes through onClear.
     if (!next) {
-      setDateRange(defaultDateRange);
+      setDateRange(maxLookback.unit === 'forever' ? undefined : defaultDateRange);
       return;
     }
     if (!next.from) {

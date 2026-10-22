@@ -380,9 +380,8 @@ function DatePickerWithRangeInner({
               ) : (
                 format(date.from, 'MMM dd, yyyy')
               )
-            ) : (
-              // A matching preset (e.g. "All Time") already names the range.
-              !displayLabel && <span>{placeholder}</span>
+            ) : displayLabel ? null : (
+              <span>{placeholder}</span>
             )}
             {date && (
               <div

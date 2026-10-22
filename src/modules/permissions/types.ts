@@ -41,7 +41,8 @@ export type PermissionAction =
   | 'manage_org_appearance_prefs'
   | 'manage_notifications'
   | 'request_date_edit'
-  | 'approve_date_edit';
+  | 'approve_date_edit'
+  | 'give_discount';
 
 // 3. Permission Storage Structure
 export type DataLookback =

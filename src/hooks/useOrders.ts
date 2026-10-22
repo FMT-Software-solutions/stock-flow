@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/utils/supabase';
 import type { Order, CreateOrderInput, UpdateOrderInput } from '@/types/orders';
+import type { SaleDiscountRequest } from '@/types/discounts';
+import { toDiscountPayload } from '@/hooks/useSalePricing';
 
 export function useOrders(organizationId?: string, branchIds?: string[]) {
   return useQuery({
@@ -13,6 +15,7 @@ export function useOrders(organizationId?: string, branchIds?: string[]) {
         .select(`
           *,
           items:order_items(*),
+          discounts:order_discounts(*),
           payments:order_payments(*, creator:profiles!order_payments_created_by_fkey1(first_name, last_name)),
           branch:branches(id, name, abbreviation),
           customer:customers(id, first_name, last_name, email, phone),
@@ -76,6 +79,7 @@ export function useCustomerOrders(
         .select(`
           *,
           items:order_items(*),
+          discounts:order_discounts(*),
           branch:branches(id, name, abbreviation),
           customer:customers(id, first_name, last_name, email, phone)
         `)
@@ -110,6 +114,7 @@ export function useOrder(orderId?: string) {
         .select(`
           *,
           items:order_items(*),
+          discounts:order_discounts(*),
           payments:order_payments(*, creator:profiles!order_payments_created_by_fkey1(first_name, last_name)),
           branch:branches(id, name, abbreviation),
           customer:customers(id, first_name, last_name, email, phone),
@@ -126,20 +131,32 @@ export function useOrder(orderId?: string) {
   });
 }
 
+function invalidateAfterSale(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['orders'] });
+  queryClient.invalidateQueries({ queryKey: ['order'] });
+  queryClient.invalidateQueries({ queryKey: ['discounts'] });
+  queryClient.invalidateQueries({ queryKey: ['sale_pricing'] });
+  queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  queryClient.invalidateQueries({ queryKey: ['reports'] });
+  // Stock changes are made by DB triggers
+  queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
+  queryClient.invalidateQueries({ queryKey: ['products'] });
+}
+
 export function useCreateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ discountId, ...input }: CreateOrderInput & { discountId?: string }) => {
-      const { items, ...orderData } = input;
+    mutationFn: async ({ discounts, ...input }: CreateOrderInput & { discounts: SaleDiscountRequest; expectedTotal: number }) => {
+      const { items, expectedTotal, ...orderData } = input;
 
-      // One transaction: stock is locked and checked, the order and its items
-      // are inserted together, and the discount use is counted. Any failure
-      // (e.g. not enough stock) leaves nothing behind.
+      // One transaction: stock is locked and checked, discounts are validated
+      // and priced, the order and its items are inserted together. Any failure
+      // (not enough stock, a code that just ran out) leaves nothing behind.
       const { data: order, error } = await supabase.rpc('create_order', {
         p_order: orderData,
         p_items: items,
-        p_discount_id: discountId ?? null,
+        p_discounts: toDiscountPayload(discounts, expectedTotal),
       });
 
       if (error) throw error;
@@ -147,23 +164,42 @@ export function useCreateOrder() {
 
       return order as Order;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['valid_inventory_discounts'] });
-      queryClient.invalidateQueries({ queryKey: ['discounts'] });
-      // Invalidate inventory queries to reflect stock changes immediately (handled by DB trigger)
-      queryClient.invalidateQueries({ queryKey: ['inventory_entries'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
+    onSuccess: () => invalidateAfterSale(queryClient),
   });
 }
 
+/** Edits a whole sale (items, discounts, details) in one transaction. */
+export function useEditOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      items,
+      discounts,
+      expectedTotal,
+      ...orderData
+    }: UpdateOrderInput & { items: CreateOrderInput['items']; discounts: SaleDiscountRequest; expectedTotal: number }) => {
+      const { data, error } = await supabase.rpc('update_order', {
+        p_order_id: id,
+        p_order: orderData,
+        p_items: items,
+        p_discounts: toDiscountPayload(discounts, expectedTotal),
+      });
+      if (error) throw error;
+      return data as Order;
+    },
+    onSuccess: () => invalidateAfterSale(queryClient),
+  });
+}
+
+/** Changes order fields only (status, payment status...). Items: useEditOrder. */
 export function useUpdateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: UpdateOrderInput) => {
-      const { items, id, ...orderData } = input;
+    mutationFn: async (input: Omit<UpdateOrderInput, 'items'>) => {
+      const { id, ...orderData } = input;
       const patchedOrderData = { ...orderData };
 
       if (patchedOrderData.payment_status === 'refunded') {
@@ -171,48 +207,12 @@ export function useUpdateOrder() {
         patchedOrderData.paid_amount = 0;
       }
 
-      // 1. Update Order Details
       const { error: orderError } = await supabase
         .from('orders')
         .update(patchedOrderData)
         .eq('id', id);
 
       if (orderError) throw orderError;
-
-      // 2. Update Items (Replace strategy for simplicity)
-      if (items) {
-        // Delete existing - Trigger should restore stock
-        const { error: deleteError } = await supabase
-          .from('order_items')
-          .delete()
-          .eq('order_id', id);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new - Trigger should deduct stock
-        if (items.length > 0) {
-          // Query order to get org_id
-          const { data: existingOrder } = await supabase
-            .from('orders')
-            .select('organization_id')
-            .eq('id', id)
-            .single();
-
-          if (!existingOrder) throw new Error('Order not found');
-
-          const itemsWithIds = items.map(item => ({
-            ...item,
-            order_id: id,
-            organization_id: existingOrder.organization_id,
-          }));
-
-          const { error: itemsError } = await supabase
-            .from('order_items')
-            .insert(itemsWithIds);
-
-          if (itemsError) throw itemsError;
-        }
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });

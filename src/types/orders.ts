@@ -34,6 +34,22 @@ export interface OrderPayment {
   } | null;
 }
 
+/** A discount a sale got (snapshot; discount_id is null for a manual discount). */
+export interface OrderDiscount {
+  id: string;
+  order_id: string;
+  discount_id?: string | null;
+  kind: 'automatic' | 'code' | 'manual';
+  name: string;
+  code?: string | null;
+  target: 'items' | 'order';
+  value_type: 'percentage' | 'fixed_amount' | 'fixed_price';
+  value: number;
+  amount: number;
+  reason?: string | null;
+  created_at: string;
+}
+
 export interface Order {
   id: string;
   organization_id: string;
@@ -58,6 +74,7 @@ export interface Order {
   // Relations
   items?: OrderItem[];
   payments?: OrderPayment[];
+  discounts?: OrderDiscount[];
   customer?: {
     id: string;
     first_name?: string;
@@ -84,11 +101,12 @@ export interface CreateOrderInput {
   status?: OrderStatus;
   payment_status?: PaymentStatus;
   payment_method?: PaymentMethod;
-  total_amount: number;
+  /** subtotal, discount and total_amount are computed by create_order / update_order */
+  total_amount?: number;
   paid_amount: number;
-  subtotal: number;
+  subtotal?: number;
   tax: number;
-  discount: number;
+  discount?: number;
   notes?: string;
   items: Omit<OrderItem, 'id' | 'created_at' | 'organization_id' | 'order_id'>[];
 }

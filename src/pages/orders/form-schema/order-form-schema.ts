@@ -27,6 +27,17 @@ export const orderSchema = z.object({
       })
     )
     .min(1, 'At least one item is required'),
+  // Discounts the cashier asked for; the server decides what applies.
+  discountCodes: z.array(z.string()).optional(),
+  skippedDiscountIds: z.array(z.string()).optional(),
+  manualDiscount: z
+    .object({
+      valueType: z.enum(['percentage', 'fixed_amount']),
+      value: z.coerce.number().min(0),
+      reason: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type OrderFormValues = z.infer<typeof orderSchema>;

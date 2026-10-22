@@ -406,8 +406,13 @@ const MultipleSelector = ({
         return value.toLowerCase().includes(search.toLowerCase()) ? 1 : -1;
       };
     }
-    // Using default filter in `cmdk`. We don&lsquo;t have to provide it.
-    return undefined;
+    // Match what the user reads (the label, passed as keywords), not the value,
+    // which is usually an id. Plain substring, so results are predictable.
+    return (_value: string, search: string, keywords?: string[]) => {
+      const term = search.trim().toLowerCase();
+      if (!term) return 1;
+      return (keywords ?? []).some((k) => k.toLowerCase().includes(term)) ? 1 : 0;
+    };
   }, [creatable, commandProps?.filter]);
 
   return (
@@ -425,8 +430,8 @@ const MultipleSelector = ({
       shouldFilter={
         commandProps?.shouldFilter !== undefined
           ? commandProps.shouldFilter
-          : !onSearch
-      } // When onSearch is provided, we don&lsquo;t want to filter the options. You can still override it.
+          : !onSearch && !onSearchSync
+      } // When onSearch/onSearchSync is provided, the options are already filtered. You can still override it.
       filter={commandFilter()}
     >
       <div
@@ -577,6 +582,8 @@ const MultipleSelector = ({
                             <CommandItem
                               key={option.value}
                               value={option.value}
+                              // Values are usually ids; let typing match the label
+                              keywords={[option.label]}
                               disabled={option.disable}
                               onMouseDown={(e) => {
                                 e.preventDefault();

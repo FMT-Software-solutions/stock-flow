@@ -17,6 +17,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { findInstallerFiles, validateDownloadUrls } = require('./lib/installers');
 const { verifyGitHubAccess } = require('./lib/github');
+const { verifySanityAccess } = require('./publish-sanity');
 
 const envLocalPath = path.join(__dirname, '../../.env.local');
 const envPath = path.join(__dirname, '../../.env');
@@ -229,6 +230,15 @@ async function preflight() {
     problems.push(...githubProblems);
     if (githubProblems.length === 0) {
       log.success(`GH_TOKEN can publish to ${config.github.owner}/${config.github.repo}`);
+    }
+  }
+
+  if (config.sanity?.enabled) {
+    try {
+      const title = await verifySanityAccess(config);
+      log.success(`SANITY_WRITE_TOKEN can update ${title} on the marketplace`);
+    } catch (error) {
+      problems.push(`Sanity: ${error.message}`);
     }
   }
 

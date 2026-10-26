@@ -18,6 +18,7 @@
     "build:electron": "npx electron-builder --config electron-builder.yml --dir",
     "package": "npx electron-builder --config electron-builder.yml",
     "publish:supabase": "node release/scripts/publish-supabase.js",
+    "publish:sanity": "node release/scripts/publish-sanity.js",
     "publish:github": "node release/scripts/publish-github.js",
     "build:only": "cross-env NODE_ENV=production npm run electron:tsc && vite build --config vite.renderer.config.mts",
     "package:only": "npx electron-builder --config electron-builder.yml",

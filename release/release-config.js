@@ -73,6 +73,15 @@ module.exports = {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
   },
 
+  // Marketplace (fmtsoftware.com) publishing: release list + download link.
+  // Needs SANITY_WRITE_TOKEN in .env.local.
+  sanity: {
+    enabled: true,
+    projectId: 'cfyhidte',
+    dataset: 'production',
+    productId: '9eb786bd-1414-4eb7-8e9a-d093382ff34e', // StockFlow premiumApp
+  },
+
   // Build configuration
   build: {
     enabled: true, // Enabled for building and packaging

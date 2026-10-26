@@ -9,12 +9,14 @@
  *   4. make sure the installer is attached, complete, and downloadable
  *   5. only then publish the version to Supabase, so the app never offers
  *      users a download link that 404s
+ *   6. publish it to the fmtsoftware.com marketplace (Sanity)
  *
  * Every step checks before it acts, so it is safe to run as many times as
  * needed — including after a release that fully succeeded.
  *
  *   npm run release:finish                  # all of the above
  *   npm run release:finish -- --skip-supabase
+ *   npm run release:finish -- --skip-sanity
  */
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +35,7 @@ const { findInstallerFiles, validateDownloadUrls } = require('./lib/installers')
 const { verifyGitHubAccess } = require('./lib/github');
 const { createGitHubRelease } = require('./publish-github');
 const { publishToSupabase } = require('./publish-supabase');
+const { publishToSanity } = require('./publish-sanity');
 
 const colors = { reset: '\x1b[0m', red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', blue: '\x1b[34m', cyan: '\x1b[36m', magenta: '\x1b[35m', bright: '\x1b[1m' };
 const log = {
@@ -99,6 +102,7 @@ async function verifyDownload(url) {
 
 async function main() {
   const skipSupabase = process.argv.includes('--skip-supabase');
+  const skipSanity = process.argv.includes('--skip-sanity');
   const tagName = `v${config.version}`;
   log.header(`Finishing release ${tagName}`);
 
@@ -147,6 +151,14 @@ async function main() {
     log.info('Skipping Supabase (--skip-supabase). Publish later with: npm run publish:supabase');
   } else if (config.supabase?.enabled) {
     await publishToSupabase();
+  }
+
+  // Last: the website follows the app. A failure here leaves the app release
+  // live; rerun with npm run publish:sanity.
+  if (skipSanity) {
+    log.info('Skipping the marketplace (--skip-sanity). Publish later with: npm run publish:sanity');
+  } else if (config.sanity?.enabled) {
+    await publishToSanity();
   }
 
   log.header(`Release ${tagName} is live`);

@@ -22,6 +22,7 @@ import type { Branch } from '@/types';
 import { useBranchesPreferences } from '@/hooks/preferences/useBranchesPreferences';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Branches() {
   const { checkPermission } = useRoleCheck();
@@ -142,12 +143,7 @@ export function Branches() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0 flex-wrap space-y-4">
         <div className="mb-4 md:mb-0">
-          <h1 className="text-xl md:text-3xl font-bold tracking-tight">
-            Branch Management
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your organization branches and locations
-          </p>
+          <PageTitle>Branch Management</PageTitle>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 flex-wrap">

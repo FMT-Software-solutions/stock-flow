@@ -18,6 +18,7 @@ import { EditSaleDateDialog } from '@/components/orders/EditSaleDateDialog';
 import type { ActionRequest, ActionRequestItem } from '@/lib/action-requests/types';
 import { toast } from 'sonner';
 import { CheckCircle2, XCircle, Clock, Pencil } from 'lucide-react';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 function statusBadge(status: ActionRequest['status']) {
   const map: Record<ActionRequest['status'], { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -291,10 +292,7 @@ export function RequestsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Requests</h1>
-        <p className="text-sm text-muted-foreground">
-          Track action requests you have submitted, and review requests awaiting your decision.
-        </p>
+        <PageTitle hint="Track action requests you have submitted, and review requests awaiting your decision.">Requests</PageTitle>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'mine' | 'review')}>

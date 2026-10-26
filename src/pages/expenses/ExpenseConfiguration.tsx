@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -331,11 +330,6 @@ export function ExpenseConfiguration() {
                 ? `Types for ${getCategoryName(selectedCategoryId)}`
                 : 'Expense Types'}
             </CardTitle>
-            <CardDescription>
-              {selectedCategoryId
-                ? 'Manage types for this category'
-                : 'Select a category to manage types'}
-            </CardDescription>
           </div>
           {canCreateType && selectedCategoryId && (
             <Dialog open={isAddTypeOpen} onOpenChange={setIsAddTypeOpen}>

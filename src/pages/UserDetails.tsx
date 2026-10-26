@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useUser, useUserQueries } from '@/hooks/useUserQueries';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -300,10 +300,8 @@ export default function UserDetails() {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                {user.profile.first_name} {user.profile.last_name}
-              </h1>
-              <p className="text-sm text-muted-foreground">{user.profile.email}</p>
+              <h1 className="text-xl font-bold tracking-tight">{user.profile.first_name} {user.profile.last_name}</h1>
+<p className="text-sm text-muted-foreground">{user.profile.email}</p>
             </div>
           </div>
         </div>
@@ -315,7 +313,6 @@ export default function UserDetails() {
           <Card>
             <CardHeader>
               <CardTitle>User Details</CardTitle>
-              <CardDescription>Basic information and role assignment</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -430,9 +427,6 @@ export default function UserDetails() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div className="space-y-1">
                 <CardTitle>User Page Access & Permissions</CardTitle>
-                <CardDescription>
-                  Configure access rights for selected user.
-                </CardDescription>
               </div>
               {canEdit && (
                 <div className="flex items-center space-x-2">

@@ -332,12 +332,8 @@ export default function CustomerDetails() {
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        {customer.firstName} {customer.lastName}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {customer.email || customer.phone || '-'}
-                    </p>
+                    <h1 className="text-xl font-bold tracking-tight">{customer.firstName} {customer.lastName}</h1>
+<p className="text-sm text-muted-foreground">{customer.email || customer.phone || '-'}</p>
                 </div>
             </div>
 

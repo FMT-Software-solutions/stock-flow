@@ -191,7 +191,7 @@ export function InventoryItemDetails() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-base md:text-2xl font-bold tracking-tight">
+            <h1 className="text-xl font-bold tracking-tight">
               {inventory.productName}
             </h1>
             <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">

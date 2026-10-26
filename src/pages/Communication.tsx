@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MessageSquare, Mail, Phone, History, Send, CreditCard, Edit } from 'lucide-react';
+import { MessageSquare, Mail, Phone, History, Send, CreditCard, Edit, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +59,8 @@ export function Communication() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'compose');
+  // Tips and recent activity beside the composer: closed until opened, remembered.
+  const [sideOpen, setSideOpen] = useOrgPreference<boolean>(currentOrganization?.id, 'communication.sidePanelOpen', false);
   const verifyPurchaseMutation = useVerifySmsPurchase();
   const queryClient = useQueryClient();
 
@@ -328,12 +331,9 @@ export function Communication() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold text-foreground">Communication</h1>
-        </div>
+        <h1 className="text-xl font-bold tracking-tight">Communication</h1>
         <div className="flex items-center gap-2">
           <SenderIdManager />
           <SmsCreditWidget
@@ -347,7 +347,7 @@ export function Communication() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full h-[100px] md:h-fit md:grid-cols-4 lg:w-[800px]">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start lg:w-fit">
           <TabsTrigger value="compose" className="flex items-center gap-2">
             <Send className="h-4 w-4" /> Compose Message
           </TabsTrigger>
@@ -362,9 +362,21 @@ export function Communication() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="compose" className="space-y-6">
+        <TabsContent value="compose" className="space-y-4">
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSideOpen(!sideOpen)}
+              aria-expanded={sideOpen}
+            >
+              {sideOpen ? <PanelRightClose className="mr-2 h-4 w-4" /> : <PanelRightOpen className="mr-2 h-4 w-4" />}
+              Tips & activity
+            </Button>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+            <div className={sideOpen ? 'min-w-0 lg:col-span-2 space-y-6' : 'min-w-0 lg:col-span-3 space-y-6'}>
               <MessageTypeSelector messageType={messageType} onChange={setMessageType} />
 
               <RecipientSelector
@@ -521,7 +533,8 @@ export function Communication() {
               />
             </div>
 
-            <div className="space-y-6">
+            {sideOpen && (
+            <div className="min-w-0 space-y-6">
               <BestPractices />
 
               <Card>
@@ -531,12 +544,12 @@ export function Communication() {
                 <CardContent>
                   <div className="space-y-4">
                     {dbHistory.slice(0, 5).map((item: CommunicationHistory) => (
-                      <div key={item.id} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
+                      <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="flex min-w-0 items-center gap-2">
                           {item.type === 'email' ? <Mail className="h-3 w-3 text-muted-foreground" /> : <MessageSquare className="h-3 w-3 text-muted-foreground" />}
-                          <span className="truncate max-w-[230px]" title={item.subject || item.content}>{item.subject || item.content}</span>
+                          <span className="truncate" title={item.subject || item.content}>{item.subject || item.content}</span>
                         </div>
-                        <span className="text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
+                        <span className="shrink-0 text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</span>
                       </div>
                     ))}
                     {dbHistory.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>}
@@ -545,6 +558,7 @@ export function Communication() {
                 </CardContent>
               </Card>
             </div>
+            )}
           </div>
         </TabsContent>
 
@@ -552,7 +566,6 @@ export function Communication() {
           <Card>
             <CardHeader>
               <CardTitle>Message History</CardTitle>
-              <CardDescription>View previously sent messages</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -589,7 +602,6 @@ export function Communication() {
               <Card>
                 <CardHeader>
                   <CardTitle>Transaction History</CardTitle>
-                  <CardDescription>View your SMS credit purchases and usage</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <TransactionHistory organizationId={currentOrganization?.id} />
@@ -612,7 +624,6 @@ export function Communication() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Communication Templates</CardTitle>
-                <CardDescription>Manage your SMS and Email templates</CardDescription>
               </div>
               <Button onClick={() => {
                 setEditingTemplateId(null);

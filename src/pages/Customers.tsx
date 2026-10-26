@@ -12,6 +12,7 @@ import {
 } from './customers/fields';
 import { cn } from '@/lib/utils';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Customers() {
   const navigate = useNavigate();
@@ -35,10 +36,7 @@ export function Customers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Customers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your customer base
-          </p>
+          <PageTitle>Customers</PageTitle>
         </div>
         {canCreateCustomers && (
           <Button onClick={() => navigate('/customers/new')} disabled={isLoading}>

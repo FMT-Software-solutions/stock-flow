@@ -57,9 +57,6 @@ export function PersonalizationTags({ onInsertTag, disabled, tags }: Personaliza
       <PopoverContent className="w-64 p-0" align="end">
         <div className="p-3 border-b bg-muted/50">
           <h4 className="font-semibold text-sm">Personalization Variables</h4>
-          <p className="text-xs text-muted-foreground mt-1">
-            Click a variable to insert it at your cursor position.
-          </p>
         </div>
         <ScrollArea className="h-64">
           <div className="p-2 flex flex-col gap-1">

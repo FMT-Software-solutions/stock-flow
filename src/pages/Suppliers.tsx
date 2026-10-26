@@ -8,6 +8,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { supplierExportFields, supplierFilterFields } from './suppliers/fields';
 import { cn } from '@/lib/utils';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Suppliers() {
   const navigate = useNavigate();
@@ -23,10 +24,7 @@ export function Suppliers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Suppliers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your product suppliers and vendors
-          </p>
+          <PageTitle>Suppliers</PageTitle>
         </div>
         {canCreateSuppliers && (
           <Button

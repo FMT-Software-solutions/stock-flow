@@ -34,6 +34,7 @@ import type { OrganizationRoleEntity } from '@/types/organizations';
 import { Loader2, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function RolesSettings() {
   const { roles, isLoading, createRole, updateRole, deleteRole } = useRoles();
@@ -122,10 +123,7 @@ export function RolesSettings() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-medium">Roles & Permissions</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage roles and their access levels within your organization.
-          </p>
+          <PageTitle as="h2" className="text-lg font-medium" hint="Manage roles and their access levels within your organization.">Roles & Permissions</PageTitle>
         </div>
         <Button onClick={handleOpenCreate} size="sm">
           <Plus className="mr-2 h-4 w-4" />

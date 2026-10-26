@@ -7,7 +7,6 @@ import { Label } from '../components/ui/label';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
@@ -21,7 +20,7 @@ import {
 import { AvatarPicker } from '../components/shared/AvatarPicker';
 import { DateOfBirthPicker } from '../components/shared/DateOfBirthPicker';
 import { toast } from 'sonner';
-import { Loader2, Save, User } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import type { Profile } from '../types/user-management';
 
 export function Profile() {
@@ -141,18 +140,12 @@ export function Profile() {
     <div className="container mx-auto py-8 px-4 max-w-2xl">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center space-x-2">
-          <User className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Profile Settings</h1>
-        </div>
+        <h1 className="text-xl font-bold tracking-tight">Profile Settings</h1>
 
         {/* Avatar Section */}
         <Card>
           <CardHeader>
             <CardTitle>Avatar</CardTitle>
-            <CardDescription>
-              Choose an avatar to represent your profile
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-4">
@@ -164,9 +157,6 @@ export function Profile() {
                 lastName={formData.last_name}
                 size="xl"
               />
-              <div className="text-sm text-muted-foreground">
-                Click the edit icon to change your avatar
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -175,7 +165,6 @@ export function Profile() {
         <Card>
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your personal details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

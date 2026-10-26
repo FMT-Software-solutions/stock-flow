@@ -29,6 +29,7 @@ import { getProductStatTiles, type ProductRow } from './inventory/fields/product
 import { cn } from '@/lib/utils';
 import { InventoryTabs } from './inventory/components/InventoryTabs';
 import { productStatusLabel } from './inventory/product-editor/productHelpers';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Products() {
   const navigate = useNavigate();
@@ -157,10 +158,7 @@ export function Products() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Products</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your product catalog, categories and variations
-          </p>
+          <PageTitle>Products</PageTitle>
         </div>
         <div className="flex items-center gap-4">
           <InventoryTabs

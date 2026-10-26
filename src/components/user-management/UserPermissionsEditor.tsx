@@ -228,9 +228,6 @@ export function UserPermissionsEditor({
       <div className="flex items-center justify-between">
         {!hideTitleSection && <div>
           <h3 className="text-lg font-medium">Page Access & Permissions</h3>
-          <p className="text-sm text-muted-foreground">
-            Configure detailed access rights for this user.
-          </p>
         </div>}
         {readOnly && <Badge variant="secondary">Read Only</Badge>}
       </div>

@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Inventory() {
   const navigate = useNavigate();
@@ -141,10 +142,7 @@ export function Inventory() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your stock levels and entries
-          </p>
+          <PageTitle>Inventory</PageTitle>
         </div>
         <div className="flex items-center gap-4">
           {canCreateInventory && (

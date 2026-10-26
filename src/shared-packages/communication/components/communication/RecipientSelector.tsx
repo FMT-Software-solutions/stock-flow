@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Users } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -23,7 +23,6 @@ export function RecipientSelector({
     <Card>
       <CardHeader>
         <CardTitle>Recipients</CardTitle>
-        <CardDescription>Select who should receive this message</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {children}
@@ -36,9 +35,6 @@ export function RecipientSelector({
             value={additionalRecipients}
             onChange={(e: any) => setAdditionalRecipients(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
-            Useful for sending to people not in your database.
-          </p>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t">

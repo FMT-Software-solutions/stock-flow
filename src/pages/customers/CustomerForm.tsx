@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, FieldError } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Loader2, X } from 'lucide-react';
 import {
@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { BranchFormSelector } from '@/components/shared/BranchFormSelector';
 import { ModernFileUpload } from '@/components/shared/ModernFileUpload';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from '@/utils/cloudinary';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 const customerSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
@@ -145,14 +146,7 @@ export function CustomerForm() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditing ? 'Edit Customer' : 'New Customer'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isEditing
-              ? 'Update customer information'
-              : 'Add a new customer to your database'}
-          </p>
+          <PageTitle>{isEditing ? 'Edit Customer' : 'New Customer'}</PageTitle>
         </div>
       </div>
 
@@ -265,9 +259,6 @@ export function CustomerForm() {
         <Card>
           <CardHeader>
             <CardTitle>Customer Pictures</CardTitle>
-            <CardDescription>
-              Upload up to 3 pictures for this customer (e.g., store front, ID, profile).
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Controller

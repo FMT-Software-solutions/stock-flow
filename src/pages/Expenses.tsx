@@ -20,6 +20,7 @@ import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import type { DataLookback, UserPermissions } from '@/modules/permissions';
 import type { DateRange } from 'react-day-picker';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 /** The table's date filter, if any. */
 const currentDateRange = (filters: { id: string; value: unknown }[]) => {
@@ -129,10 +130,7 @@ export function Expenses() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Expenses</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage your expenses and categories.
-          </p>
+          <PageTitle>Expenses</PageTitle>
         </div>
         {canCreateExpenses && (
           <div className="flex gap-2">

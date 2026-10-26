@@ -54,9 +54,6 @@ export function SuppliersSection({
     <>
       <div className="flex items-end justify-between mb-4">
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-muted-foreground">
-            Suppliers summary and insights
-          </span>
         </div>
       </div>
 

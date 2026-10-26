@@ -51,6 +51,7 @@ import {
   type OrderFormValues,
 } from './form-schema/order-form-schema';
 import { OrderSuccessBanner } from './OrderSuccessBanner';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function OrderForm() {
   const { id } = useParams();
@@ -601,14 +602,7 @@ function OrderFormInner({
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">
-                {isEditing ? 'Edit Sale or Order' : 'New Sale or Order'}
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                {isEditing
-                  ? 'Update sale or order details'
-                  : 'Record a new sale or order'}
-              </p>
+              <PageTitle>{isEditing ? 'Edit Sale or Order' : 'New Sale or Order'}</PageTitle>
             </div>
           </div>
 

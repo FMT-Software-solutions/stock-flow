@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useDebounceValue } from '@/hooks/useDebounce';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export default function UserManagement() {
   const { checkPermission, isBranchAdmin, isOwner, isAdmin } = useRoleCheck();
@@ -237,10 +238,7 @@ export default function UserManagement() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage users and their permissions
-          </p>
+          <PageTitle>User Management</PageTitle>
         </div>
         {canCreate && (
           <UserAddDialog

@@ -16,6 +16,7 @@ import { ChevronLeft } from "lucide-react"
 import { useCreateSupplier, useUpdateSupplier, useSupplier } from "@/hooks/useInventoryQueries"
 import { useOrganization } from "@/contexts/OrganizationContext"
 import { toast } from "sonner"
+import { PageTitle } from '@/components/shared/PageTitle';
 
 const supplierSchema = z.object({
   name: z.string().min(2, "Company name is required"),
@@ -96,12 +97,7 @@ export function SupplierForm() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditing ? "Edit Supplier" : "New Supplier"}
-          </h1>
-          <p className="text-muted-foreground">
-            {isEditing ? "Update supplier information" : "Add a new supplier to your list"}
-          </p>
+          <PageTitle>{isEditing ? "Edit Supplier" : "New Supplier"}</PageTitle>
         </div>
       </div>
 

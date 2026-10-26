@@ -22,6 +22,7 @@ import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import type { DataLookback, UserPermissions } from '@/modules/permissions';
 import type { DateRange } from 'react-day-picker';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Orders() {
   const navigate = useNavigate();
@@ -180,10 +181,7 @@ export function Orders() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Sales & Orders</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage inventory sales and orders
-          </p>
+          <PageTitle>Sales & Orders</PageTitle>
         </div>
         {canCreateOrders && (
           <Button

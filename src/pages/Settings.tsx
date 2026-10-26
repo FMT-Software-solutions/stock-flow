@@ -5,7 +5,6 @@ import { Button } from '../components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
@@ -47,6 +46,7 @@ import { toast } from 'sonner';
 import { isElectron } from '../utils/asset-path';
 import { useRoleCheck } from '../components/auth/RoleGuard';
 import { Shield } from 'lucide-react';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Settings() {
   const { currentOrganization, updateOrganization } = useOrganization();
@@ -358,10 +358,7 @@ export function Settings() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Organization Settings</h1>
-          <p className="text-muted-foreground mt-2">
-            Configure your organization details, branding, and preferences
-          </p>
+          <PageTitle>Organization Settings</PageTitle>
         </div>
       </div>
 
@@ -427,9 +424,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Organization Details</CardTitle>
-                <CardDescription>
-                  Basic information about your organization
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -556,9 +550,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Organization Logo</CardTitle>
-                <CardDescription>
-                  Upload and configure your organization's logo
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-start space-x-6">
@@ -620,9 +611,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Theme Settings</CardTitle>
-                <CardDescription>
-                  Switch between light and dark modes
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ThemeSwitcher />
@@ -632,9 +620,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Layout Selection</CardTitle>
-                <CardDescription>
-                  Choose how the application navigation and structure appears
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <LayoutSelector />
@@ -644,10 +629,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Theme Selection</CardTitle>
-                <CardDescription>
-                  Choose from predefined themes, custom themes, or create custom
-                  colors
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <ThemeSelector />
@@ -661,9 +642,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Configure which notifications you want to receive
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -674,9 +652,6 @@ export function Settings() {
                     >
                       Role Changes
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when user roles are modified
-                    </p>
                   </div>
                   <Switch
                     id="roleChanges"
@@ -697,9 +672,6 @@ export function Settings() {
                     >
                       Security Alerts
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Important security notifications and alerts
-                    </p>
                   </div>
                   <Switch
                     id="securityAlerts"
@@ -720,9 +692,6 @@ export function Settings() {
                     >
                       App Updates
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Notifications about new features and updates
-                    </p>
                   </div>
                   <Switch
                     id="appUpdates"
@@ -743,9 +712,6 @@ export function Settings() {
                     >
                       New User Added
                     </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when a new user joins the organization
-                    </p>
                   </div>
                   <Switch
                     id="newUserAdded"
@@ -787,9 +753,6 @@ export function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Software Updates</CardTitle>
-                <CardDescription>
-                  Check for application updates and install new versions
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <UpdateSettings />

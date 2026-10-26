@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { CreateDiscountSheet } from './inventory/components/CreateDiscountSheet';
 import { DiscountManager } from './inventory/DiscountManager';
+import { PageTitle } from '@/components/shared/PageTitle';
 
 export function Discounts() {
   const { checkPermission, isOwner } = useRoleCheck();
@@ -19,10 +20,7 @@ export function Discounts() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Discounts</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your discount rules and codes
-          </p>
+          <PageTitle>Discounts</PageTitle>
         </div>
         <div className="flex items-center gap-4">
           {canCreateDiscount && (

@@ -11,7 +11,6 @@ import { Button } from '../ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '../ui/card';
@@ -150,9 +149,6 @@ export function HelpDrawer({ children }: HelpDrawerProps) {
                 <Card className="md:col-span-2">
                   <CardHeader>
                     <CardTitle>Getting Started</CardTitle>
-                    <CardDescription>
-                      Quick guide to using this application
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2">

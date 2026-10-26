@@ -1,34 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Box,
-  AlertTriangle,
-  Settings2,
-} from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Package, Plus, ReceiptText, Settings2, Tag } from 'lucide-react';
+import {
+  endOfDay,
+  format,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+  subDays,
+  subMonths,
+  subYears,
+} from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
-import {
-  useDashboardStats,
-  type InventoryStats,
-  type ProductStats,
-  type SalesStats,
-  type ExpenseStats,
-  type CustomerStats,
-  type SupplierStats,
-  type UserStats,
-  type BranchStats,
-  type TrendData,
-} from '@/hooks/useDashboardStats';
-import type { StatsGroup } from '@/types/stats';
 import { DatePickerWithRange } from '@/components/shared/date-range-picker';
-import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,36 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { setOrgKV } from '@/lib/dexie';
-import { useOrgArrayPreference } from '@/hooks/preferences/useOrgArrayPreference';
-import { useProducts, useInventoryEntries } from '@/hooks/useInventoryQueries';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { cn } from '@/lib/utils';
-import {
-  endOfDay,
-  startOfDay,
-  startOfMonth,
-  startOfWeek,
-  startOfYear,
-  subDays,
-  subMonths,
-  subYears,
-} from 'date-fns';
-import type { DataLookback, UserPermissions } from '@/modules/permissions';
-import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
-import { useRoleCheck } from '@/components/auth/RoleGuard';
 import {
   Select,
   SelectContent,
@@ -75,23 +34,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useOrgArrayPreference } from '@/hooks/preferences/useOrgArrayPreference';
+import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
+import { useRoleCheck } from '@/components/auth/RoleGuard';
+import type { DataLookback, UserPermissions } from '@/modules/permissions';
+import { useAiSummary, useDashboardSummary } from '@/hooks/useDashboardSummary';
+import { AddExpenseDialog } from './expenses/AddExpenseDialog';
+import { buildPeriod } from './dashboard/period';
+import { useChartData } from './dashboard/useChartData';
+import {
+  AiSummaryCard,
+  BranchesCard,
+  CountsStrip,
+  KpiTiles,
+  NeedsAttention,
+  PaymentsCard,
+  RecentSales,
+  SalesChart,
+  TopProducts,
+} from './dashboard/DashboardSections';
 
 // --- Types ---
-type SectionId =
-  | 'inventory'
-  | 'products'
-  | 'sales'
-  | 'expenses'
-  | 'customers'
-  | 'suppliers'
-  | 'users'
-  | 'branches'
-  | 'low_stock';
 
-interface DashboardSection {
-  id: SectionId;
-  label: string;
-}
+type SectionId =
+  | 'summary'
+  | 'figures'
+  | 'chart'
+  | 'attention'
+  | 'top_products'
+  | 'payments'
+  | 'branches'
+  | 'recent'
+  | 'counts';
 
 type DashboardDatePreset =
   | 'today'
@@ -102,197 +76,40 @@ type DashboardDatePreset =
   | 'last_30_days'
   | 'all_time';
 
-const ALL_SECTIONS: DashboardSection[] = [
-  { id: 'inventory', label: 'Inventory Stats' },
-  { id: 'products', label: 'Product Stats' },
-  { id: 'sales', label: 'Sales & Orders' },
-  { id: 'expenses', label: 'Expenses' },
-  { id: 'customers', label: 'Customers' },
-  { id: 'suppliers', label: 'Suppliers' },
-  { id: 'users', label: 'Users' },
+const ALL_SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'figures', label: 'Key figures' },
+  { id: 'chart', label: 'Sales chart' },
+  { id: 'attention', label: 'Needs attention' },
+  { id: 'top_products', label: 'Top products' },
+  { id: 'payments', label: 'Payments received' },
   { id: 'branches', label: 'Branches' },
-  { id: 'low_stock', label: 'Low Stock Items' },
+  { id: 'recent', label: 'Recent sales' },
+  { id: 'counts', label: 'Counts' },
 ];
 
-function ChartSection({
-  data,
-  dataKey,
-  color,
-  type = 'area',
-  currency = false,
-  formatCurrency,
-}: {
-  data: TrendData[];
-  dataKey: string;
-  color: string;
-  type?: 'area' | 'bar';
-  currency?: boolean;
-  formatCurrency?: (val: number) => string;
-}) {
-  if (!data || data.length === 0) return null;
-
-  const formatValue = (value: unknown) => {
-    if (!currency || !formatCurrency) return value;
-    return typeof value === 'number' ? formatCurrency(value) : value;
-  };
-
-  const formatTick = (value: unknown) => {
-    const formatted = formatValue(value);
-    return typeof formatted === 'string' ? formatted : String(formatted);
-  };
-
-  return (
-    <div className="w-full mt-4">
-      <ResponsiveContainer width="100%" height={200}>
-        {type === 'area' ? (
-          <AreaChart data={data}>
-            <defs>
-              <linearGradient id={`color-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 12 }}
-              minTickGap={30}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 12 }}
-              tickFormatter={(val) => formatTick(val)}
-            />
-            <Tooltip
-              formatter={(val) => formatValue(val) as string | number}
-              labelStyle={{ color: 'black' }}
-            />
-            <Area
-              type="monotone"
-              dataKey={dataKey}
-              stroke={color}
-              fillOpacity={1}
-              fill={`url(#color-${dataKey})`}
-            />
-          </AreaChart>
-        ) : (
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 12 }}
-              minTickGap={30}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 12 }}
-              tickFormatter={(val) => formatTick(val)}
-            />
-            <Tooltip
-              formatter={(val) => formatValue(val) as string | number}
-              cursor={{ fill: 'transparent' }}
-              labelStyle={{ color: 'black' }}
-            />
-            <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        )}
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// Wrapper for a Dashboard Card Section
-function DashboardMetricCard<TData>({
-  title,
-  groups,
-  data,
-  chart,
-  className,
-  loading,
-}: {
-  title: string;
-  groups: StatsGroup<TData>[];
-  data: TData[];
-  chart?: React.ReactNode;
-  className?: string;
-  loading?: boolean;
-}) {
-  return (
-    <Card className={cn('w-full flex flex-col', loading && 'opacity-60', className)}>
-      <CardHeader className="flex flex-column md:flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1">
-        <div className={cn('grid gap-4', loading && 'pointer-events-none')}>
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-1 gap-4">
-            {groups.map((group) => (
-              <div key={group.id} className="grid grid-cols-2 gap-4">
-                {group.fields.map(field => {
-                  const result = field.calculate(data);
-                  const Icon = field.icon;
-                  return (
-                    <div key={field.id} className="flex flex-col space-y-1">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        {Icon && <Icon className="h-3 w-3" />}
-                        {field.label}
-                      </span>
-                      <div className="flex items-baseline gap-2">
-                        <span className={cn("text-sm sm:text-base md:text-xl font-bold", field.className)}>
-                          {result.value}
-                        </span>
-                        {result.subValue && (
-                          <span className="text-xs text-muted-foreground">
-                            {result.subValue}
-                          </span>
-                        )}
-                      </div>
-                      {result.trendValue && (
-                        <span className={cn(
-                          "text-xs font-medium",
-                          result.trend === 'up' ? "text-green-600" :
-                            result.trend === 'down' ? "text-red-600" : "text-muted-foreground"
-                        )}>
-                          {result.trendValue}
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-          {/* Chart Section */}
-          {chart}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+const greeting = (now: Date) => {
+  const h = now.getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+};
 
 export function Dashboard() {
   const { currentOrganization } = useOrganization();
-  const { formatCurrency } = useCurrency();
-  const { selectedBranchIds } = useBranchContext();
+  const orgId = currentOrganization?.id;
+  const { user } = useAuth();
+  const { formatCurrency, currency } = useCurrency();
+  const { selectedBranchIds, availableBranches } = useBranchContext();
   const { checkPermission } = useRoleCheck();
+  const [expenseOpen, setExpenseOpen] = useState(false);
 
-  const canEditInventory = checkPermission('inventory', 'edit');
-  const canEditProducts = checkPermission('products', 'edit');
-
-  // Visibility State
   const [visibleSections, setVisibleSections] = useOrgArrayPreference<SectionId>(
-    currentOrganization?.id,
-    'dashboard.visibleSections',
-    ALL_SECTIONS.map(s => s.id)
+    orgId,
+    'dashboard.sections.v2',
+    ALL_SECTIONS.map((s) => s.id)
   );
+  const [summaryOpen, setSummaryOpen] = useOrgPreference<boolean>(orgId, 'dashboard.summaryOpen', false);
   const [defaultDatePreset, setDefaultDatePreset] = useOrgPreference<DashboardDatePreset>(
-    currentOrganization?.id,
+    orgId,
     'dashboard.defaultDatePreset',
     'this_month'
   );
@@ -447,299 +264,61 @@ export function Dashboard() {
     );
   };
 
-  // --- Queries ---
-  const stats = useDashboardStats({
-    organizationId: currentOrganization?.id,
-    branchIds: selectedBranchIds,
-    dateRange,
-  });
+  // --- Data ---
 
-  // Low stock query
-  const { data: allProducts = [] } = useProducts(currentOrganization?.id);
-  const { data: inventoryEntries = [] } = useInventoryEntries(currentOrganization?.id, selectedBranchIds, true);
+  const period = useMemo(() => buildPeriod(dateRange, new Date(), minDate), [dateRange, minDate]);
+  const summary = useDashboardSummary(orgId, selectedBranchIds, period);
+  const data = summary.data;
+  const loading = summary.isFetching;
 
-  const lowStockProducts = useMemo(() => {
-    return allProducts
-      .filter(p => {
-        if (!p.trackStock) return false;
-        const threshold = Number(p.minStockLevel ?? 0);
-        return p.quantity <= 0 || p.quantity <= threshold;
-      })
-      .sort((a, b) => a.quantity - b.quantity);
-  }, [allProducts]);
+  const branchLabel =
+    selectedBranchIds.length === 0 || selectedBranchIds.length >= availableBranches.length
+      ? 'All branches'
+      : availableBranches
+          .filter((b) => selectedBranchIds.includes(b.id))
+          .map((b) => b.name)
+          .join(', ');
 
-  const lowStockInventories = useMemo(() => {
-    return inventoryEntries
-      .filter(i => {
-        const threshold = Number(i.minStockLevel ?? 0);
-        return i.quantity <= 0 || i.quantity <= threshold;
-      })
-      .sort((a, b) => a.quantity - b.quantity);
-  }, [inventoryEntries]);
+  const ai = useAiSummary(
+    { organizationId: orgId, branchIds: selectedBranchIds, branchLabel, period, currency },
+    summaryOpen && visibleSections.includes('summary')
+  );
 
-  // --- Stats Groups Definitions ---
+  const chartData = useChartData(period, data?.first_sale, data?.series ?? [], data?.previous_series ?? []);
+  const netSeries = useMemo(() => chartData.map((r) => r.net), [chartData]);
+  const orderSeries = useMemo(() => chartData.map((r) => r.orders), [chartData]);
 
-  const inventoryGroups: StatsGroup<InventoryStats>[] = [
-    {
-      id: 'inventory-main',
-      title: 'Inventory Overview',
-      fields: [
-        {
-          id: 'total_items',
-          label: 'Total Items',
-          calculate: (data) => ({ value: data[0]?.total_items ?? 0 }),
-        },
-        {
-          id: 'low_stock',
-          label: 'Low Stock',
-          calculate: (data) => ({
-            value: data[0]?.low_stock_items ?? 0,
-            trend: (data[0]?.low_stock_items ?? 0) > 0 ? 'down' : 'neutral',
-            trendValue: (data[0]?.low_stock_items ?? 0) > 0 ? 'Action needed' : undefined
-          }),
-          className: 'text-orange-500',
-        },
-        {
-          id: 'out_of_stock',
-          label: 'Out of Stock',
-          calculate: (data) => ({
-            value: data[0]?.out_of_stock_items ?? 0,
-            trend: (data[0]?.out_of_stock_items ?? 0) > 0 ? 'down' : 'neutral',
-            trendValue: (data[0]?.out_of_stock_items ?? 0) > 0 ? 'Critical' : undefined
-          }),
-          className: 'text-red-500',
-        },
-      ],
-    },
-  ];
+  const toggleSection = (id: SectionId) =>
+    setVisibleSections(
+      visibleSections.includes(id) ? visibleSections.filter((s) => s !== id) : [...visibleSections, id]
+    );
+  const show = (id: SectionId) => visibleSections.includes(id);
 
-  const productGroups: StatsGroup<ProductStats>[] = [
-    {
-      id: 'products-main',
-      title: 'Product Catalog',
-      fields: [
-        {
-          id: 'total',
-          label: 'Total Products',
-          calculate: (data) => ({ value: data[0]?.total_products ?? 0 }),
-        },
-        {
-          id: 'active',
-          label: 'Active',
-          calculate: (data) => ({ value: data[0]?.active_products ?? 0 }),
-        },
-        {
-          id: 'top_cat',
-          label: 'Top Category',
-          calculate: (data) => ({
-            value: data[0]?.top_categories?.[0]?.category ?? '-',
-            subValue: data[0]?.top_categories?.[0] ? `${data[0].top_categories[0].count} items` : undefined
-          }),
-        },
-      ],
-    },
-  ];
-
-  const salesGroups: StatsGroup<SalesStats>[] = [
-    {
-      id: 'sales-main',
-      title: 'Sales & Revenue',
-      cardVariant: 'glass',
-      fields: [
-        {
-          id: 'gross_sales',
-          label: 'Gross Sales',
-          calculate: (data) => ({ value: formatCurrency(data[0]?.gross_sales ?? 0) }),
-          className: 'text-blue-600',
-        },
-        {
-          id: 'revenue',
-          label: 'Revenue Collected',
-          calculate: (data) => {
-            const current = data[0]?.revenue_from_current_sales ?? 0;
-            const previous = data[0]?.revenue_from_previous_sales ?? 0;
-            const total = data[0]?.revenue_collected ?? data[0]?.total_revenue ?? 0;
-
-            return {
-              value: formatCurrency(total),
-              subValue: (current > 0 || previous > 0) ? (
-                <div className="flex flex-col text-[10px] mt-1 text-muted-foreground/80 font-normal">
-                  <span>From Current Sales: {formatCurrency(current)}</span>
-                  <span>From Previous Sales: {formatCurrency(previous)}</span>
-                </div>
-              ) : undefined
-            };
-          },
-          className: 'text-green-600',
-        },
-        {
-          id: 'owings',
-          label: 'Owings',
-          calculate: (data) => ({ value: formatCurrency(data[0]?.owings ?? 0) }),
-          className: 'text-amber-600',
-        },
-        {
-          id: 'refunds',
-          label: 'Refunds',
-          calculate: (data) => ({ value: formatCurrency(data[0]?.refunds ?? 0) }),
-          className: 'text-red-600',
-        },
-        {
-          id: 'orders',
-          label: 'Total New Orders',
-          calculate: (data) => ({ value: data[0]?.total_orders ?? 0 }),
-        },
-        {
-          id: 'completed',
-          label: 'Completed Orders',
-          calculate: (data) => ({ value: data[0]?.breakdown?.completed ?? 0 }),
-        },
-        {
-          id: 'pending',
-          label: 'Pending Orders',
-          calculate: (data) => ({ value: data[0]?.breakdown?.pending ?? 0 }),
-        },
-      ],
-    },
-  ];
-
-  const expenseGroups: StatsGroup<ExpenseStats>[] = [
-    {
-      id: 'expenses-main',
-      title: 'Expenditure',
-      fields: [
-        {
-          id: 'total_exp',
-          label: 'Total Expenses',
-          calculate: (data) => ({ value: formatCurrency(data[0]?.total_expenditure ?? 0) }),
-          className: 'text-red-600',
-        },
-        {
-          id: 'records',
-          label: 'Records',
-          calculate: (data) => ({ value: data[0]?.total_records ?? 0 }),
-        },
-        {
-          id: 'top_cat',
-          label: 'Top Category',
-          calculate: (data) => ({
-            value: data[0]?.top_category?.category ?? '-',
-            subValue: data[0]?.top_category ? formatCurrency(data[0].top_category.amount) : undefined
-          }),
-        },
-      ],
-    },
-  ];
-
-  const customerGroups: StatsGroup<CustomerStats>[] = [
-    {
-      id: 'customers-main',
-      title: 'Customers',
-      cardVariant: 'glass',
-      fields: [
-        {
-          id: 'total',
-          label: 'Total Customers',
-          calculate: (data) => ({ value: data[0]?.total_customers ?? 0 }),
-        },
-        {
-          id: 'new',
-          label: 'New (Period)',
-          calculate: (data) => ({ value: data[0]?.new_this_period ?? 0 }),
-          className: 'text-blue-500',
-        },
-      ],
-    },
-  ];
-
-  const supplierGroups: StatsGroup<SupplierStats>[] = [
-    {
-      id: 'suppliers-main',
-      title: 'Suppliers',
-      fields: [
-        {
-          id: 'total',
-          label: 'Total Suppliers',
-          calculate: (data) => ({ value: data[0]?.total_suppliers ?? 0 }),
-        },
-      ],
-    },
-  ];
-
-  const userGroups: StatsGroup<UserStats>[] = [
-    {
-      id: 'users-main',
-      title: 'Users',
-      fields: [
-        {
-          id: 'total',
-          label: 'Total Users',
-          calculate: (data) => ({ value: data[0]?.total_users ?? 0 }),
-        },
-        {
-          id: 'active',
-          label: 'Active',
-          calculate: (data) => ({ value: data[0]?.active_users ?? 0 }),
-          className: 'text-green-600',
-        },
-        {
-          id: 'inactive',
-          label: 'Inactive',
-          calculate: (data) => ({ value: data[0]?.inactive_users ?? 0 }),
-          className: 'text-gray-500',
-        },
-      ],
-    },
-  ];
-
-  const branchGroups: StatsGroup<BranchStats>[] = [
-    {
-      id: 'branches-main',
-      title: 'Branches',
-      fields: [
-        {
-          id: 'total',
-          label: 'Total Branches',
-          calculate: (data) => ({ value: data[0]?.total_branches ?? 0 }),
-        },
-        {
-          id: 'active',
-          label: 'Active',
-          calculate: (data) => ({ value: data[0]?.active_branches ?? 0 }),
-          className: 'text-green-600',
-        },
-      ],
-    },
-  ];
-
-  const toggleSection = (id: SectionId) => {
-    setVisibleSections(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      const orgId = currentOrganization?.id;
-      if (orgId) {
-        setOrgKV<SectionId[]>(orgId, 'dashboard.visibleSections', next).catch(() => { });
-      }
-      return next;
-    });
-  };
-
-  const isDashboardRangeLoading =
-    stats.sales.isFetching || stats.expenses.isFetching || stats.customers.isFetching;
+  const now = new Date();
+  const firstName = user?.profile?.first_name?.trim();
+  const canSell = checkPermission('orders', 'create');
+  const canAddProduct = checkPermission('products', 'create');
+  const canStock = checkPermission('inventory', 'edit') || checkPermission('inventory', 'create');
+  const canExpense = checkPermission('expenses', 'create');
 
   return (
-    <div className="space-y-6">
-      {/* Header Controls */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Overview of your organization's performance.</p>
+    <div className="mx-auto flex max-w-[1360px] flex-col gap-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[13px] text-muted-foreground">
+            {format(now, 'EEEE, d MMMM')} · {branchLabel}
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {greeting(now)}
+            {firstName ? `, ${firstName}` : ''}
+          </h1>
         </div>
-
         <div className="flex items-center gap-2">
           <DatePickerWithRange
             date={dateRange}
             setDate={handleGlobalDateChange}
-            disabled={isDashboardRangeLoading}
+            disabled={loading}
             minDate={minDate}
             maxDate={maxDate}
             onClear={() => setDateRange(defaultDateRange)}
@@ -747,21 +326,16 @@ export function Dashboard() {
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" title="Customize Dashboard" className='h-8'>
+              <Button variant="outline" size="icon" aria-label="Customize dashboard" className="h-8">
                 <Settings2 className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Default Date Preset</DropdownMenuLabel>
+              <DropdownMenuLabel>Default period</DropdownMenuLabel>
               <div className="px-2 pb-2">
-                <Select
-                  value={effectiveDatePreset}
-                  onValueChange={(value) =>
-                    setDefaultDatePreset(value as DashboardDatePreset)
-                  }
-                >
+                <Select value={effectiveDatePreset} onValueChange={(value) => setDefaultDatePreset(value as DashboardDatePreset)}>
                   <SelectTrigger className="h-8 w-full">
-                    <SelectValue placeholder="Select default" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {datePresetOptions.map((option) => (
@@ -773,13 +347,13 @@ export function Dashboard() {
                 </Select>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Visible Sections</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Show</DropdownMenuLabel>
               {ALL_SECTIONS.map((section) => (
                 <DropdownMenuCheckboxItem
                   key={section.id}
-                  checked={visibleSections.includes(section.id)}
+                  checked={show(section.id)}
                   onCheckedChange={() => toggleSection(section.id)}
+                  onSelect={(e) => e.preventDefault()}
                 >
                   {section.label}
                 </DropdownMenuCheckboxItem>
@@ -789,244 +363,92 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-
-        {/* Row 1: Sales & Expenses */}
-        {visibleSections.includes('sales') && (
-          <DashboardMetricCard
-            title="Sales"
-            className="lg:col-span-2"
-            groups={salesGroups}
-            data={stats.sales.data ? [stats.sales.data] : ([] as SalesStats[])}
-            loading={stats.sales.isFetching}
-            chart={
-              <ChartSection
-                data={(stats.sales.data?.trend ?? []) as TrendData[]}
-                dataKey="value"
-                color="#16a34a"
-                currency
-                formatCurrency={formatCurrency}
-              />
-            }
-          />
-        )}
-
-        {visibleSections.includes('expenses') && (
-          <DashboardMetricCard
-            title="Expenses"
-            className="lg:col-span-2"
-            groups={expenseGroups}
-            data={stats.expenses.data ? [stats.expenses.data] : ([] as ExpenseStats[])}
-            loading={stats.expenses.isFetching}
-            chart={
-              <ChartSection
-                data={(stats.expenses.data?.trend ?? []) as TrendData[]}
-                dataKey="value"
-                color="#dc2626"
-                currency
-                formatCurrency={formatCurrency}
-              />
-            }
-          />
-        )}
-
-        {/* Row 2: Customers & Low Stock */}
-        {visibleSections.includes('customers') && (
-          <DashboardMetricCard
-            title="Customers"
-            className="lg:col-span-2"
-            groups={customerGroups}
-            data={stats.customers.data ? [stats.customers.data] : ([] as CustomerStats[])}
-            loading={stats.customers.isFetching}
-            chart={
-              <ChartSection
-                data={(stats.customers.data?.trend ?? []) as TrendData[]}
-                dataKey="value"
-                color="#3b82f6"
-                type="bar"
-              />
-            }
-          />
-        )}
-
-        {visibleSections.includes('low_stock') && (
-          <Card className="lg:col-span-2 flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                <CardTitle className="text-base font-medium">Low Stock</CardTitle>
-              </div>
-              <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
-                <Link to="/inventory">View All</Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="flex-1 min-h-75">
-              <Tabs defaultValue="inventory" className="w-full">
-                <TabsList className="mb-3">
-                  <TabsTrigger value="inventory">Inventory ({lowStockInventories.length})</TabsTrigger>
-                  <TabsTrigger value="products">Products ({lowStockProducts.length})</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="products">
-                  {lowStockProducts.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-                      No low stock products. Great job!
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-75 pr-4">
-                      <div className="space-y-4">
-                        {lowStockProducts.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex flex-col md:flex-row items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-                          >
-                            <div className="flex items-start gap-3">
-                              {item.imageUrl ? (
-                                <img
-                                  src={item.imageUrl}
-                                  alt={item.name}
-                                  className="h-10 w-10 rounded-md object-cover"
-                                />
-                              ) : (
-                                <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                                  <Box className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                              )}
-                              <div>
-                                <div className="font-medium text-sm">{item.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  SKU: {item.sku || '-'}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                              <div className="text-left md:text-right">
-                                <div className="text-xs text-muted-foreground">Available</div>
-                                <div className={`text-sm font-bold ${item.quantity <= 0 ? 'text-red-500' : 'text-orange-500'}`}>
-                                  {item.quantity} <span className="text-[10px] font-normal text-muted-foreground">{item.unit}</span>
-                                </div>
-                              </div>
-                              {canEditProducts && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                  <Link to={`/products/${item.id}`}>Restock</Link>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="inventory">
-                  {lowStockInventories.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-                      No low stock inventory entries. Great job!
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-75 pr-4">
-                      <div className="space-y-4">
-                        {lowStockInventories.map((inv) => (
-                          <div
-                            key={inv.id}
-                            className="flex flex-col md:flex-row items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-                          >
-                            <div className="flex items-start gap-3">
-                              {inv.imageUrl || inv.productImage ? (
-                                <img
-                                  src={inv.imageUrl || inv.productImage!}
-                                  alt={inv.productName}
-                                  className="h-10 w-10 rounded-md object-cover"
-                                />
-                              ) : (
-                                <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                                  <Box className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                              )}
-                              <div>
-                                <div className="font-medium text-sm">{inv.productName}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  SKU: {inv.sku || '-'} • {inv.branchName || 'Org-wide'}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                              <div className="text-left md:text-right">
-                                <div className="text-xs text-muted-foreground">Available</div>
-                                <div className={`text-sm font-bold ${inv.quantity <= 0 ? 'text-red-500' : 'text-orange-500'}`}>
-                                  {inv.quantity} <span className="text-[10px] font-normal text-muted-foreground">{inv.unit || ''}</span>
-                                </div>
-                              </div>
-                              {canEditInventory && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                  <Link to={`/inventory/entry/${inv.id}`}>Restock</Link>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Row 3: Small Stats */}
-        {visibleSections.includes('inventory') && (
-          <DashboardMetricCard
-            title="Inventory"
-            groups={inventoryGroups}
-            data={stats.inventory.data ? [stats.inventory.data] : ([] as InventoryStats[])}
-            loading={stats.inventory.isFetching}
-          />
-        )}
-
-        {visibleSections.includes('products') && (
-          <DashboardMetricCard
-            title="Products"
-            groups={productGroups}
-            data={stats.products.data ? [stats.products.data] : ([] as ProductStats[])}
-            loading={stats.products.isFetching}
-          />
-        )}
-
-        {visibleSections.includes('users') && (
-          <DashboardMetricCard
-            title="Users"
-            groups={userGroups}
-            data={stats.users.data ? [stats.users.data] : ([] as UserStats[])}
-            loading={stats.users.isFetching}
-          />
-        )}
-
-        {/* Stacked Small Cards */}
-        <div className="flex flex-col gap-6">
-          {visibleSections.includes('branches') && (
-            <DashboardMetricCard
-              title="Branches"
-              groups={branchGroups}
-              data={stats.branches.data ? [stats.branches.data] : ([] as BranchStats[])}
-              loading={stats.branches.isFetching}
-            />
+      {/* Quick actions */}
+      {(canSell || canStock || canAddProduct || canExpense) && (
+        <div className="flex flex-wrap gap-2">
+          {canSell && (
+            <Button asChild className="h-10">
+              <Link to="/orders/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New sale
+              </Link>
+            </Button>
           )}
-          {visibleSections.includes('suppliers') && (
-            <DashboardMetricCard
-              title="Suppliers"
-              groups={supplierGroups}
-              data={stats.suppliers.data ? [stats.suppliers.data] : ([] as SupplierStats[])}
-              loading={stats.suppliers.isFetching}
-            />
+          {canStock && (
+            <Button asChild variant="outline" className="h-10">
+              <Link to="/inventory">
+                <Package className="mr-2 h-4 w-4" />
+                Add stock
+              </Link>
+            </Button>
+          )}
+          {canAddProduct && (
+            <Button asChild variant="outline" className="h-10">
+              <Link to="/products/new">
+                <Tag className="mr-2 h-4 w-4" />
+                Add product
+              </Link>
+            </Button>
+          )}
+          {canExpense && (
+            <AddExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen}>
+              <Button variant="outline" className="h-10">
+                <ReceiptText className="mr-2 h-4 w-4" />
+                Record expense
+              </Button>
+            </AddExpenseDialog>
           )}
         </div>
+      )}
 
-      </div>
+      {summary.error && (
+        <p className="text-sm text-destructive">{(summary.error as Error).message || 'Could not load the dashboard'}</p>
+      )}
+
+      {show('summary') && (
+        <AiSummaryCard
+          open={summaryOpen}
+          onToggle={() => setSummaryOpen(!summaryOpen)}
+          summary={ai.query.data}
+          loading={ai.query.isFetching}
+          refreshing={ai.refresh.isPending}
+          error={((ai.refresh.error ?? ai.query.error) as Error | null)?.message}
+          onRefresh={() => ai.refresh.mutate()}
+        />
+      )}
+
+      {show('figures') && (
+        <KpiTiles
+          current={data?.current}
+          previous={data?.previous}
+          prevLabel={period.prevLabel}
+          netSeries={netSeries}
+          orderSeries={orderSeries}
+          money={formatCurrency}
+          loading={loading}
+        />
+      )}
+
+      {(show('chart') || show('attention')) && (
+        <div className="flex flex-wrap gap-3">
+          {show('chart') && <SalesChart period={period} data={chartData} money={formatCurrency} loading={loading} />}
+          {show('attention') && <NeedsAttention attention={data?.attention} money={formatCurrency} loading={loading} />}
+        </div>
+      )}
+
+      {(show('top_products') || show('payments') || show('branches')) && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
+          {show('top_products') && <TopProducts items={data?.top_products} money={formatCurrency} loading={loading} />}
+          {show('payments') && <PaymentsCard items={data?.payments} money={formatCurrency} loading={loading} />}
+          {show('branches') && (
+            <BranchesCard items={data?.branches} expenses={data?.current.expenses} money={formatCurrency} loading={loading} />
+          )}
+        </div>
+      )}
+
+      {show('recent') && <RecentSales items={data?.recent} money={formatCurrency} loading={loading} />}
+
+      {show('counts') && <CountsStrip counts={data?.counts} />}
     </div>
   );
 }

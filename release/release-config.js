@@ -8,15 +8,23 @@
 
 module.exports = {
   // Version information
-  version: "1.1.8",
+  version: "1.1.9",
 
   // Release notes in markdown format
   releaseNotes: `### What's New
-- **Custom options** — add an option to a product just by typing its name, like a model number ("NXRF140") or "Red XL 2023", with its own price and stock in each branch. No option types or values needed.
-- **Your existing custom stock is now custom options** — each name becomes one option across all your branches. Quantities, prices and past sales are unchanged.
-- **Add options from the product page** — use Add option under the stock table, then put stock in with a click. Rename or remove custom options right there.
-- **Edit options in place** — rename an option (Size → Fit) or a value (S → Small) and every product using it updates. Archive values you no longer use to hide them from new products.
-- **Custom options on the Variations page** — every custom option grouped by product, with search, stock and inline rename.
+- **A new dashboard** — key figures compared with the previous period, a sales chart, what needs your attention (stock out or low by branch, money owed, pending orders, discounts ending), top products, payments by method, branches and recent sales. Shortcuts for a new sale, adding stock, adding a product and recording an expense.
+- **AI summary** — open Summary on the dashboard for a short plain-language read of how the period went and what needs attention.
+- **Clearer page stats** — Sales & Orders, Products, Inventory and Expenses show their figures as tiles, compared with the previous period. Click a tile such as Owed, Out of stock or No receipt to filter the list.
+
+### Improvements
+- Sales figures leave out cancelled and refunded sales everywhere
+- Out of stock and running low follow the branches you select
+- Stock value at cost and potential profit on the Products page (owners)
+- One heading size on every page and less text on screen
+- Communication: tips and recent activity are tucked away until you open them, and the page works better on small screens
+
+### Bug Fixes
+- AI product descriptions work again
 `,
 
 

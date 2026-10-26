@@ -34,6 +34,7 @@ interface VariantRecord {
   id: string;
   product_id: string;
   attributes: Record<string, string> | null;
+  custom_label: string | null;
   price: number | string | null;
   sku: string | null;
 }
@@ -46,7 +47,7 @@ export function useOrganizationVariants(organizationId?: string) {
       if (!organizationId) return [];
       const { data, error } = await supabase
         .from('product_variants')
-        .select('id, product_id, attributes, price, sku')
+        .select('id, product_id, attributes, custom_label, price, sku')
         .eq('organization_id', organizationId)
         .eq('is_deleted', false);
       if (error) throw error;
@@ -57,7 +58,7 @@ export function useOrganizationVariants(organizationId?: string) {
   });
 }
 
-const variantName = (attributes: Record<string, string> | null) => Object.values(attributes ?? {}).join(' / ');
+const variantName = (v: VariantRecord) => v.custom_label || Object.values(v.attributes ?? {}).join(' / ');
 
 /**
  * Active products as they can be sold in one branch, grouped by product.
@@ -88,9 +89,10 @@ export function useSellableProducts(organizationId?: string, branchId?: string) 
               const variant = e.variantId ? variantById.get(e.variantId) : undefined;
               return {
                 key: e.id,
-                label: [variant ? variantName(variant.attributes) : null, e.customLabel || null]
-                  .filter(Boolean)
-                  .join(' · '),
+                // A custom option's rows carry its name; don't repeat it.
+                label: variant?.custom_label
+                  ? variant.custom_label
+                  : [variant ? variantName(variant) : null, e.customLabel || null].filter(Boolean).join(' · '),
                 lineName: e.productName,
                 price: e.priceOverride ?? e.variantPrice ?? e.productPrice ?? p.sellingPrice ?? 0,
                 stock: e.quantity,
@@ -107,8 +109,8 @@ export function useSellableProducts(organizationId?: string, branchId?: string) 
             productVariants.length > 0
               ? productVariants.map((v) => ({
                   key: untrackedLineKey(p.id, v.id),
-                  label: variantName(v.attributes),
-                  lineName: lineProductName(p.name, v.attributes),
+                  label: variantName(v),
+                  lineName: lineProductName(p.name, v.attributes, v.custom_label),
                   price: v.price === null ? p.sellingPrice : Number(v.price),
                   stock: null,
                   sku: v.sku ?? p.sku,

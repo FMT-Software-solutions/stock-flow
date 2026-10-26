@@ -110,6 +110,7 @@ export function ProductDetails() {
               branches={availableBranches}
               stockRows={stockRows}
               canAdjust={canAdjustStock}
+              canManage={canEditProduct}
             />
           </TabsContent>
         )}

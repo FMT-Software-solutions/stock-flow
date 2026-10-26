@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, Loader2, Wand2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Loader2, Trash2, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,8 +45,10 @@ import {
   combineOptions,
   generateSku,
   groupsFromVariants,
+  isCustomOption,
   splitStockRows,
   variantLabel,
+  variantName,
   type OptionGroup,
 } from './product-editor/productHelpers';
 
@@ -78,10 +80,21 @@ interface VariantDraft {
   price: string;
 }
 
+/** A custom option: a variant named in free text. */
+interface CustomDraft {
+  /** variant id for saved options, a client key for new ones */
+  key: string;
+  id?: string;
+  label: string;
+  /** '' = same as the product price */
+  price: string;
+}
+
 interface EditorState {
   fields: Fields;
   groups: OptionGroup[];
   drafts: Record<string, VariantDraft>; // by attributesKey
+  customs: CustomDraft[];
   stock: Record<string, string>; // by cellKey(variant key | null, branch)
   lowStock: string;
 }
@@ -150,7 +163,8 @@ function initialState(
   };
 
   const drafts: Record<string, VariantDraft> = {};
-  variants.forEach((v) => {
+  const optionVariants = variants.filter((v) => !isCustomOption(v));
+  optionVariants.forEach((v) => {
     drafts[attributesKey(v.attributes)] = {
       key: v.id,
       id: v.id,
@@ -160,8 +174,15 @@ function initialState(
     };
   });
 
+  const customs: CustomDraft[] = variants.filter(isCustomOption).map((v) => ({
+    key: v.id,
+    id: v.id,
+    label: v.customLabel ?? '',
+    price: v.price === null || v.price === undefined ? '' : String(v.price),
+  }));
+
   const hasVariants = variants.length > 0;
-  const { cells } = splitStockRows(stockRows, new Set(variants.map((v) => v.id)), hasVariants);
+  const { cells } = splitStockRows(stockRows, variants, hasVariants);
   const stock: Record<string, string> = {};
   cells.forEach((row, key) => {
     stock[key] = String(row.quantity);
@@ -171,8 +192,9 @@ function initialState(
 
   return {
     fields,
-    groups: groupsFromVariants(variants, typeIdByName),
+    groups: groupsFromVariants(optionVariants, typeIdByName),
     drafts,
+    customs,
     stock,
     lowStock: alerts.length > 0 ? String(Math.max(...alerts)) : '',
   };
@@ -204,12 +226,13 @@ function ProductEditor({
 
   const [initial] = useState(() => initialState(product, stockRows, typeIdByName, trackStockByDefault));
   const [state, setState] = useState<EditorState>(initial);
-  const [errors, setErrors] = useState<Partial<Record<'name' | 'sellingPrice', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'name' | 'sellingPrice' | 'customs', string>>>({});
+  const [focusCustom, setFocusCustom] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState<{ label: string; quantity: number }[] | null>(null);
 
-  const { fields, groups, drafts, stock, lowStock } = state;
+  const { fields, groups, drafts, customs, stock, lowStock } = state;
   const branches: Branch[] = availableBranches;
 
   const setField = <K extends keyof Fields>(key: K, value: Fields[K]) =>
@@ -225,7 +248,7 @@ function ProductEditor({
       }),
     [groups, drafts]
   );
-  const hasVariants = variants.length > 0;
+  const hasVariants = variants.length + customs.length > 0;
 
   const updateDraft = (draft: VariantDraft, patch: Partial<VariantDraft>) =>
     setState((s) => ({
@@ -235,18 +258,33 @@ function ProductEditor({
 
   const setStock = (key: string, value: string) => setState((s) => ({ ...s, stock: { ...s.stock, [key]: value } }));
 
+  const addCustom = () => {
+    const key = `custom:${crypto.randomUUID()}`;
+    setState((s) => ({ ...s, customs: [...s.customs, { key, label: '', price: '' }] }));
+    setFocusCustom(key);
+  };
+  const updateCustom = (key: string, patch: Partial<CustomDraft>) =>
+    setState((s) => ({ ...s, customs: s.customs.map((c) => (c.key === key ? { ...c, ...patch } : c)) }));
+  const removeCustom = (key: string) => setState((s) => ({ ...s, customs: s.customs.filter((c) => c.key !== key) }));
+
+  // The grid's rows: option combinations, then custom options.
+  const lines = [
+    ...variants.map((v) => ({ key: v.key, name: variantLabel(v.attributes), price: v.price, custom: null })),
+    ...customs.map((c) => ({ key: c.key, name: c.label.trim() || 'Option', price: c.price, custom: c })),
+  ];
+
   // Saved variants that are no longer selected, and the stock they hold.
   const removedVariants = useMemo(() => {
-    const kept = new Set(variants.map((v) => v.id).filter(Boolean));
+    const kept = new Set([...variants.map((v) => v.id), ...customs.map((c) => c.id)].filter(Boolean));
     return (product?.variants ?? [])
       .filter((v) => !kept.has(v.id))
       .map((v) => ({
-        label: variantLabel(v.attributes),
+        label: variantName(v),
         quantity: stockRows
           .filter((r) => r.variantId === v.id && !r.isDeleted)
           .reduce((sum, r) => sum + r.quantity, 0),
       }));
-  }, [variants, product, stockRows]);
+  }, [variants, customs, product, stockRows]);
 
   const handleImageUpload = async (files: File[], target: 'main' | 'more') => {
     try {
@@ -278,6 +316,9 @@ function ProductEditor({
     if (fields.sellingPrice === '' || Number.isNaN(Number(fields.sellingPrice)) || Number(fields.sellingPrice) < 0) {
       next.sellingPrice = 'Enter a price';
     }
+    const names = customs.map((c) => c.label.trim().toLowerCase());
+    if (names.some((n) => !n)) next.customs = 'Name every custom option';
+    else if (new Set(names).size < names.length) next.customs = 'Custom option names must be different';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -310,10 +351,17 @@ function ProductEditor({
       attributes: v.attributes,
     }));
 
+    const customPayload = customs.map((c) => ({
+      id: c.id,
+      key: c.key,
+      label: c.label.trim(),
+      price: c.price === '' ? null : Number(c.price),
+    }));
+
     const stockPayload: NonNullable<SaveProductInput['stock']> = [];
     if (fields.trackStock && canEditStock) {
       const lowChanged = lowStock !== initial.lowStock && lowStock !== '';
-      const rowsFor = hasVariants ? variants : [null];
+      const rowsFor: ({ key: string; id?: string } | null)[] = hasVariants ? [...variants, ...customs] : [null];
       rowsFor.forEach((variant) =>
         branches.forEach((branch) => {
           const key = cellKey(variant ? variant.key : null, branch.id);
@@ -333,7 +381,7 @@ function ProductEditor({
       );
     }
 
-    return { product: productPayload, variants: variantPayload, stock: stockPayload };
+    return { product: productPayload, variants: variantPayload, custom: customPayload, stock: stockPayload };
   };
 
   const save = async () => {
@@ -515,8 +563,10 @@ function ProductEditor({
           <OptionsEditor
             groups={groups}
             onChange={(next) => setState((s) => ({ ...s, groups: next }))}
+            onAddCustom={addCustom}
             organizationId={organizationId}
           />
+          {errors.customs && <p className="text-sm text-destructive">{errors.customs}</p>}
 
           {hasVariants && (
             <div className="overflow-x-auto rounded-md border">
@@ -535,20 +585,49 @@ function ProductEditor({
                   </tr>
                 </thead>
                 <tbody>
-                  {variants.map((variant) => (
-                    <tr key={variant.key} className="border-t">
-                      <td className="whitespace-nowrap px-3 py-2">{variantLabel(variant.attributes)}</td>
+                  {lines.map((line) => (
+                    <tr key={line.key} className="border-t">
+                      <td className="px-3 py-1.5">
+                        {line.custom ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={line.custom.label}
+                              onChange={(e) => updateCustom(line.key, { label: e.target.value })}
+                              placeholder="Name"
+                              autoFocus={focusCustom === line.key}
+                              className="h-8 min-w-36"
+                              aria-label="Custom option name"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-muted-foreground"
+                              onClick={() => removeCustom(line.key)}
+                              aria-label={`Remove ${line.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="whitespace-nowrap">{line.name}</span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5 text-right">
                         <Input
                           type="number"
                           inputMode="decimal"
                           min={0}
                           step="any"
-                          value={variant.price}
+                          value={line.price}
                           placeholder={fields.sellingPrice || '0'}
-                          onChange={(e) => updateDraft(variant, { price: e.target.value })}
+                          onChange={(e) => {
+                            const custom = line.custom;
+                            if (custom) updateCustom(custom.key, { price: e.target.value });
+                            else updateDraft(variants.find((v) => v.key === line.key)!, { price: e.target.value });
+                          }}
                           className="ml-auto h-8 w-24 text-right tabular-nums"
-                          aria-label={`Price of ${variantLabel(variant.attributes)}`}
+                          aria-label={`Price of ${line.name}`}
                         />
                       </td>
                       {fields.trackStock &&
@@ -556,10 +635,7 @@ function ProductEditor({
                         branches.map((b) => (
                           <td key={b.id} className="px-3 py-1.5">
                             <div className="flex justify-end">
-                              {stockInput(
-                                cellKey(variant.key, b.id),
-                                `${variantLabel(variant.attributes)} stock in ${b.name}`
-                              )}
+                              {stockInput(cellKey(line.key, b.id), `${line.name} stock in ${b.name}`)}
                             </div>
                           </td>
                         ))}

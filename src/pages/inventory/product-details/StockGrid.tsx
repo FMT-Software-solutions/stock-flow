@@ -1,28 +1,47 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useAdjustStock, type StockAdjustment, type StockRow } from '@/hooks/useProductStock';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  useAdjustStock,
+  useSaveCustomOptions,
+  type StockAdjustment,
+  type StockRow,
+} from '@/hooks/useProductStock';
 import { cn } from '@/lib/utils';
 import type { Branch } from '@/types/branches';
 import type { Product } from '@/types/inventory';
 import {
   cellKey,
+  customOptionError,
+  isCustomOption,
   otherStockLabel,
   splitStockRows,
   stockTone,
-  variantLabel,
+  variantName,
 } from '../product-editor/productHelpers';
+import { AddVariantPopover } from './AddVariantPopover';
 
 interface GridRow {
   key: string;
   label: string;
   variantId: string | null;
   stockLabel: string | null;
+  /** Set on a custom option's line, which can be renamed here. */
+  customLabel?: string;
   cells: Map<string, StockRow>; // by branch id
   /** Whether a branch without a row can be stocked from this line. */
   fillsEmpty: boolean;
@@ -34,17 +53,20 @@ export function StockGrid({
   branches,
   stockRows,
   canAdjust,
+  canManage,
 }: {
   product: Product;
   branches: Branch[];
   stockRows: StockRow[];
   canAdjust: boolean;
+  /** May add, rename and remove options. */
+  canManage: boolean;
 }) {
   const variants = useMemo(() => product.variants ?? [], [product.variants]);
   const hasVariants = variants.length > 0;
 
   const { rows, others } = useMemo(() => {
-    const { cells, others: rest } = splitStockRows(stockRows, new Set(variants.map((v) => v.id)), hasVariants);
+    const { cells, others: rest } = splitStockRows(stockRows, variants, hasVariants);
     const byBranch = (variantId: string | null) =>
       new Map(branches.flatMap((b) => {
         const row = cells.get(cellKey(variantId, b.id));
@@ -54,9 +76,10 @@ export function StockGrid({
     const main: GridRow[] = hasVariants
       ? variants.map((v) => ({
           key: v.id,
-          label: variantLabel(v.attributes),
+          label: variantName(v),
           variantId: v.id,
           stockLabel: null,
+          customLabel: v.customLabel ?? undefined,
           cells: byBranch(v.id),
           fillsEmpty: true,
         }))
@@ -79,7 +102,7 @@ export function StockGrid({
         key,
         label: noVariantStock
           ? 'No variant'
-          : otherStockLabel(row, variant ? variantLabel(variant.attributes) : undefined, hasVariants),
+          : otherStockLabel(row, variant ? variantName(variant) : undefined, hasVariants),
         variantId: row.variantId,
         stockLabel: row.label,
         cells: new Map<string, StockRow>(),
@@ -98,7 +121,13 @@ export function StockGrid({
 
   const renderRow = (row: GridRow) => (
     <tr key={row.key} className="border-t">
-      <td className="whitespace-nowrap px-3 py-2">{row.label}</td>
+      <td className="whitespace-nowrap px-3 py-2">
+        {row.customLabel && canManage ? (
+          <CustomOptionName product={product} variantId={row.variantId!} label={row.customLabel} stock={total(row)} />
+        ) : (
+          row.label
+        )}
+      </td>
       {branches.map((branch) => (
         <td key={branch.id} className="px-1 py-1 text-right">
           <StockCell
@@ -115,7 +144,8 @@ export function StockGrid({
   );
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="space-y-1">
+      <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-xs text-muted-foreground">
           <tr>
@@ -140,6 +170,126 @@ export function StockGrid({
           {others.map(renderRow)}
         </tbody>
       </table>
+      </div>
+      {canManage && <AddVariantPopover product={product} />}
+    </div>
+  );
+}
+
+/** A custom option's name with inline rename and remove. */
+function CustomOptionName({
+  product,
+  variantId,
+  label,
+  stock,
+}: {
+  product: Product;
+  variantId: string;
+  label: string;
+  stock: number;
+}) {
+  const saveCustoms = useSaveCustomOptions();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const customs = (product.variants ?? []).filter(isCustomOption);
+
+  const save = async (options: { id?: string; label: string }[], done: string) => {
+    try {
+      await saveCustoms.mutateAsync({ productId: product.id, options });
+      toast.success(done);
+      return true;
+    } catch (error) {
+      console.error('Saving custom option failed:', error);
+      toast.error(customOptionError(error));
+      return false;
+    }
+  };
+
+  // A refused name stays for correcting; leaving the field then drops it.
+  const [failed, setFailed] = useState(false);
+
+  const cancel = () => {
+    setEditing(false);
+    setFailed(false);
+    setDraft(label);
+  };
+
+  const rename = async () => {
+    const name = draft.trim();
+    if (!name || name === label) return cancel();
+    const ok = await save(
+      customs.map((c) => ({ id: c.id, label: c.id === variantId ? name : c.customLabel! })),
+      `Renamed to ${name}`
+    );
+    if (ok) setEditing(false);
+    else setFailed(true);
+  };
+
+  const remove = () =>
+    save(
+      customs.filter((c) => c.id !== variantId).map((c) => ({ id: c.id, label: c.customLabel! })),
+      `${label} removed`
+    );
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          rename();
+        }}
+        className="flex items-center gap-1"
+      >
+        <Input
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setFailed(false);
+          }}
+          onKeyDown={(e) => e.key === 'Escape' && cancel()}
+          onBlur={() => !saveCustoms.isPending && (failed ? cancel() : rename())}
+          autoFocus
+          className="h-7 min-w-36 text-sm"
+          aria-label="Option name"
+          readOnly={saveCustoms.isPending}
+        />
+        {saveCustoms.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+      </form>
+    );
+  }
+
+  return (
+    <div className="group flex items-center gap-1">
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="rounded p-1 text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+        aria-label={`Rename ${label}`}
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        onClick={() => (stock > 0 ? setConfirmRemove(true) : remove())}
+        className="rounded p-1 text-muted-foreground opacity-0 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+        aria-label={`Remove ${label}`}
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {label}?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <p className="text-sm tabular-nums text-muted-foreground">{stock} in stock</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={remove}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

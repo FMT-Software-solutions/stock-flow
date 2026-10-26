@@ -60,6 +60,7 @@ export interface VariationType {
   id: string;
   name: string;
   isDefault: boolean;
+  isArchived: boolean;
   organizationId?: string;
 }
 
@@ -67,6 +68,7 @@ export interface VariationOption {
   id: string;
   variationTypeId: string;
   value: string;
+  isArchived: boolean;
   organizationId?: string;
 }
 
@@ -77,6 +79,8 @@ export interface ProductVariant {
   /** Null when the variant uses the product's selling price. */
   price: number | null;
   attributes: Record<string, string>;
+  /** Set for custom options: the variant is named in free text, not by option values. */
+  customLabel?: string | null;
   organizationId: string;
   quantity?: number;
   minStockLevel?: number;

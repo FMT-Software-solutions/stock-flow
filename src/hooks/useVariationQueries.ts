@@ -8,6 +8,7 @@ const mapVariationTypeFromDB = (data: any): VariationType => ({
   id: data.id,
   name: data.name,
   isDefault: data.is_default,
+  isArchived: !!data.is_archived,
   organizationId: data.organization_id,
 });
 
@@ -15,6 +16,7 @@ const mapVariationOptionFromDB = (data: any): VariationOption => ({
   id: data.id,
   variationTypeId: data.variation_type_id,
   value: data.value,
+  isArchived: !!data.is_archived,
   organizationId: data.organization_id,
 });
 
@@ -138,5 +140,44 @@ export function useDeleteVariationOption() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['variationOptions'] });
     },
+  });
+}
+
+// Renames update every variant using the old name (rename_variation_* RPCs).
+const invalidateVariations = (queryClient: ReturnType<typeof useQueryClient>) =>
+  ['variationTypes', 'variationOptions', 'organization_variants', 'product', 'products', 'inventory_entries'].forEach(
+    (key) => queryClient.invalidateQueries({ queryKey: [key] })
+  );
+
+export function useRenameVariationType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.rpc('rename_variation_type', { p_type_id: id, p_name: name });
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateVariations(queryClient),
+  });
+}
+
+export function useRenameVariationOption() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: string }) => {
+      const { error } = await supabase.rpc('rename_variation_option', { p_option_id: id, p_value: value });
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateVariations(queryClient),
+  });
+}
+
+export function useSetVariationArchived() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ kind, id, archived }: { kind: 'type' | 'option'; id: string; archived: boolean }) => {
+      const { error } = await supabase.rpc('set_variation_archived', { p_kind: kind, p_id: id, p_archived: archived });
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateVariations(queryClient),
   });
 }

@@ -20,7 +20,7 @@ import {
 import { useAdjustStock, type StockAdjustment, type StockRow } from '@/hooks/useProductStock';
 import type { Branch } from '@/types/branches';
 import type { Product } from '@/types/inventory';
-import { cellKey, splitStockRows, variantLabel } from '../product-editor/productHelpers';
+import { cellKey, splitStockRows, variantLabel, variantName } from '../product-editor/productHelpers';
 
 interface Line {
   key: string;
@@ -55,12 +55,12 @@ export function AddStockDialog({
 
   const lines = useMemo<Line[]>(() => {
     if (!branchId) return [];
-    const { cells, others } = splitStockRows(stockRows, new Set(variants.map((v) => v.id)), hasVariants);
+    const { cells, others } = splitStockRows(stockRows, variants, hasVariants);
     const main: Line[] = (hasVariants ? variants : [null]).map((v) => {
       const row = cells.get(cellKey(v?.id ?? null, branchId));
       return {
         key: v?.id ?? 'base',
-        label: v ? variantLabel(v.attributes) : product.name,
+        label: v ? variantName(v) : product.name,
         current: row?.quantity ?? 0,
         target: row
           ? { inventory_id: row.id }
@@ -73,7 +73,9 @@ export function AddStockDialog({
         const v = variants.find((x) => x.id === r.variantId);
         return {
           key: r.id,
-          label: [v ? variantLabel(v.attributes) : null, r.label].filter(Boolean).join(' · '),
+          label: v?.customLabel
+            ? [r.label, r.inventoryNumber ? `#${r.inventoryNumber}` : null].filter(Boolean).join(' · ')
+            : [v ? variantLabel(v.attributes) : null, r.label].filter(Boolean).join(' · '),
           current: r.quantity,
           target: { inventory_id: r.id },
         };

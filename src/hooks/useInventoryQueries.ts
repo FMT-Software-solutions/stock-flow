@@ -63,8 +63,10 @@ const mapInventoryEntryFromDB = (data: any): InventoryEntry => {
     const attributeString = Object.entries(attributes)
       .map(([key, value]) => `${key}: ${value}`)
       .join(', ');
-    if (attributeString) {
-      productName = `${productName} (${attributeString})`;
+    // A custom option has no option values; its stock rows carry its name.
+    const suffix = attributeString || data.custom_label;
+    if (suffix) {
+      productName = `${productName} (${suffix})`;
     }
     sku = data.variant.sku || sku;
   } else if (data.custom_label) {
@@ -346,11 +348,18 @@ export function useProduct(id?: string) {
             productId: v.product_id,
             sku: v.sku,
             price: v.price === null ? null : Number(v.price),
-            attributes: v.attributes,
+            attributes: v.attributes ?? {},
+            customLabel: v.custom_label ?? null,
             organizationId: v.organization_id,
             quantity: Number(v.quantity || 0),
             minStockLevel: Number(v.min_stock_level || 0),
           }));
+          // Option variants first (as created), then custom options by name.
+          product.variants!.sort((a, b) =>
+            !a.customLabel || !b.customLabel
+              ? Number(!!a.customLabel) - Number(!!b.customLabel)
+              : a.customLabel.localeCompare(b.customLabel, undefined, { numeric: true, sensitivity: 'base' })
+          );
         }
       }
 

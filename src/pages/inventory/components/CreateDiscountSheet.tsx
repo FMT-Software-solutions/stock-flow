@@ -152,7 +152,7 @@ export function CreateDiscountSheet({ open, onOpenChange, onSuccess, discount }:
     for (const p of products) {
       out.push({ label: p.name, value: p.id, group: p.name });
       for (const v of variants.filter((x) => x.product_id === p.id)) {
-        const attrs = Object.values(v.attributes ?? {}).join(' / ');
+        const attrs = v.custom_label || Object.values(v.attributes ?? {}).join(' / ');
         out.push({ label: `${p.name} (${attrs || v.sku || 'variant'})`, value: `${p.id}:${v.id}`, group: p.name });
       }
     }

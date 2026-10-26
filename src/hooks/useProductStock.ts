@@ -55,6 +55,13 @@ export interface SaveProductInput {
     price: number | null;
     attributes: Record<string, string>;
   }[];
+  /** Custom options; omit to leave them unchanged, ids not listed are archived. */
+  custom?: {
+    id?: string;
+    key?: string;
+    label: string;
+    price?: number | null;
+  }[];
   stock?: {
     branch_id: string;
     variant_id?: string;
@@ -128,6 +135,7 @@ const invalidateStock = (queryClient: ReturnType<typeof useQueryClient>) => {
     'inventory_entries',
     'stock_movements',
     'organization_variants',
+    'custom_option_stock',
   ].forEach(
     (key) => queryClient.invalidateQueries({ queryKey: [key] })
   );
@@ -202,14 +210,33 @@ export function useStockMovements(productId?: string) {
 export function useSaveProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ product, variants, stock }: SaveProductInput) => {
+    mutationFn: async ({ product, variants, custom, stock }: SaveProductInput) => {
       const { data, error } = await supabase.rpc('save_product', {
         p_product: product,
         p_variants: variants ?? null,
         p_stock: stock && stock.length > 0 ? stock : null,
+        p_custom: custom ?? null,
       });
       if (error) throw error;
       return data as { product_id: string; variants: Record<string, string> };
+    },
+    onSuccess: () => invalidateStock(queryClient),
+  });
+}
+
+/**
+ * Replaces a product's custom options with this list: listed ones are added
+ * or renamed, saved ones left out are archived with their stock rows.
+ */
+export function useSaveCustomOptions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ productId, options }: { productId: string; options: { id?: string; label: string }[] }) => {
+      const { error } = await supabase.rpc('save_product', {
+        p_product: { id: productId },
+        p_custom: options.map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim() })),
+      });
+      if (error) throw error;
     },
     onSuccess: () => invalidateStock(queryClient),
   });

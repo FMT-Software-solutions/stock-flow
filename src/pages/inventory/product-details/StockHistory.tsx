@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useStockMovements, type StockReason, type StockRow } from '@/hooks/useProductStock';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types/inventory';
-import { variantLabel } from '../product-editor/productHelpers';
+import { variantName } from '../product-editor/productHelpers';
 
 const REASON_LABEL: Record<StockReason, string> = {
   opening: 'Opening',
@@ -38,7 +38,9 @@ export function StockHistory({ product, stockRows }: { product: Product; stockRo
   const describe = (inventoryId: string, variantId: string | null) => {
     const variant = product.variants?.find((v) => v.id === variantId);
     const row = stockRows.find((r) => r.id === inventoryId);
-    const name = variant ? variantLabel(variant.attributes) : variantId ? 'Removed variant' : null;
+    // A custom option's rows carry its name, which outlives the option.
+    if (row?.label && (!variant || variant.customLabel)) return row.label;
+    const name = variant ? variantName(variant) : variantId ? 'Removed variant' : null;
     return [name, row?.label].filter(Boolean).join(' · ') || '—';
   };
 

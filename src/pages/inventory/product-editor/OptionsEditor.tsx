@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { PenLine, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ import { InlineCreateForm } from './InlineCreateForm';
 interface OptionsEditorProps {
   groups: OptionGroup[];
   onChange: (groups: OptionGroup[]) => void;
+  /** Adds a custom option (a variant named in free text). */
+  onAddCustom?: () => void;
   organizationId?: string;
   disabled?: boolean;
 }
@@ -32,7 +34,7 @@ interface OptionsEditorProps {
 const UUID = /^[0-9a-f-]{36}$/i;
 
 /** Option types (Size, Colour…) and the values this product comes in. */
-export function OptionsEditor({ groups, onChange, organizationId, disabled }: OptionsEditorProps) {
+export function OptionsEditor({ groups, onChange, onAddCustom, organizationId, disabled }: OptionsEditorProps) {
   const { data: types = [] } = useVariationTypes(organizationId);
   const createType = useCreateVariationType();
   const { checkPermission } = useRoleCheck();
@@ -45,7 +47,7 @@ export function OptionsEditor({ groups, onChange, organizationId, disabled }: Op
   // Stops the popover handing focus back to its trigger after adding a group.
   const keepFocus = useRef(false);
 
-  const unused = types.filter((t) => !groups.some((g) => g.typeId === t.id || g.name === t.name));
+  const unused = types.filter((t) => !t.isArchived && !groups.some((g) => g.typeId === t.id || g.name === t.name));
   const typed = search.trim();
   const exists = types.some((t) => t.name.toLowerCase() === typed.toLowerCase());
 
@@ -139,6 +141,22 @@ export function OptionsEditor({ groups, onChange, organizationId, disabled }: Op
                     </CommandItem>
                   ))}
                 </CommandGroup>
+                {onAddCustom && (
+                  <CommandGroup forceMount className="border-t">
+                    <CommandItem
+                      forceMount
+                      value="__custom_option__"
+                      onSelect={() => {
+                        keepFocus.current = true;
+                        handleOpenChange(false);
+                        onAddCustom();
+                      }}
+                    >
+                      <PenLine className="mr-2 h-4 w-4" />
+                      Custom option
+                    </CommandItem>
+                  </CommandGroup>
+                )}
                 {canCreateOptions && (
                   <CommandGroup forceMount className="border-t">
                     <CommandItem
@@ -182,7 +200,11 @@ function OptionGroupRow({
   const [draft, setDraft] = useState('');
 
   // Values already on the product stay visible even if removed from the org list.
-  const values = [...options.map((o) => o.value), ...group.values.filter((v) => !options.some((o) => o.value === v))];
+  // Archived values are only shown where the product still uses them.
+  const values = [
+    ...options.filter((o) => !o.isArchived || group.values.includes(o.value)).map((o) => o.value),
+    ...group.values.filter((v) => !options.some((o) => o.value === v)),
+  ];
 
   const toggle = (value: string) => {
     const selected = group.values.includes(value);

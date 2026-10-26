@@ -8,26 +8,15 @@
 
 module.exports = {
   // Version information
-  version: "1.1.7",
+  version: "1.1.8",
 
   // Release notes in markdown format
   releaseNotes: `### What's New
-- **Add a product on one screen** — name, price, photo, stock for each branch, and options like size or colour with their own prices and stock. Create categories and options right there without leaving the form.
-- **Products without stock** — restaurants and service businesses can sell items without managing inventory. Choose the default in Settings › Organization.
-- **Stock on the product page** — see stock for every variant in every branch, receive deliveries, count stock, or record damaged items with a reason.
-- **Stock history** — every stock change is recorded with its reason, the sale it came from, and who made it.
-- **New discounts** — automatic or code discounts on items or the whole sale (percentage, amount off or fixed price), for all products, categories or chosen products, with schedules, usage and per-customer limits, minimum spend, and rules for combining. Cashiers with permission can give a manual discount. Discounts show on receipts and sale details.
-- **Redesigned reports** — reports grouped into Sales, Stock, Expenses and People with one filter bar. New Product Sales, Stock Activity and Discounts reports; Stock on hand brings products and inventory together.
-
-### Improvements
-- The sale item picker lists products with their variants and the stock in your branch
-- Sales are saved in one step and can't sell more stock than you have
-- Stock value uses variant prices, and sales reports show discounts
-
-### Bug Fixes
-- The dashboard's All Time option now shows all your data
-- Products that don't track stock no longer show as out of stock
-- Dark theme colours for notices, badges and payment statuses
+- **Custom options** — add an option to a product just by typing its name, like a model number ("NXRF140") or "Red XL 2023", with its own price and stock in each branch. No option types or values needed.
+- **Your existing custom stock is now custom options** — each name becomes one option across all your branches. Quantities, prices and past sales are unchanged.
+- **Add options from the product page** — use Add option under the stock table, then put stock in with a click. Rename or remove custom options right there.
+- **Edit options in place** — rename an option (Size → Fit) or a value (S → Small) and every product using it updates. Archive values you no longer use to hide them from new products.
+- **Custom options on the Variations page** — every custom option grouped by product, with search, stock and inline rename.
 `,
 
 

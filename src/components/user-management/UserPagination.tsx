@@ -37,21 +37,21 @@ export function UserPagination({
   const canGoNext = currentPage < totalPages;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-2 py-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>
-          Showing {startItem} to {endItem} of {totalItems} users
+          {startItem}–{endItem} of {totalItems}
         </span>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows per page:</span>
+          <span className="whitespace-nowrap text-sm text-muted-foreground">Rows per page</span>
           <Select
             value={pageSize.toString()}
             onValueChange={(value) => onPageSizeChange(Number(value))}
           >
-            <SelectTrigger className="w-[70px]">
+            <SelectTrigger className="h-8 w-[70px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -69,6 +69,7 @@ export function UserPagination({
             variant="outline"
             size="sm"
             onClick={() => onPageChange(1)}
+            aria-label="First page"
             disabled={!canGoPrevious}
             className="h-8 w-8 p-0"
           >
@@ -78,6 +79,7 @@ export function UserPagination({
             variant="outline"
             size="sm"
             onClick={() => onPageChange(currentPage - 1)}
+            aria-label="Previous page"
             disabled={!canGoPrevious}
             className="h-8 w-8 p-0"
           >
@@ -85,7 +87,7 @@ export function UserPagination({
           </Button>
 
           <div className="flex items-center gap-1 mx-2">
-            <span className="text-sm text-muted-foreground">
+            <span className="whitespace-nowrap text-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
             </span>
           </div>
@@ -94,6 +96,7 @@ export function UserPagination({
             variant="outline"
             size="sm"
             onClick={() => onPageChange(currentPage + 1)}
+            aria-label="Next page"
             disabled={!canGoNext}
             className="h-8 w-8 p-0"
           >
@@ -103,6 +106,7 @@ export function UserPagination({
             variant="outline"
             size="sm"
             onClick={() => onPageChange(totalPages)}
+            aria-label="Last page"
             disabled={!canGoNext}
             className="h-8 w-8 p-0"
           >

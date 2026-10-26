@@ -19,14 +19,16 @@ export function UserDisplayControls({
 }: UserDisplayControlsProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+      <div className="flex h-8 items-center gap-0.5 rounded-md border p-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={displayMode === 'grid' ? 'default' : 'ghost'}
+              variant={displayMode === 'grid' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => onDisplayModeChange('grid')}
-              className="p-1"
+              className="h-6 w-6 p-0"
+              aria-label="Grid view"
+              aria-pressed={displayMode === 'grid'}
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
@@ -39,10 +41,12 @@ export function UserDisplayControls({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={displayMode === 'table' ? 'default' : 'ghost'}
+              variant={displayMode === 'table' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => onDisplayModeChange('table')}
-              className="p-1"
+              className="h-6 w-6 p-0"
+              aria-label="Table view"
+              aria-pressed={displayMode === 'table'}
             >
               <Table className="h-4 w-4" />
             </Button>

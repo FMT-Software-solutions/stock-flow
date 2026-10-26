@@ -6,7 +6,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { X, SortAsc, SortDesc } from 'lucide-react';
 import type {
   UserFilters,
@@ -55,19 +54,14 @@ export function UserFiltersControls({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {/* Status Filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
-          Status:
-        </span>
-        <Select
+    <div className="flex flex-wrap items-center gap-2">
+      <Select
           value={filters.status}
           onValueChange={(value) =>
             onFiltersChange({ status: value as 'all' | 'active' | 'inactive' })
           }
         >
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="h-8 w-32" aria-label="Status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,12 +72,8 @@ export function UserFiltersControls({
             ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Role Filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Role:</span>
-        <Select
+      <Select
           value={filters.role || 'all'}
           onValueChange={(value) =>
             onFiltersChange({
@@ -91,7 +81,7 @@ export function UserFiltersControls({
             })
           }
         >
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="h-8 w-36" aria-label="Role">
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
@@ -103,20 +93,15 @@ export function UserFiltersControls({
             ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Sort Controls */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
-          Sort by:
-        </span>
+      <div className="flex items-center gap-1">
         <Select
           value={sortBy}
           onValueChange={(value) =>
             onSortChange(value as UserSortField, sortOrder)
           }
         >
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="h-8 w-36" aria-label="Sort by">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -131,7 +116,8 @@ export function UserFiltersControls({
           variant="outline"
           size="sm"
           onClick={handleSortToggle}
-          className="px-2"
+          className="h-8 w-8 p-0"
+          aria-label={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
         >
           {sortOrder === 'asc' ? (
             <SortAsc className="h-4 w-4" />
@@ -147,28 +133,11 @@ export function UserFiltersControls({
           variant="ghost"
           size="sm"
           onClick={onResetFilters}
-          className="text-muted-foreground hover:text-foreground"
+          className="h-8 text-muted-foreground hover:text-foreground"
         >
           <X className="h-4 w-4 mr-1" />
-          Clear Filters
+          Reset
         </Button>
-      )}
-
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div className="flex items-center gap-1 ml-2">
-          {filters.status !== 'all' && (
-            <Badge variant="secondary" className="text-xs">
-              Status:{' '}
-              {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
-            </Badge>
-          )}
-          {filters.role && (
-            <Badge variant="secondary" className="text-xs">
-              Role: {ROLE_OPTIONS.find((r) => r.value === filters.role)?.label}
-            </Badge>
-          )}
-        </div>
       )}
     </div>
   );

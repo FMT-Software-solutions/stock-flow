@@ -68,7 +68,7 @@ export function UserGrid({
       );
 
       if (hasAllBranches) {
-        return 'All Branches';
+        return 'All branches';
       }
     }
 
@@ -112,7 +112,8 @@ export function UserGrid({
         {users.map((user) => {
           const isInactive = !user.is_active;
           const userRole = getUserRole(user);
-          const userBranches = getUserBranches(user);
+          // Owners see every branch.
+          const userBranches = userRole === 'owner' ? 'All branches' : getUserBranches(user);
           const fullName = getFullName(user.profile);
           const hasLowerRole =
             isBranchAdmin() && ['owner', 'admin'].includes(userRole);
@@ -141,14 +142,12 @@ export function UserGrid({
                           {fullName}
                         </h3>
                         {isInactive && (
-                          <Lock className="h-3 w-3 text-gray-400 shrink-0" />
+                          <Lock className="h-3 w-3 text-muted-foreground shrink-0" aria-label="Inactive" />
                         )}
                       </div>
                       <Badge
                         variant="outline"
-                        className={`text-xs w-fit ${
-                          isInactive ? 'text-gray-400 border-gray-300' : ''
-                        }`}
+                        className="w-fit text-xs font-normal"
                       >
                         {ROLE_DISPLAY_NAMES[userRole]}
                       </Badge>
@@ -179,8 +178,8 @@ export function UserGrid({
                   <div className="flex items-start space-x-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      {userBranches === 'All Branches' ? (
-                        <span>All Branches</span>
+                      {userBranches === 'All branches' ? (
+                        <span>All branches</span>
                       ) : (
                         <div className="space-y-1">
                           {Array.isArray(userBranches) &&
@@ -204,32 +203,25 @@ export function UserGrid({
                 )}
 
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant={user.is_active ? 'default' : 'secondary'}
-                    className={`text-xs ${
-                      isInactive ? 'bg-muted text-muted-foreground' : ''
-                    }`}
-                  >
+                  <span className="inline-flex items-center gap-1.5 text-sm">
+                    <span
+                      className={`h-2 w-2 rounded-full ${user.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+                      aria-hidden
+                    />
                     {user.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  </span>
 
                   {user.is_first_login && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs text-orange-600"
-                    >
-                      First login pending
-                    </Badge>
+                    <span className="text-xs text-amber-600 dark:text-amber-400">· First login pending</span>
                   )}
                 </div>
 
                 <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                   <Calendar className="h-3 w-3" />
                   <span>
-                    Last login:{' '}
                     {user.last_login
-                      ? format(new Date(user.last_login), 'MMM d, yyyy')
-                      : 'Never'}
+                      ? format(new Date(user.last_login), 'd MMM yyyy, HH:mm')
+                      : 'Never signed in'}
                   </span>
                 </div>
               </CardContent>

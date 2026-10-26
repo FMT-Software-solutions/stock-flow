@@ -17,7 +17,7 @@ import { useUserActions } from '@/hooks/useUserActions';
 import { useUserQueries } from '@/hooks/useUserQueries';
 import { useUsersPreferences } from '@/hooks/preferences/useUsersPreferences';
 import type { UserAction } from '@/types/user-management';
-import { Search } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -234,12 +234,9 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <div>
-          <PageTitle>User Management</PageTitle>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <PageTitle>User Management</PageTitle>
         {canCreate && (
           <UserAddDialog
             isOpen={isCreateDialogOpen}
@@ -251,25 +248,18 @@ export default function UserManagement() {
         )}
       </div>
 
-      {/* Search and Display Controls */}
-      <div className="flex flex-col md:flex-row gap-4 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+      {/* Search, filters, sorting and view in one row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search users by name or email..."
+            placeholder="Search name or email"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-10"
+            className="h-8 pl-8"
+            aria-label="Search users"
           />
         </div>
-        <UserDisplayControls
-          displayMode={displayMode}
-          onDisplayModeChange={setDisplayMode}
-        />
-      </div>
-
-      {/* Filters and Sorting */}
-      <div className="mb-6">
         <UserFiltersControls
           filters={filters}
           sortBy={sortBy}
@@ -281,14 +271,19 @@ export default function UserManagement() {
           }}
           onResetFilters={resetFilters}
         />
+        <div className="ml-auto">
+          <UserDisplayControls
+            displayMode={displayMode}
+            onDisplayModeChange={setDisplayMode}
+          />
+        </div>
       </div>
 
       {/* User Display - Hide when status filter is 'inactive' */}
       {filters.status !== 'inactive' &&
         (isLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading users...</p>
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading users" />
           </div>
         ) : (
           <>

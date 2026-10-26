@@ -75,7 +75,7 @@ export function UserTable({
       );
 
       if (hasAllBranches) {
-        return 'All Branches';
+        return 'All branches';
       }
     }
 
@@ -91,14 +91,13 @@ export function UserTable({
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 text-xs hover:bg-muted/50">
               <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Branches</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead className="w-25">Actions</TableHead>
+              <TableHead>Last login</TableHead>
+              <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -106,27 +105,24 @@ export function UserTable({
               <TableRow key={i}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
-                    <div className="h-8 w-8 bg-gray-100 animate-pulse rounded-full" />
-                    <div className="h-4 w-24 bg-gray-100 animate-pulse rounded" />
+                    <div className="h-8 w-8 bg-muted animate-pulse rounded-full" />
+                    <div className="h-4 w-24 bg-muted animate-pulse rounded" />
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="h-4 w-32 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-4 w-16 bg-muted animate-pulse rounded" />
                 </TableCell>
                 <TableCell>
-                  <div className="h-4 w-16 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-4 w-20 bg-muted animate-pulse rounded" />
                 </TableCell>
                 <TableCell>
-                  <div className="h-4 w-20 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-4 w-16 bg-muted animate-pulse rounded" />
                 </TableCell>
                 <TableCell>
-                  <div className="h-4 w-16 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-4 w-20 bg-muted animate-pulse rounded" />
                 </TableCell>
                 <TableCell>
-                  <div className="h-4 w-20 bg-gray-100 animate-pulse rounded" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-8 bg-gray-100 animate-pulse rounded" />
+                  <div className="h-4 w-8 bg-muted animate-pulse rounded" />
                 </TableCell>
               </TableRow>
             ))}
@@ -141,32 +137,29 @@ export function UserTable({
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 text-xs hover:bg-muted/50">
               <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Branches</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead className="w-25">Actions</TableHead>
+              <TableHead>Last login</TableHead>
+              <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => {
               const isInactive = !user.is_active;
               const userRole = getUserRole(user);
-              const userBranches = getUserBranches(user);
+              // Owners see every branch.
+              const userBranches = userRole === 'owner' ? 'All branches' : getUserBranches(user);
               const fullName = getFullName(user.profile);
               const hasLowerRole =
                 isBranchAdmin() && ['owner', 'admin'].includes(userRole);
 
               return (
-                <TableRow
-                  key={user.id}
-                  className={isInactive ? 'opacity-60' : ''}
-                >
+                <TableRow key={user.id} className={isInactive ? 'opacity-60' : ''}>
                   <TableCell>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarImage
                           src={processAvatarUrl(user.profile.avatar)}
@@ -175,68 +168,41 @@ export function UserTable({
                           {getUserInitials(user)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex flex-col">
-                        <span className="font-medium">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="flex items-center gap-1.5 font-medium">
                           {fullName}
-                          {isInactive && (
-                            <Lock className="ml-2 inline h-4 w-4 text-gray-400" />
-                          )}
+                          {isInactive && <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-label="Inactive" />}
                         </span>
+                        <span className="truncate text-xs text-muted-foreground">{user.profile.email}</span>
                         {user.is_first_login && (
-                          <span className="text-xs text-orange-600">
-                            First login pending
-                          </span>
+                          <span className="text-xs text-amber-600 dark:text-amber-400">First login pending</span>
                         )}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className={isInactive ? 'text-gray-400' : ''}>
-                      {user.profile.email}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        isInactive ? 'text-gray-400 border-gray-300' : ''
-                      }
-                    >
+                    <Badge variant="outline" className="font-normal">
                       {ROLE_DISPLAY_NAMES[userRole]}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="max-w-37.5 truncate">
-                      <span
-                        className={`text-sm ${
-                          isInactive ? 'text-gray-400' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {userBranches}
-                      </span>
+                    <div className="max-w-40 truncate text-sm text-muted-foreground" title={userBranches}>
+                      {userBranches}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={user.is_active ? 'default' : 'secondary'}
-                      className={
-                        isInactive ? 'bg-muted text-muted-foreground' : ''
-                      }
-                    >
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <span
+                        className={`h-2 w-2 rounded-full ${user.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+                        aria-hidden
+                      />
                       {user.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`text-[12px] ${
-                        isInactive ? 'text-gray-400' : 'text-muted-foreground'
-                      }`}
-                    >
+                    <span className="whitespace-nowrap text-xs text-muted-foreground">
                       {user.last_login
-                        ? format(
-                            new Date(user.last_login),
-                            'MMM d, yyyy h:mm a'
-                          )
+                        ? format(new Date(user.last_login), 'd MMM yyyy, HH:mm')
                         : 'Never'}
                     </span>
                   </TableCell>

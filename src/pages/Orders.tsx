@@ -7,16 +7,16 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useOrders } from '@/hooks/useOrders';
 import { cn } from '@/lib/utils';
 import { CalendarClock, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RequestDateEditDialog } from '@/components/orders/RequestDateEditDialog';
 import { useNavigate } from 'react-router-dom';
 import { columns } from './orders/columns';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
-import {
-  getOrderFilterFields,
-  getOrderStatsGroups,
-  orderExportFields,
-} from './orders/fields';
+import { getOrderFilterFields, orderExportFields } from './orders/fields';
+import { getOrderStatTiles } from './orders/orderStats';
+import { buildPeriod } from './dashboard/period';
+import { useTableFilters } from '@/hooks/useTableFilters';
+import { usePeriodFigures } from '@/hooks/usePeriodFigures';
 import type { Order } from '@/types/orders';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
@@ -138,10 +138,6 @@ export function Orders() {
     });
   }, [defaultDateRange, maxDate, minDate, orders]);
 
-  const orderStatsGroups = useMemo(() => getOrderStatsGroups(formatCurrency), [
-    formatCurrency,
-  ]);
-
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [summaryMode, setSummaryMode] = useOrgPreference<'filtered' | 'all'>(
     currentOrganization?.id,
@@ -153,6 +149,32 @@ export function Orders() {
     : summaryMode === 'filtered'
       ? filteredOrders
       : orders;
+
+  const table = useTableFilters([{ id: 'date', value: defaultDateRange }]);
+  const { setFilters } = table;
+  useEffect(() => {
+    setFilters([{ id: 'date', value: defaultDateRange }]);
+  }, [defaultDateRange, setFilters]);
+
+  // Compare with the period before when the table is filtered by date only.
+  const dateOnly = summaryData === filteredOrders ? table.onlyDateRange() : null;
+  const comparison = useMemo(
+    () => (dateOnly ? buildPeriod(dateOnly, new Date(), minDate) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateOnly?.from?.getTime(), dateOnly?.to?.getTime(), minDate]
+  );
+  const prevRange =
+    comparison?.prevStart && comparison.prevEnd ? { start: comparison.prevStart, end: comparison.prevEnd } : null;
+  const { data: previous } = usePeriodFigures(currentOrganization?.id, selectedBranchIds, prevRange);
+
+  const stats = getOrderStatTiles({
+    orders: summaryData,
+    money: formatCurrency,
+    previous: prevRange ? previous : null,
+    prevLabel: comparison?.prevLabel,
+    isActive: table.isActive,
+    toggle: table.toggle,
+  });
 
   return (
     <div className="space-y-6">
@@ -174,8 +196,8 @@ export function Orders() {
       </div>
 
       <StatsContainer
-        groups={orderStatsGroups}
-        data={summaryData}
+        tiles={stats.tiles}
+        footnote={stats.footnote}
         storageKey="stockflow-orders-stats-container-is-open"
         summaryLabel="Order Summary"
         orgId={currentOrganization?.id}
@@ -195,7 +217,8 @@ export function Orders() {
           storageKey="stockflow-orders-table"
           canExport={canExportOrders}
           orgId={currentOrganization?.id}
-          defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
+          columnFilters={table.filters}
+          onColumnFiltersChange={table.setFilters}
           defaultColumnVisibility={{ search: false }}
           onFilteredDataChange={(rows) => setFilteredOrders(rows as Order[])}
           onSelectionChange={(rows) => setSelectedOrders(rows as Order[])}

@@ -7,10 +7,13 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategories, useProducts } from '@/hooks/useInventoryQueries';
+import { useCategories, useInventoryEntries, useProducts } from '@/hooks/useInventoryQueries';
+import { useBranchContext } from '@/contexts/BranchContext';
+import { useTableFilters } from '@/hooks/useTableFilters';
+import { productStockMap } from './inventory/fields/stockStatus';
 import type { Category, Product } from '@/types/inventory';
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Categories } from './inventory/Categories';
 import { CategoryDialog } from './inventory/CategoryDialog';
@@ -22,7 +25,7 @@ import {
   getProductFilterFields,
   productExportFields,
 } from './inventory/fields/productFields';
-import { getProductStatsGroups } from './inventory/fields/productStats';
+import { getProductStatTiles, type ProductRow } from './inventory/fields/productStats';
 import { cn } from '@/lib/utils';
 import { InventoryTabs } from './inventory/components/InventoryTabs';
 import { productStatusLabel } from './inventory/product-editor/productHelpers';
@@ -32,10 +35,19 @@ export function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentOrganization } = useOrganization();
   const { formatCurrency } = useCurrency();
-  const { checkPermission } = useRoleCheck();
-  const { data: products = [], isLoading } = useProducts(
+  const { checkPermission, isOwner } = useRoleCheck();
+  const { selectedBranchIds } = useBranchContext();
+  const { data: productList = [], isLoading } = useProducts(
     currentOrganization?.id
   );
+  const { data: stockRows = [] } = useInventoryEntries(currentOrganization?.id, selectedBranchIds);
+  // Each product's stock in the selected branches, for the tiles and their filters.
+  const stock = useMemo(() => productStockMap(productList, stockRows), [productList, stockRows]);
+  const products = useMemo<ProductRow[]>(
+    () => productList.map((p) => ({ ...p, stockStatus: stock.get(p.id)?.status })),
+    [productList, stock]
+  );
+  const productTable = useTableFilters();
   const { data: categoriesList = [] } = useCategories(currentOrganization?.id);
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -123,8 +135,6 @@ export function Products() {
     productCreators
   );
 
-  const productStatsGroups = getProductStatsGroups(formatCurrency);
-
   const categoryExportFields = getCategoryExportFields(products);
 
   const [productsFiltered, setProductsFiltered] = useState<Product[]>([]);
@@ -133,6 +143,15 @@ export function Products() {
   >(currentOrganization?.id, 'products.summaryMode', 'filtered');
   const productsSummaryData =
     productsSummaryMode === 'filtered' ? productsFiltered : products;
+
+  const productTiles = getProductStatTiles({
+    products: productsSummaryData as ProductRow[],
+    stock,
+    money: formatCurrency,
+    showValue: isOwner(),
+    isActive: productTable.isActive,
+    toggle: productTable.toggle,
+  });
 
   return (
     <div className="space-y-6">
@@ -198,8 +217,7 @@ export function Products() {
           {canViewProducts && (
             <>
               <StatsContainer
-                groups={productStatsGroups}
-                data={productsSummaryData}
+                tiles={productTiles}
                 summaryLabel="Product Summary"
                 storageKey="stockflow-products-stats-container-is-open"
                 orgId={currentOrganization?.id}
@@ -214,6 +232,9 @@ export function Products() {
                 exportFields={productExportFields}
                 storageKey="inventory-products-table"
                 defaultColumnVisibility={{ searchable: false }}
+                columnFilters={productTable.filters}
+                onColumnFiltersChange={productTable.setFilters}
+                hiddenColumns={['stockStatus']}
                 canExport={canExportProducts}
                 orgId={currentOrganization?.id}
                 onFilteredDataChange={(rows) =>

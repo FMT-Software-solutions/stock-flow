@@ -11,16 +11,17 @@ import {
   useInventoryEntries,
   useProducts,
 } from '@/hooks/useInventoryQueries';
-import type { InventoryEntry } from '@/types/inventory';
 import { Check, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { inventoryColumns } from './inventory/columns';
 import {
   getInventoryFilterFields,
   inventoryExportFields,
 } from './inventory/fields/inventoryFields';
-import { getInventoryStatsGroups } from './inventory/fields/inventoryStats';
+import { getInventoryStatTiles, type InventoryRow } from './inventory/fields/inventoryStats';
+import { rowStatus } from './inventory/fields/stockStatus';
+import { useTableFilters } from '@/hooks/useTableFilters';
 
 import {
   Command,
@@ -46,10 +47,25 @@ export function Inventory() {
   const { data: products = [], isLoading } = useProducts(
     currentOrganization?.id
   );
-  const { data: inventoryEntries = [] } = useInventoryEntries(
+  const { data: entries = [] } = useInventoryEntries(
     currentOrganization?.id,
     selectedBranchIds
   );
+  // Rows carry their stock status for the tiles and their filters.
+  const trackStockOf = useMemo(() => new Map(products.map((p) => [p.id, p.trackStock])), [products]);
+  const costOf = useMemo(() => {
+    const costs = new Map(products.map((p) => [p.id, p.costPrice || 0]));
+    return (productId: string) => costs.get(productId) ?? 0;
+  }, [products]);
+  const inventoryEntries = useMemo<InventoryRow[]>(
+    () =>
+      entries.map((e) => ({
+        ...e,
+        stockStatus: trackStockOf.get(e.productId) === false ? 'untracked' : rowStatus(e),
+      })),
+    [entries, trackStockOf]
+  );
+  const inventoryTable = useTableFilters();
 
   const [openProductSearch, setOpenProductSearch] = useState(false);
 
@@ -100,12 +116,8 @@ export function Inventory() {
     inventoryCreators
   );
 
-  const inventoryStatsGroups = getInventoryStatsGroups(
-    formatCurrency,
-    isOwner()
-  );
 
-  const [inventoryFiltered, setInventoryFiltered] = useState<InventoryEntry[]>(
+  const [inventoryFiltered, setInventoryFiltered] = useState<InventoryRow[]>(
     []
   );
   const [inventorySummaryMode, setInventorySummaryMode] = useOrgPreference<
@@ -114,6 +126,14 @@ export function Inventory() {
 
   const inventorySummaryData =
     inventorySummaryMode === 'filtered' ? inventoryFiltered : inventoryEntries;
+  const inventoryTiles = getInventoryStatTiles({
+    rows: inventorySummaryData,
+    costOf,
+    money: formatCurrency,
+    showValue: isOwner(),
+    isActive: inventoryTable.isActive,
+    toggle: inventoryTable.toggle,
+  });
 
   if (!canViewInventory) return null;
 
@@ -171,8 +191,7 @@ export function Inventory() {
 
       <div className="space-y-4">
         <StatsContainer
-          groups={inventoryStatsGroups}
-          data={inventorySummaryData}
+          tiles={inventoryTiles}
           summaryLabel="Inventory Summary"
           storageKey="stockflow-inventory-stats-container-is-open"
           orgId={currentOrganization?.id}
@@ -190,10 +209,13 @@ export function Inventory() {
             searchable: false,
             branchName: false,
           }}
+          columnFilters={inventoryTable.filters}
+          onColumnFiltersChange={inventoryTable.setFilters}
+          hiddenColumns={['stockStatus']}
           canExport={canExportInventory}
           orgId={currentOrganization?.id}
           onFilteredDataChange={(rows) =>
-            setInventoryFiltered(rows as InventoryEntry[])
+            setInventoryFiltered(rows as InventoryRow[])
           }
         />
       </div>

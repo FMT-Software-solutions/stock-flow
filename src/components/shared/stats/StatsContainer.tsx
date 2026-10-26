@@ -1,5 +1,7 @@
-import type { StatsGroup } from '@/types/stats';
+import type { ReactNode } from 'react';
+import type { StatsGroup, StatTile } from '@/types/stats';
 import { StatsGroupCard } from './StatsGroupCard';
+import { StatTiles } from './StatTiles';
 import { cn } from '@/lib/utils';
 import {
   Collapsible,
@@ -17,8 +19,12 @@ import {
 } from '@/components/ui/select';
 
 interface StatsContainerProps<TData> {
-  groups: StatsGroup<TData>[];
-  data: TData[];
+  groups?: StatsGroup<TData>[];
+  data?: TData[];
+  /** Figures as tiles (the dashboard's style) instead of group cards. */
+  tiles?: StatTile[];
+  /** A line under the tiles for minor figures. */
+  footnote?: ReactNode;
   className?: string;
   storageKey?: string;
   summaryLabel?: string;
@@ -29,8 +35,10 @@ interface StatsContainerProps<TData> {
 }
 
 export function StatsContainer<TData>({
-  groups,
-  data,
+  groups = [],
+  data = [],
+  tiles,
+  footnote,
   className,
   storageKey = 'stockflow-stats-container-is-open',
   summaryLabel = 'Summary',
@@ -47,7 +55,11 @@ export function StatsContainer<TData>({
   const glassCardClassName =
     'relative overflow-hidden border-primary/20 bg-card/40 bg-linear-to-br from-primary/15 via-primary/10 to-background/25 shadow-md backdrop-blur-sm';
 
-  const content = (
+  const content = tiles ? (
+    <div className={className}>
+      <StatTiles tiles={tiles} footnote={footnote} />
+    </div>
+  ) : (
     <div className={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
       {groups
         .filter((group) => !group.isHidden)

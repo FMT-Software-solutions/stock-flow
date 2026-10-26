@@ -7,17 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { changeVs, TONES } from '@/lib/statTones';
 import type { AiSummary, DashboardSummary, PeriodFigures } from '@/hooks/useDashboardSummary';
 import type { DashboardPeriod } from './period';
 import type { ChartRow } from './useChartData';
 
 type Money = (amount: number) => string;
 
-const SALES = 'text-blue-600 dark:text-blue-400';
-const CASH = 'text-emerald-600 dark:text-emerald-400';
-const DEBT = 'text-red-600 dark:text-red-400';
-const WARN = 'text-amber-600 dark:text-amber-400';
-const EXPENSE = 'text-orange-600 dark:text-orange-400';
+const { sales: SALES, cash: CASH, debt: DEBT, warn: WARN, expense: EXPENSE } = TONES;
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Cash',
@@ -125,17 +122,8 @@ export function AiSummaryCard({
 // ---------------------------------------------------------------------------
 
 function changeText(current: number, previous: number | undefined, prevLabel: string | null, lowerIsBetter = false) {
-  if (previous === undefined || !prevLabel) return null;
-  if (previous === 0 && current === 0) return { text: `Same as ${prevLabel}`, className: 'text-muted-foreground' };
-  if (previous === 0) return { text: `Up from 0 in ${prevLabel}`, className: lowerIsBetter ? DEBT : CASH };
-  const pct = Math.round(((current - previous) / previous) * 100);
-  if (pct === 0) return { text: `Same as ${prevLabel}`, className: 'text-muted-foreground' };
-  const up = pct > 0;
-  const good = lowerIsBetter ? !up : up;
-  return {
-    text: `${up ? '▲' : '▼'} ${Math.abs(pct).toLocaleString()}% vs ${prevLabel}`,
-    className: good ? CASH : DEBT,
-  };
+  const change = changeVs(current, previous, prevLabel, lowerIsBetter);
+  return change && { text: change.text, className: TONES[change.tone] };
 }
 
 function Spark({ values, className }: { values: number[]; className: string }) {

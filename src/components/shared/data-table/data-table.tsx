@@ -37,6 +37,11 @@ interface DataTableProps<TData, TValue> {
   storageKey?: string
   defaultColumnVisibility?: VisibilityState
   defaultColumnFilters?: ColumnFiltersState
+  /** Controlled filters, for pages that set them from outside (stats tiles). */
+  columnFilters?: ColumnFiltersState
+  onColumnFiltersChange?: (filters: ColumnFiltersState) => void
+  /** Columns that only exist to filter by (never shown, whatever the saved view says). */
+  hiddenColumns?: string[]
   canExport?: boolean
   onFilteredDataChange?: (rows: TData[]) => void
   onSelectionChange?: (rows: TData[]) => void
@@ -54,6 +59,9 @@ export function DataTable<TData, TValue>({
   storageKey,
   defaultColumnVisibility = {},
   defaultColumnFilters,
+  columnFilters: controlledFilters,
+  onColumnFiltersChange,
+  hiddenColumns,
   canExport = true,
   onFilteredDataChange,
   onSelectionChange,
@@ -61,7 +69,16 @@ export function DataTable<TData, TValue>({
   orgId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(() => defaultColumnFilters ?? [])
+  const [ownFilters, setOwnFilters] = React.useState<ColumnFiltersState>(() => defaultColumnFilters ?? [])
+  const columnFilters = controlledFilters ?? ownFilters
+  const setColumnFilters = React.useCallback(
+    (updater: React.SetStateAction<ColumnFiltersState>) => {
+      const next = typeof updater === 'function' ? updater(columnFilters) : updater
+      if (onColumnFiltersChange) onColumnFiltersChange(next)
+      else setOwnFilters(next)
+    },
+    [columnFilters, onColumnFiltersChange]
+  )
   const { columnVisibility, setColumnVisibility, pageSize, setPageSize } =
     useOrgTablePreferences(orgId, storageKey, defaultColumnVisibility, 10)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -113,6 +130,7 @@ export function DataTable<TData, TValue>({
         ...columnVisibility,
         search: false,
         searchable: false,
+        ...Object.fromEntries((hiddenColumns ?? []).map((id) => [id, false])),
       },
       rowSelection,
       pagination,

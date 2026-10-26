@@ -8,6 +8,16 @@ import { isDateInRange } from "@/lib/utils"
 import { ExpenseActions } from "./ExpenseActions"
 
 export const columns: ColumnDef<Expense>[] = [
+  // Filter-only: whether a receipt is attached, for the stats tiles (never shown).
+  {
+    id: "receipt",
+    accessorFn: (row) => (row.attachmentUrl ? "attached" : "missing"),
+    enableHiding: false,
+    enableSorting: false,
+    header: () => null,
+    cell: () => null,
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
   {
     id: "search",
     accessorFn: (row) =>

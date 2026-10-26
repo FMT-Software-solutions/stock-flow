@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import { ImagePreview } from "@/components/shared/ImagePreview"
 import { isDateInRange } from "@/lib/utils"
 import { productStatusLabel } from "./product-editor/productHelpers"
+import type { ProductRow } from "./fields/productStats"
+import type { InventoryRow } from "./fields/inventoryStats"
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -44,6 +46,16 @@ const formatRelativeTime = (value: string) => {
 }
 
 export const columns: ColumnDef<Product>[] = [
+  // Filter-only: stock status for the stats tiles (never shown).
+  {
+    id: "stockStatus",
+    accessorFn: (row) => (row as ProductRow).stockStatus,
+    enableHiding: false,
+    enableSorting: false,
+    header: () => null,
+    cell: () => null,
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
   {
     id: "searchable",
     accessorFn: (row) =>
@@ -215,6 +227,16 @@ export const columns: ColumnDef<Product>[] = [
 ]
 
 export const inventoryColumns: ColumnDef<InventoryEntry>[] = [
+  // Filter-only: stock status for the stats tiles (never shown).
+  {
+    id: "stockStatus",
+    accessorFn: (row) => (row as InventoryRow).stockStatus,
+    enableHiding: false,
+    enableSorting: false,
+    header: () => null,
+    cell: () => null,
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
   {
     id: "searchable",
     accessorFn: (row) => `${row.productName} ${row.sku} ${row.inventoryNumber || ''} ${row.categoryName || ""} ${row.branchName || ''}`.trim(),

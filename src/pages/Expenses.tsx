@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -10,14 +10,22 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useBranchContext } from '@/contexts/BranchContext';
 import { useExpenses } from '@/hooks/useExpenseQueries';
 import { useCurrency } from '@/hooks/useCurrency';
-import { getExpenseStatsGroups } from './expenses/fields';
-import { useMemo } from 'react';
+import { getExpenseStatTiles } from './expenses/expenseStats';
+import { buildPeriod } from './dashboard/period';
+import { useTableFilters } from '@/hooks/useTableFilters';
+import { usePeriodFigures } from '@/hooks/usePeriodFigures';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Expense } from '@/types/expenses';
 import { useOrgPreference } from '@/hooks/preferences/useOrgPreference';
 import { endOfDay, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import type { DataLookback, UserPermissions } from '@/modules/permissions';
 import type { DateRange } from 'react-day-picker';
+
+/** The table's date filter, if any. */
+const currentDateRange = (filters: { id: string; value: unknown }[]) => {
+  const value = filters.find((f) => f.id === 'date')?.value as { from?: Date | string; to?: Date | string } | undefined;
+  return value?.from ? { from: new Date(value.from), to: value.to ? new Date(value.to) : undefined } : null;
+};
 
 export function Expenses() {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -27,10 +35,6 @@ export function Expenses() {
   const { data: expenses = [] } = useExpenses(
     currentOrganization?.id,
     selectedBranchIds.length > 0 ? selectedBranchIds : undefined
-  );
-  const expenseStatsGroups = useMemo(
-    () => getExpenseStatsGroups(formatCurrency),
-    [formatCurrency]
   );
   const { checkPermission } = useRoleCheck();
   const canCreateExpenses = checkPermission('expenses', 'create');
@@ -94,6 +98,33 @@ export function Expenses() {
   const summaryData =
     minDate ? filteredExpenses : summaryMode === 'filtered' ? filteredExpenses : expenses;
 
+  const table = useTableFilters([{ id: 'date', value: defaultDateRange }]);
+  const { setFilters } = table;
+  useEffect(() => {
+    setFilters([{ id: 'date', value: defaultDateRange }]);
+  }, [defaultDateRange, setFilters]);
+
+  // Compare with the period before when the table is filtered by date only.
+  const dateOnly = summaryData === filteredExpenses ? table.onlyDateRange() : null;
+  const comparison = useMemo(
+    () => (dateOnly ? buildPeriod(dateOnly, new Date(), minDate) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateOnly?.from?.getTime(), dateOnly?.to?.getTime(), minDate]
+  );
+  const prevRange =
+    comparison?.prevStart && comparison.prevEnd ? { start: comparison.prevStart, end: comparison.prevEnd } : null;
+  const { data: previous } = usePeriodFigures(currentOrganization?.id, selectedBranchIds, prevRange);
+
+  const tiles = getExpenseStatTiles({
+    expenses: summaryData,
+    money: formatCurrency,
+    previousTotal: prevRange ? previous?.expenses : null,
+    prevLabel: comparison?.prevLabel,
+    range: summaryData === filteredExpenses ? table.onlyDateRange() ?? currentDateRange(table.filters) : null,
+    isActive: table.isActive,
+    toggle: table.toggle,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -118,8 +149,7 @@ export function Expenses() {
       </div>
 
       <StatsContainer
-        groups={expenseStatsGroups}
-        data={summaryData}
+        tiles={tiles}
         storageKey="expenses-stats-is-open"
         summaryLabel="Expenses Summary"
         orgId={currentOrganization?.id}
@@ -143,6 +173,8 @@ export function Expenses() {
               defaultValue: minDate ? defaultDateRange : undefined,
             }}
             defaultDateRange={defaultDateRange}
+            columnFilters={table.filters}
+            onColumnFiltersChange={table.setFilters}
             onFilteredDataChange={(rows) =>
               setFilteredExpenses(rows as Expense[])
             }

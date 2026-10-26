@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import type { Tone } from '@/lib/statTones';
 
 export interface StatResult {
   value: ReactNode;
@@ -7,6 +8,21 @@ export interface StatResult {
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: ReactNode;
   footer?: ReactNode;
+}
+
+/** One figure in a page's stats strip. */
+export interface StatTile {
+  id: string;
+  label: string;
+  value: ReactNode;
+  /** One line of context under the value (a change, a share, a count). */
+  sub?: ReactNode;
+  subTone?: Tone;
+  valueTone?: Tone;
+  /** Clicking filters the table; `active` while that filter is on. */
+  onClick?: () => void;
+  active?: boolean;
+  hidden?: boolean;
 }
 
 export interface StatsField<TData> {

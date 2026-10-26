@@ -13,15 +13,21 @@ import { cn } from '@/lib/utils';
 import { useRoleCheck } from '@/components/auth/RoleGuard';
 import type { Expense } from '@/types/expenses';
 import type { DateRange } from 'react-day-picker';
+import type { ColumnFiltersState } from '@tanstack/react-table';
 
 export function ExpensesList({
   onFilteredDataChange,
   dateConstraints,
   defaultDateRange,
+  columnFilters,
+  onColumnFiltersChange,
 }: {
   onFilteredDataChange?: (rows: Expense[]) => void;
   dateConstraints?: { minDate?: Date; maxDate?: Date; defaultValue?: DateRange };
   defaultDateRange: DateRange;
+  /** Controlled by the page so its stats tiles can filter the table. */
+  columnFilters?: ColumnFiltersState;
+  onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
 }) {
   const { currentOrganization } = useOrganization();
   const { selectedBranchIds } = useBranchContext();
@@ -175,6 +181,9 @@ export function ExpensesList({
         exportFields={expenseExportFields}
         defaultColumnVisibility={{ search: false }}
         defaultColumnFilters={[{ id: 'date', value: defaultDateRange }]}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={onColumnFiltersChange}
+        hiddenColumns={['receipt']}
         canExport={checkPermission('expenses', 'export')}
         onFilteredDataChange={
           onFilteredDataChange as ((rows: Expense[]) => void) | undefined

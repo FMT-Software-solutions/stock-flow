@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.8] - 2026-10-26
+
+### What's New
+- **Custom options** — add an option to a product just by typing its name, like a model number ("NXRF140") or "Red XL 2023", with its own price and stock in each branch. No option types or values needed.
+- **Your existing custom stock is now custom options** — each name becomes one option across all your branches. Quantities, prices and past sales are unchanged.
+- **Add options from the product page** — use Add option under the stock table, then put stock in with a click. Rename or remove custom options right there.
+- **Edit options in place** — rename an option (Size → Fit) or a value (S → Small) and every product using it updates. Archive values you no longer use to hide them from new products.
+- **Custom options on the Variations page** — every custom option grouped by product, with search, stock and inline rename.
+
+
 ## [1.1.7] - 2026-10-22
 
 ### What's New

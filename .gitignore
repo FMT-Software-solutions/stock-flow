@@ -27,3 +27,6 @@ dist-ssr
 .trae/*
 todo.txt
 *.temp
+
+# Promo video work (assets, renders)
+promo-video/

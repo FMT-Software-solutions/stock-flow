@@ -8,23 +8,15 @@
 
 module.exports = {
   // Version information
-  version: "1.1.9",
+  version: "1.1.10",
 
   // Release notes in markdown format
-  releaseNotes: `### What's New
-- **A new dashboard** — key figures compared with the previous period, a sales chart, what needs your attention (stock out or low by branch, money owed, pending orders, discounts ending), top products, payments by method, branches and recent sales. Shortcuts for a new sale, adding stock, adding a product and recording an expense.
-- **AI summary** — open Summary on the dashboard for a short plain-language read of how the period went and what needs attention.
-- **Clearer page stats** — Sales & Orders, Products, Inventory and Expenses show their figures as tiles, compared with the previous period. Click a tile such as Owed, Out of stock or No receipt to filter the list.
-
-### Improvements
-- Sales figures leave out cancelled and refunded sales everywhere
-- Out of stock and running low follow the branches you select
-- Stock value at cost and potential profit on the Products page (owners)
-- One heading size on every page and less text on screen
-- Communication: tips and recent activity are tucked away until you open them, and the page works better on small screens
+  releaseNotes: `### Improvements
+- User Management is cleaner: search, filters and sorting in one row, email shown under each name, and a simpler status display
+- Owners show "All branches" in User Management
 
 ### Bug Fixes
-- AI product descriptions work again
+- Showing and hiding dashboard sections now works and is remembered
 `,
 
 

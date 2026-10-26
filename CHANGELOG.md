@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.10] - 2026-10-26
+
+### Improvements
+- User Management is cleaner: search, filters and sorting in one row, email shown under each name, and a simpler status display
+- Owners show "All branches" in User Management
+
+### Bug Fixes
+- Showing and hiding dashboard sections now works and is remembered
+
+
 ## [1.1.9] - 2026-10-26
 
 ### What's New

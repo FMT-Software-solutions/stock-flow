@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const MODEL = 'gpt-6-luna'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -37,6 +39,17 @@ Deno.serve(async (req) => {
         throw new Error('Missing organizationId')
     }
 
+    const { data: membership } = await supabaseClient
+      .from('user_organizations')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .eq('organization_id', organizationId)
+      .maybeSingle()
+
+    if (!membership) {
+        throw new Error('Not a member of this organization')
+    }
+
     // 2. Check Usage Limit
     const today = new Date().toISOString().split('T')[0]
 
@@ -64,112 +77,40 @@ Deno.serve(async (req) => {
       )
     }
 
-    // 3. Call AI Provider (Randomized Selection)
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')
+    // 3. Generate with OpenAI.
+    // gpt-6-luna: OpenAI's low-cost model with no announced shutdown
+    // (gpt-3.5-turbo, used before, was shut down on 2026-10-23). It is a
+    // reasoning model; effort "none" keeps a short text answer fast and cheap.
     const openaiKey = Deno.env.get('OPENAI_API_KEY')
-    const groqKey = Deno.env.get('GROQ_API_KEY')
-    
+    if (!openaiKey) {
+        throw new Error('AI is not configured (OPENAI_API_KEY is missing).')
+    }
+
     const prompt = `Generate a professional and concise product description for a product named "${productName}"${categoryName ? ` in the category "${categoryName}"` : ''}. ${additionalContext ? `Additional details: ${additionalContext}` : ''}. Keep it under 100 words.`
 
-    // Define providers
-    const providers = [
-        {
-            name: 'Google',
-            model: 'gemini-1.5-flash',
-            key: geminiKey,
-            generate: async (key: string) => {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                })
-                if (!response.ok) throw new Error(await response.text())
-                const data = await response.json()
-                return data.candidates?.[0]?.content?.parts?.[0]?.text
-            }
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
         },
-        {
-            name: 'OpenAI',
-            model: 'gpt-3.5-turbo',
-            key: openaiKey,
-            generate: async (key: string) => {
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${key}`
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-3.5-turbo',
-                        messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 150
-                    })
-                })
-                if (!response.ok) throw new Error(await response.text())
-                const data = await response.json()
-                return data.choices?.[0]?.message?.content
-            }
-        },
-        {
-            name: 'Groq',
-            model: 'llama3-8b-8192',
-            key: groqKey,
-            generate: async (key: string) => {
-                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${key}`
-                    },
-                    body: JSON.stringify({
-                        model: 'llama3-8b-8192',
-                        messages: [{ role: 'user', content: prompt }],
-                        max_tokens: 150
-                    })
-                })
-                if (!response.ok) throw new Error(await response.text())
-                const data = await response.json()
-                return data.choices?.[0]?.message?.content
-            }
-        }
-    ]
-
-    // Filter available providers
-    const availableProviders = providers.filter(p => !!p.key)
-
-    if (availableProviders.length === 0) {
-        throw new Error('No AI provider API keys configured (GEMINI_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY).')
+        body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            reasoning_effort: 'none',
+            max_completion_tokens: 300
+        })
+    })
+    if (!response.ok) {
+        console.error('OpenAI error:', response.status, await response.text())
+        throw new Error('Could not generate a description right now. Please try again.')
     }
-
-    // Shuffle providers to randomize usage (Fisher-Yates shuffle)
-    for (let i = availableProviders.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [availableProviders[i], availableProviders[j]] = [availableProviders[j], availableProviders[i]];
-    }
-
-    let generatedText = ''
-    let modelUsed = ''
-    let providerName = ''
-
-    // Try each provider until one succeeds
-    for (const provider of availableProviders) {
-        try {
-            console.log(`Trying provider: ${provider.name}`)
-            const result = await provider.generate(provider.key!)
-            if (result) {
-                generatedText = result
-                modelUsed = provider.model
-                providerName = provider.name
-                break // Success!
-            }
-        } catch (error) {
-            console.error(`${provider.name} Generation Error:`, error)
-            // Continue to next provider
-        }
-    }
+    const data = await response.json()
+    const generatedText: string = data.choices?.[0]?.message?.content?.trim() ?? ''
+    const tokensUsed: number = data.usage?.total_tokens ?? 0
 
     if (!generatedText) {
-        throw new Error('Failed to generate content from all available providers.')
+        throw new Error('Could not generate a description right now. Please try again.')
     }
 
     // 4. Update Usage and Log
@@ -191,9 +132,9 @@ Deno.serve(async (req) => {
         request_type: 'product_description',
         input_context: { productName, categoryName, additionalContext },
         generated_content: generatedText,
-        model_used: modelUsed,
-        provider: providerName,
-        tokens_used: 0 
+        model_used: MODEL,
+        provider: 'OpenAI',
+        tokens_used: tokensUsed
     })
 
     if (logError) {

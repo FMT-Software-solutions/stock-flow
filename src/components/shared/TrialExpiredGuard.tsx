@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { openExternalUrl } from '@/utils/external-url';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { TrialExpiredGuard as SharedTrialExpiredGuard } from '@/shared-packages/trial-package';
-import { buyNowURL, contactSupportURL } from '@/constants/urls';
+import { buyNowURLFor, contactSupportURL } from '@/constants/urls';
 
 export function TrialExpiredGuard({ children }: { children: React.ReactNode }) {
   const { currentOrganization, isLoading } = useOrganization();
@@ -14,7 +14,7 @@ export function TrialExpiredGuard({ children }: { children: React.ReactNode }) {
   };
 
   const handleBuyNow = () => {
-    openExternalUrl(buyNowURL);
+    openExternalUrl(buyNowURLFor(currentOrganization));
   };
 
   const handleSwitchOrganization = () => {
